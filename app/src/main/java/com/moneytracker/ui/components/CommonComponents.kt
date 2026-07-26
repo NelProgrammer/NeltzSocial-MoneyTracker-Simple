@@ -22,6 +22,7 @@ import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.util.CurrencyUtils
 import com.moneytracker.util.DateUtils
 
@@ -29,6 +30,7 @@ import com.moneytracker.util.DateUtils
 fun BalanceCard(
     balance: Double,
     income: Double,
+    investment: Double,
     expense: Double,
     modifier: Modifier = Modifier
 ) {
@@ -60,6 +62,7 @@ fun BalanceCard(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 SummaryChip(label = "Income", amount = income, color = IncomeColor)
+                SummaryChip(label = "Investment", amount = investment, color = InvestmentColor)
                 SummaryChip(label = "Expenses", amount = expense, color = ExpenseColor)
             }
         }

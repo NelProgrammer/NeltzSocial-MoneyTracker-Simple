@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.TransactionListDivider
+import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.TransactionRow
 import com.moneytracker.ui.viewmodel.DashboardViewModel
 import java.time.LocalDate
@@ -74,9 +75,12 @@ fun DashboardScreen(
                 BalanceCard(
                     balance = summary.balance,
                     income = summary.income,
+                    investment = summary.investment,
                     expense = summary.expense
                 )
             }
+
+            // Expense breakdown section removed (not applicable on Dashboard)
 
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -96,9 +100,17 @@ fun DashboardScreen(
                     EmptyState("No transactions this month. Tap + to add one.")
                 }
             } else {
-                items(transactions.take(5), key = { it.id }) { transaction ->
-                    TransactionRow(transaction = transaction)
-                    TransactionListDivider()
+                val sorted = transactions.sortedBy { transaction ->
+    when (transaction.type) {
+        TransactionType.INCOME -> 0
+        TransactionType.INVESTMENT -> 1
+        TransactionType.EXPENSE -> 2
+        else -> 3
+    }
+}.take(5)
+items(sorted, key = { it.id }) { transaction ->
+    TransactionRow(transaction = transaction)
+    TransactionListDivider()
                 }
             }
         }

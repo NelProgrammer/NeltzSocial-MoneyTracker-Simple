@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+// Dashboard ViewModel
 class DashboardViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
@@ -28,29 +29,57 @@ class DashboardViewModel(
 
     val summary: StateFlow<MonthlySummary> = repository
         .observeMonthlySummary(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
 
     val recentTransactions: StateFlow<List<TransactionWithCategory>> = repository
         .observeTransactionsForMonth(monthStart, monthEnd)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
 
+// Transactions ViewModel
 class TransactionsViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
     private val _filterType = MutableStateFlow<TransactionType?>(null)
     val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
 
+    // Sort field state and enum
+    private val _sortField = MutableStateFlow<SortField>(SortField.AMOUNT)
+    val sortField: StateFlow<SortField> = _sortField.asStateFlow()
+
+    enum class SortField { ID, DATE, AMOUNT, CATEGORY, DESCRIPTION, TYPE }
+
+    fun setSortField(field: SortField) {
+        _sortField.value = field
+    }
+
     val transactions: StateFlow<List<TransactionWithCategory>> = combine(
         repository.observeAllTransactions(),
-        _filterType
-    ) { list, type ->
-        if (type == null) list else list.filter { it.type == type }
+        _filterType,
+        _sortField
+    ) { list, type, sortField ->
+        // Apply type filter first
+        val filtered = if (type == null) list else list.filter { it.type == type }
+        // Sort based on selected field
+        when (sortField) {
+            SortField.ID -> filtered.sortedBy { it.id }
+            SortField.DATE -> filtered.sortedBy { it.date }
+            SortField.AMOUNT -> filtered.sortedBy { it.amount }
+            SortField.CATEGORY -> filtered.sortedBy { it.categoryName }
+            SortField.DESCRIPTION -> filtered.sortedBy { it.note }
+            SortField.TYPE -> filtered.sortedBy {
+                when (it.type) {
+                    TransactionType.INCOME -> 0
+                    TransactionType.INVESTMENT -> 1
+                    TransactionType.EXPENSE -> 2
+                    else -> 3
+                }
+            }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun setFilter(type: TransactionType?) {
-        _filterType.value = type
-    }
+    fun setFilter(type: TransactionType?) { _filterType.value = type }
+    fun clearFilter() { setFilter(null) }
 
     fun deleteTransaction(transaction: TransactionWithCategory) {
         viewModelScope.launch {
@@ -65,6 +94,7 @@ class TransactionsViewModel(
     }
 }
 
+// UI State for Add/Edit Screen
 data class AddEditUiState(
     val amount: String = "",
     val type: TransactionType = TransactionType.EXPENSE,
@@ -77,6 +107,7 @@ data class AddEditUiState(
     val errorMessage: String? = null
 )
 
+// Add/Edit ViewModel
 class AddEditViewModel(
     private val repository: TransactionRepository,
     private val transactionId: Long?
@@ -118,8 +149,7 @@ class AddEditViewModel(
             repository.observeCategories(type).collect { categories ->
                 val current = _uiState.value
                 val selectedCategory = when {
-                    current.categoryId != null && categories.any { it.id == current.categoryId } ->
-                        current.categoryId
+                    current.categoryId != null && categories.any { it.id == current.categoryId } -> current.categoryId
                     categories.isNotEmpty() -> categories.first().id
                     else -> null
                 }
@@ -187,6 +217,7 @@ class AddEditViewModel(
     }
 }
 
+// Stats ViewModel
 class StatsViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
@@ -195,7 +226,7 @@ class StatsViewModel(
 
     val summary: StateFlow<MonthlySummary> = repository
         .observeMonthlySummary(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
 
     val expenseBreakdown: StateFlow<List<CategorySummary>> = repository
         .observeExpenseCategorySummaries(monthStart, monthEnd)
@@ -204,8 +235,13 @@ class StatsViewModel(
     val incomeBreakdown: StateFlow<List<CategorySummary>> = repository
         .observeIncomeCategorySummaries(monthStart, monthEnd)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val investmentBreakdown: StateFlow<List<CategorySummary>> = repository
+        .observeInvestmentCategorySummaries(monthStart, monthEnd)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
 
+// ViewModel Factory
 class ViewModelFactory(
     private val repository: TransactionRepository,
     private val transactionId: Long? = null
@@ -213,14 +249,11 @@ class ViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
-            modelClass.isAssignableFrom(DashboardViewModel::class.java) ->
-                DashboardViewModel(repository) as T
-            modelClass.isAssignableFrom(TransactionsViewModel::class.java) ->
-                TransactionsViewModel(repository) as T
-            modelClass.isAssignableFrom(AddEditViewModel::class.java) ->
-                AddEditViewModel(repository, transactionId) as T
-            modelClass.isAssignableFrom(StatsViewModel::class.java) ->
-                StatsViewModel(repository) as T
+            modelClass.isAssignableFrom(DashboardViewModel::class.java) -> DashboardViewModel(repository) as T
+            modelClass.isAssignableFrom(TransactionsViewModel::class.java) -> TransactionsViewModel(repository) as T
+            modelClass.isAssignableFrom(CategoriesViewModel::class.java) -> CategoriesViewModel(repository) as T
+            modelClass.isAssignableFrom(AddEditViewModel::class.java) -> AddEditViewModel(repository, transactionId) as T
+            modelClass.isAssignableFrom(StatsViewModel::class.java) -> StatsViewModel(repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
     }

@@ -1,20 +1,36 @@
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Android/Gradle build artifacts
+# Generated build files, compiled binaries, and packaged outputs that should not be version-controlled.
+.gradle/
+build/
+*/build/
+*/out/
+*/bin/
+*/gen/
+*/captures/
 *.apk
 *.ap_
 *.aab
 *.dex
 *.class
-bin/
-gen/
-out/
+*.jar
+*.war
+*.log
+
+# IDE & project files
+# IDE-specific configuration, project metadata, and OS temporary files that are local to each developer.
+.idea/
+*.iml
+*.hprof
+.DS_Store
+
+# Local configuration & secrets
+# Machine-specific settings and any signing keys that must not be shared.
+/local.properties
+*.keystore
+
+# Native build dirs
+# Files produced by the NDK or other native tooling; they are rebuildable and should be ignored.
+.externalNativeBuild/
+.cxx/
 .navigation/
-captures/
 output.json

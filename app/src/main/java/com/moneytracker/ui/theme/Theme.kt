@@ -11,6 +11,7 @@ private val GreenPrimary = Color(0xFF2E7D32)
 private val GreenDark = Color(0xFF1B5E20)
 private val RedExpense = Color(0xFFC62828)
 private val GreenIncome = Color(0xFF2E7D32)
+private val BlueInvestment = Color(0xFF1565C0)
 
 private val LightColors = lightColorScheme(
     primary = GreenPrimary,
@@ -36,6 +37,7 @@ private val DarkColors = darkColorScheme(
 
 val IncomeColor = GreenIncome
 val ExpenseColor = RedExpense
+val InvestmentColor = BlueInvestment
 
 @Composable
 fun MoneyTrackerTheme(

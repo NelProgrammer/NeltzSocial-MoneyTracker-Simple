@@ -27,6 +27,8 @@ import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.theme.InvestmentColor
+import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.viewmodel.StatsViewModel
 import com.moneytracker.util.CurrencyUtils
 import java.time.LocalDate
@@ -42,6 +44,7 @@ fun StatsScreen(
     val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
     val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
     val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+    val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
 
     Scaffold(
         modifier = Modifier.padding(contentPadding),
@@ -66,6 +69,7 @@ fun StatsScreen(
                 BalanceCard(
                     balance = summary.balance,
                     income = summary.income,
+                    investment = summary.investment,
                     expense = summary.expense
                 )
             }
@@ -87,6 +91,14 @@ fun StatsScreen(
                     total = summary.income,
                     barColor = IncomeColor,
                     emptyMessage = "No income recorded this month."
+                )
+                // Investment breakdown using existing component
+                CategoryBreakdownSection(
+                    title = "Investments by Category",
+                    summaries = investmentBreakdown,
+                    total = summary.investment,
+                    barColor = InvestmentColor,
+                    emptyMessage = "No investments recorded this month."
                 )
             }
         }

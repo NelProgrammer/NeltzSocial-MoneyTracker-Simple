@@ -4,11 +4,13 @@ import android.app.Application
 import com.moneytracker.data.local.DefaultCategories
 import com.moneytracker.data.local.MoneyTrackerDatabase
 import com.moneytracker.data.repository.TransactionRepository
+import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+@HiltAndroidApp
 class MoneyTrackerApp : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneytracker.ui.components.TransactionSectionCard
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.ReorderableTransactionList
@@ -61,13 +62,18 @@ fun TransactionsScreen(
             ) {
                 FilterChip(
                     selected = filterType == null,
-                    onClick = { viewModel.setFilter(null) },
+                    onClick = { viewModel.clearFilter() },
                     label = { Text("All") }
                 )
                 FilterChip(
                     selected = filterType == TransactionType.INCOME,
                     onClick = { viewModel.setFilter(TransactionType.INCOME) },
                     label = { Text("Income") }
+                )
+                FilterChip(
+                    selected = filterType == TransactionType.INVESTMENT,
+                    onClick = { viewModel.setFilter(TransactionType.INVESTMENT) },
+                    label = { Text("Investment") }
                 )
                 FilterChip(
                     selected = filterType == TransactionType.EXPENSE,
@@ -88,14 +94,34 @@ fun TransactionsScreen(
             if (transactions.isEmpty()) {
                 EmptyState("No transactions found.")
             } else {
-                ReorderableTransactionList(
-                    transactions = transactions,
-                    reorderEnabled = reorderEnabled,
-                    contentPadding = PaddingValues(bottom = 88.dp),
-                    onReorder = viewModel::reorderTransactions,
-                    onEditTransaction = onEditTransaction,
-                    onDeleteTransaction = viewModel::deleteTransaction
-                )
+                // Determine which sections to show based on the selected filter
+                val sections = if (filterType == null) {
+                    listOf(TransactionType.INCOME, TransactionType.INVESTMENT, TransactionType.EXPENSE)
+                } else {
+                    listOf(filterType)
+                }
+                Column {
+                    sections.forEach { type ->
+                        val filtered = transactions.filter { it.type == type }.sortedBy { it.id }
+                        if (filtered.isNotEmpty()) {
+                            val title = when (type) {
+                                TransactionType.INCOME -> "Income"
+                                TransactionType.INVESTMENT -> "Investment"
+                                TransactionType.EXPENSE -> "Expenses"
+                                else -> ""
+                            }
+                            TransactionSectionCard(
+                                title = title,
+                                transactions = filtered,
+                                reorderEnabled = reorderEnabled,
+                                onEditTransaction = onEditTransaction,
+                                onDeleteTransaction = viewModel::deleteTransaction,
+                                onReorder = viewModel::reorderTransactions,
+                                contentPadding = PaddingValues(bottom = 8.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

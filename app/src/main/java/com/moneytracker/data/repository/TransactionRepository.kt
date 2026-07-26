@@ -32,25 +32,43 @@ class TransactionRepository(
             startDate,
             endDate
         )
+        val investment = transactionDao.observeTotalByTypeAndDateRange(
+            TransactionType.INVESTMENT,
+            startDate,
+            endDate
+        )
         val expense = transactionDao.observeTotalByTypeAndDateRange(
             TransactionType.EXPENSE,
             startDate,
             endDate
         )
-        return combine(income, expense) { incomeTotal, expenseTotal ->
+        return combine(income, investment, expense) { incomeTotal, investmentTotal, expenseTotal ->
             MonthlySummary(
                 income = incomeTotal,
+                investment = investmentTotal,
                 expense = expenseTotal,
-                balance = incomeTotal - expenseTotal
+                balance = incomeTotal + investmentTotal - expenseTotal
             )
         }
     }
+
+    // Observe summaries for a list of month ranges
+    fun observeMonthlySummaries(monthRanges: List<Pair<Long, Long>>): Flow<List<MonthlySummary>> {
+        val flows = monthRanges.map { (start, end) -> observeMonthlySummary(start, end) }
+        return combine(flows) { summaries ->
+            summaries.toList()
+        }
+    }
+
 
     fun observeExpenseCategorySummaries(startDate: Long, endDate: Long): Flow<List<CategorySummary>> =
         transactionDao.observeCategorySummaries(TransactionType.EXPENSE, startDate, endDate)
 
     fun observeIncomeCategorySummaries(startDate: Long, endDate: Long): Flow<List<CategorySummary>> =
         transactionDao.observeCategorySummaries(TransactionType.INCOME, startDate, endDate)
+
+    fun observeInvestmentCategorySummaries(startDate: Long, endDate: Long): Flow<List<CategorySummary>> =
+        transactionDao.observeCategorySummaries(TransactionType.INVESTMENT, startDate, endDate)
 
     suspend fun getTransaction(id: Long): TransactionEntity? =
         transactionDao.getById(id)
@@ -98,6 +116,7 @@ class TransactionRepository(
 
 data class MonthlySummary(
     val income: Double,
+    val investment: Double,
     val expense: Double,
     val balance: Double
 )

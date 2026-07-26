@@ -10,7 +10,7 @@ object DefaultCategories {
         val categories = listOf(
             CategoryEntity(name = "Salary", type = TransactionType.INCOME, iconName = "salary"),
             CategoryEntity(name = "Freelance", type = TransactionType.INCOME, iconName = "freelance"),
-            CategoryEntity(name = "Investment", type = TransactionType.INCOME, iconName = "investment"),
+            CategoryEntity(name = "Investment", type = TransactionType.INVESTMENT, iconName = "investment"),
             CategoryEntity(name = "Gift", type = TransactionType.INCOME, iconName = "gift"),
             CategoryEntity(name = "Other Income", type = TransactionType.INCOME, iconName = "other"),
             CategoryEntity(name = "Food", type = TransactionType.EXPENSE, iconName = "food"),
