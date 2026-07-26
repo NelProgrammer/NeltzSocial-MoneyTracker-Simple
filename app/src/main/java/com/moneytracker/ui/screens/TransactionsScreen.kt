@@ -24,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneytracker.ui.components.TransactionSectionCard
 import com.moneytracker.data.local.entity.TransactionType
+import com.moneytracker.ui.components.TransactionHeaderRow
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.ReorderableTransactionList
+import androidx.compose.foundation.clickable
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,7 +104,7 @@ fun TransactionsScreen(
                 }
                 Column {
                     sections.forEach { type ->
-                        val filtered = transactions.filter { it.type == type }.sortedBy { it.id }
+                        val filtered = transactions.filter { it.type == type }
                         if (filtered.isNotEmpty()) {
                             val title = when (type) {
                                 TransactionType.INCOME -> "Income"
@@ -110,6 +112,11 @@ fun TransactionsScreen(
                                 TransactionType.EXPENSE -> "Expenses"
                                 else -> ""
                             }
+                            TransactionHeaderRow(
+                                currentSort = viewModel.sortField.collectAsState().value,
+                                sortDirection = viewModel.sortDirection.collectAsState().value,
+                                onSortChange = viewModel::setSortField
+                            )
                             TransactionSectionCard(
                                 title = title,
                                 transactions = filtered,

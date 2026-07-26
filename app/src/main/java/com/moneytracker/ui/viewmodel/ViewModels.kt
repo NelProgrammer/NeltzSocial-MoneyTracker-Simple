@@ -49,25 +49,45 @@ class TransactionsViewModel(
 
     enum class SortField { ID, DATE, AMOUNT, CATEGORY, DESCRIPTION, TYPE }
 
+    // Sort direction state and enum
+    private val _sortDirection = MutableStateFlow<SortDirection>(SortDirection.ASC)
+    val sortDirection: StateFlow<SortDirection> = _sortDirection.asStateFlow()
+
+    enum class SortDirection { ASC, DESC }
+
     fun setSortField(field: SortField) {
-        _sortField.value = field
+        if (_sortField.value == field) {
+            // Toggle direction
+            _sortDirection.value = if (_sortDirection.value == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+        } else {
+            _sortField.value = field
+            _sortDirection.value = SortDirection.ASC
+        }
     }
 
     val transactions: StateFlow<List<TransactionWithCategory>> = combine(
         repository.observeAllTransactions(),
         _filterType,
-        _sortField
-    ) { list, type, sortField ->
+        _sortField,
+        _sortDirection
+    ) { list, type, sortField, sortDirection ->
         // Apply type filter first
         val filtered = if (type == null) list else list.filter { it.type == type }
-        // Sort based on selected field
-        when (sortField) {
-            SortField.ID -> filtered.sortedBy { it.id }
-            SortField.DATE -> filtered.sortedBy { it.date }
-            SortField.AMOUNT -> filtered.sortedBy { it.amount }
-            SortField.CATEGORY -> filtered.sortedBy { it.categoryName }
-            SortField.DESCRIPTION -> filtered.sortedBy { it.note }
-            SortField.TYPE -> filtered.sortedBy {
+        // Sort based on selected field and direction
+        val sorted = when (sortField) {
+            SortField.ID -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.id } else filtered.sortedByDescending { it.id }
+            SortField.DATE -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.date } else filtered.sortedByDescending { it.date }
+            SortField.AMOUNT -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.amount } else filtered.sortedByDescending { it.amount }
+            SortField.CATEGORY -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.categoryName } else filtered.sortedByDescending { it.categoryName }
+            SortField.DESCRIPTION -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.note } else filtered.sortedByDescending { it.note }
+            SortField.TYPE -> if (sortDirection == SortDirection.ASC) filtered.sortedBy {
+                when (it.type) {
+                    TransactionType.INCOME -> 0
+                    TransactionType.INVESTMENT -> 1
+                    TransactionType.EXPENSE -> 2
+                    else -> 3
+                }
+            } else filtered.sortedByDescending {
                 when (it.type) {
                     TransactionType.INCOME -> 0
                     TransactionType.INVESTMENT -> 1
@@ -76,6 +96,7 @@ class TransactionsViewModel(
                 }
             }
         }
+        sorted
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setFilter(type: TransactionType?) { _filterType.value = type }
