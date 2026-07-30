@@ -26,8 +26,8 @@ fun MonthComparisonScreen(
 ) {
     val summaries = viewModel.summaries.collectAsState().value
     LazyColumn(
-        contentPadding = contentPadding,
-        modifier = Modifier.fillMaxWidth()
+        contentPadding = PaddingValues(16.dp),
+        modifier = Modifier.fillMaxSize()
     ) {
         items(summaries) { summaryItem ->
             MonthSummaryCard(summary = summaryItem)

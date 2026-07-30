@@ -33,8 +33,7 @@ fun TaxiFareScreen(contentPadding: PaddingValues) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(contentPadding),
+                .padding(innerPadding),
             contentAlignment = Alignment.Center
         ) {
             Text(

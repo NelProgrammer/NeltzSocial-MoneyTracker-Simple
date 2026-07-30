@@ -43,7 +43,7 @@ fun TransactionsScreen(
     val reorderEnabled = filterType == null
 
     Scaffold(
-        modifier = Modifier.padding(contentPadding),
+        modifier = Modifier,
         topBar = { TopAppBar(title = { Text("Transactions") }) },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTransaction) {
@@ -62,26 +62,29 @@ fun TransactionsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
                 FilterChip(
+                    modifier = Modifier.weight(1f),
                     selected = filterType == null,
                     onClick = { viewModel.clearFilter() },
-                    label = { Text("All") }
+                    label = { Text("All", maxLines = 1) }
                 )
                 FilterChip(
+                    modifier = Modifier.weight(1f),
                     selected = filterType == TransactionType.INCOME,
                     onClick = { viewModel.setFilter(TransactionType.INCOME) },
-                    label = { Text("Income") }
+                    label = { Text("Income", maxLines = 1) }
                 )
                 FilterChip(
+                    modifier = Modifier.weight(1f),
                     selected = filterType == TransactionType.INVESTMENT,
                     onClick = { viewModel.setFilter(TransactionType.INVESTMENT) },
-                    label = { Text("Investment") }
+                    label = { Text("Investment", maxLines = 1) }
                 )
                 FilterChip(
+                    modifier = Modifier.weight(1f),
                     selected = filterType == TransactionType.EXPENSE,
                     onClick = { viewModel.setFilter(TransactionType.EXPENSE) },
-                    label = { Text("Expenses") }
+                    label = { Text("Expenses", maxLines = 1) }
                 )
             }
             if (!reorderEnabled) {

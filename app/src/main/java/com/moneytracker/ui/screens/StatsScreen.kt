@@ -3,14 +3,15 @@ package com.moneytracker.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -23,11 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.CategorySummary
+import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
-import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.viewmodel.StatsViewModel
 import com.moneytracker.util.CurrencyUtils
@@ -43,11 +44,12 @@ fun StatsScreen(
     val summary by viewModel.summary.collectAsState()
     val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
     val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
-    val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
     val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
+    val filterType by viewModel.filterType.collectAsState()
+    val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
 
     Scaffold(
-        modifier = Modifier.padding(contentPadding),
+        modifier = Modifier,
         topBar = { TopAppBar(title = { Text("Stats") }) }
     ) { padding ->
         LazyColumn(
@@ -75,31 +77,71 @@ fun StatsScreen(
             }
 
             item {
-                CategoryBreakdownSection(
-                    title = "Expenses by Category",
-                    summaries = expenseBreakdown,
-                    total = summary.expense,
-                    barColor = ExpenseColor,
-                    emptyMessage = "No expenses recorded this month."
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = filterType == null,
+                        onClick = { viewModel.clearFilter() },
+                        label = { Text("All", maxLines = 1) }
+                    )
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = filterType == TransactionType.INCOME,
+                        onClick = { viewModel.setFilter(TransactionType.INCOME) },
+                        label = { Text("Income", maxLines = 1) }
+                    )
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = filterType == TransactionType.INVESTMENT,
+                        onClick = { viewModel.setFilter(TransactionType.INVESTMENT) },
+                        label = { Text("Investment", maxLines = 1) }
+                    )
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = filterType == TransactionType.EXPENSE,
+                        onClick = { viewModel.setFilter(TransactionType.EXPENSE) },
+                        label = { Text("Expenses", maxLines = 1) }
+                    )
+                }
             }
 
-            item {
-                CategoryBreakdownSection(
-                    title = "Income by Category",
-                    summaries = incomeBreakdown,
-                    total = summary.income,
-                    barColor = IncomeColor,
-                    emptyMessage = "No income recorded this month."
-                )
-                // Investment breakdown using existing component
-                CategoryBreakdownSection(
-                    title = "Investments by Category",
-                    summaries = investmentBreakdown,
-                    total = summary.investment,
-                    barColor = InvestmentColor,
-                    emptyMessage = "No investments recorded this month."
-                )
+            if (filterType == null || filterType == TransactionType.INCOME) {
+                item {
+                    CategoryBreakdownSection(
+                        title = "Income by Category",
+                        summaries = incomeBreakdown,
+                        total = summary.income,
+                        barColor = IncomeColor,
+                        emptyMessage = "No income recorded this month."
+                    )
+                }
+            }
+
+            if (filterType == null || filterType == TransactionType.INVESTMENT) {
+                item {
+                    CategoryBreakdownSection(
+                        title = "Investments by Category",
+                        summaries = investmentBreakdown,
+                        total = summary.investment,
+                        barColor = InvestmentColor,
+                        emptyMessage = "No investments recorded this month."
+                    )
+                }
+            }
+
+            if (filterType == null || filterType == TransactionType.EXPENSE) {
+                item {
+                    CategoryBreakdownSection(
+                        title = "Expenses by Category",
+                        summaries = expenseBreakdown,
+                        total = summary.expense,
+                        barColor = ExpenseColor,
+                        emptyMessage = "No expenses recorded this month."
+                    )
+                }
             }
         }
     }

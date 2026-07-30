@@ -46,7 +46,7 @@ fun DashboardScreen(
     val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
 
     Scaffold(
-        modifier = Modifier.padding(contentPadding),
+        modifier = Modifier,
         topBar = {
             TopAppBar(title = { Text("Money Tracker") })
         },

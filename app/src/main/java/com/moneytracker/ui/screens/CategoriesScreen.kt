@@ -5,6 +5,8 @@ import com.moneytracker.util.sortedByPriority
 
 
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 
@@ -56,7 +58,7 @@ fun CategoriesScreen(
     var iconState by remember { mutableStateOf(TextFieldValue()) }
 
     Scaffold(
-        modifier = Modifier.padding(contentPadding),
+        modifier = Modifier,
         topBar = { TopAppBar(title = { Text("Categories") }, navigationIcon = { TextButton(onClick = onNavigateBack) { Text("Back") } }) },
         floatingActionButton = {
             FloatingActionButton(onClick = {
@@ -72,8 +74,9 @@ fun CategoriesScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier
-                .padding(padding)
-                .padding(16.dp),
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(categories.sortedByPriority(), key = { it.id }) { category ->

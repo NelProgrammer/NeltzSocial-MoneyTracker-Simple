@@ -248,6 +248,17 @@ class StatsViewModel(
     private val monthStart = DateUtils.startOfMonth()
     private val monthEnd = DateUtils.startOfNextMonth()
 
+    private val _filterType = MutableStateFlow<TransactionType?>(null)
+    val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
+
+    fun setFilter(type: TransactionType?) {
+        _filterType.value = type
+    }
+
+    fun clearFilter() {
+        setFilter(null)
+    }
+
     val summary: StateFlow<MonthlySummary> = repository
         .observeMonthlySummary(monthStart, monthEnd)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
