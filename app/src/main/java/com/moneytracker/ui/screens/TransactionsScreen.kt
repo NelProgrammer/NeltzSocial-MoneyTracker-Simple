@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,12 +25,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneytracker.ui.components.TransactionSectionCard
 import com.moneytracker.data.local.entity.TransactionType
-import com.moneytracker.ui.components.TransactionHeaderRow
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.ReorderableTransactionList
-import androidx.compose.foundation.clickable
+import com.moneytracker.ui.components.TransactionHeaderRow
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ fun TransactionsScreen(
 ) {
     val transactions by viewModel.transactions.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
+    val secondarySorts by viewModel.secondarySorts.collectAsState()
     val reorderEnabled = filterType == null
 
     Scaffold(
@@ -96,42 +98,34 @@ fun TransactionsScreen(
                 )
             }
 
-            if (transactions.isEmpty()) {
-                EmptyState("No transactions found.")
-            } else {
-                // Determine which sections to show based on the selected filter
-                val sections = if (filterType == null) {
-                    listOf(TransactionType.INCOME, TransactionType.INVESTMENT, TransactionType.EXPENSE)
-                } else {
-                    listOf(filterType)
-                }
+            // Single Card Table View for all transactions
+            Card(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp)
+                        .padding(12.dp)
                 ) {
-                    sections.forEach { type ->
-                        val filtered = transactions.filter { it.type == type }
-                        val title = when (type) {
-                            TransactionType.INCOME -> "Income"
-                            TransactionType.INVESTMENT -> "Investment"
-                            TransactionType.EXPENSE -> "Expenses"
-                            else -> ""
-                        }
-                        TransactionHeaderRow(
-                            currentSort = viewModel.sortField.collectAsState().value,
-                            sortDirection = viewModel.sortDirection.collectAsState().value,
-                            onSortChange = viewModel::setSortField
-                        )
-                        TransactionSectionCard(
-                            title = title,
-                            transactions = filtered,
+                    TransactionHeaderRow(
+                        secondarySorts = secondarySorts,
+                        onHeaderClicked = viewModel::onHeaderClicked,
+                        onHeaderLongPressed = viewModel::onHeaderLongPressed
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    if (transactions.isEmpty()) {
+                        EmptyState("No transactions found.")
+                    } else {
+                        ReorderableTransactionList(
+                            transactions = transactions,
                             reorderEnabled = reorderEnabled,
                             onEditTransaction = onEditTransaction,
                             onDeleteTransaction = viewModel::deleteTransaction,
-                            onReorder = viewModel::reorderTransactions,
-                            contentPadding = PaddingValues(bottom = 8.dp),
-                            modifier = Modifier.weight(1f)
+                            onReorder = viewModel::reorderTransactions
                         )
                     }
                 }

@@ -38,66 +38,90 @@ class DashboardViewModel(
 }
 
 // Transactions ViewModel
+data class SortCriterion(
+    val field: TransactionsViewModel.SortField,
+    val direction: TransactionsViewModel.SortDirection = TransactionsViewModel.SortDirection.ASC
+)
+
 class TransactionsViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
     private val _filterType = MutableStateFlow<TransactionType?>(null)
     val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
 
-    // Sort field state and enum
-    private val _sortField = MutableStateFlow<SortField>(SortField.AMOUNT)
-    val sortField: StateFlow<SortField> = _sortField.asStateFlow()
-
     enum class SortField { ID, DATE, AMOUNT, CATEGORY, DESCRIPTION, TYPE }
-
-    // Sort direction state and enum
-    private val _sortDirection = MutableStateFlow<SortDirection>(SortDirection.ASC)
-    val sortDirection: StateFlow<SortDirection> = _sortDirection.asStateFlow()
-
     enum class SortDirection { ASC, DESC }
 
-    fun setSortField(field: SortField) {
-        if (_sortField.value == field) {
-            // Toggle direction
-            _sortDirection.value = if (_sortDirection.value == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+    // Secondary and multi-column sort priority list
+    private val _secondarySorts = MutableStateFlow<List<SortCriterion>>(
+        listOf(SortCriterion(SortField.DATE, SortDirection.DESC))
+    )
+    val secondarySorts: StateFlow<List<SortCriterion>> = _secondarySorts.asStateFlow()
+
+    fun onHeaderClicked(field: SortField) {
+        if (field == SortField.TYPE) return
+        val current = _secondarySorts.value
+        if (current.isNotEmpty() && current.first().field == field) {
+            val first = current.first()
+            val newDirection = if (first.direction == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+            _secondarySorts.value = listOf(first.copy(direction = newDirection))
         } else {
-            _sortField.value = field
-            _sortDirection.value = SortDirection.ASC
+            _secondarySorts.value = listOf(SortCriterion(field, SortDirection.ASC))
         }
+    }
+
+    fun onHeaderLongPressed(field: SortField) {
+        if (field == SortField.TYPE) return
+        val current = _secondarySorts.value.toMutableList()
+        val index = current.indexOfFirst { it.field == field }
+        if (index >= 0) {
+            val item = current[index]
+            val newDirection = if (item.direction == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+            current[index] = item.copy(direction = newDirection)
+        } else {
+            current.add(SortCriterion(field, SortDirection.ASC))
+        }
+        _secondarySorts.value = current
     }
 
     val transactions: StateFlow<List<TransactionWithCategory>> = combine(
         repository.observeAllTransactions(),
         _filterType,
-        _sortField,
-        _sortDirection
-    ) { list, type, sortField, sortDirection ->
-        // Apply type filter first
+        _secondarySorts
+    ) { list, type, secondarySorts ->
         val filtered = if (type == null) list else list.filter { it.type == type }
-        // Sort based on selected field and direction
-        val sorted = when (sortField) {
-            SortField.ID -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.id } else filtered.sortedByDescending { it.id }
-            SortField.DATE -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.date } else filtered.sortedByDescending { it.date }
-            SortField.AMOUNT -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.amount } else filtered.sortedByDescending { it.amount }
-            SortField.CATEGORY -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.categoryName } else filtered.sortedByDescending { it.categoryName }
-            SortField.DESCRIPTION -> if (sortDirection == SortDirection.ASC) filtered.sortedBy { it.note } else filtered.sortedByDescending { it.note }
-            SortField.TYPE -> if (sortDirection == SortDirection.ASC) filtered.sortedBy {
-                when (it.type) {
-                    TransactionType.INCOME -> 0
-                    TransactionType.INVESTMENT -> 1
-                    TransactionType.EXPENSE -> 2
-                    else -> 3
-                }
-            } else filtered.sortedByDescending {
-                when (it.type) {
-                    TransactionType.INCOME -> 0
-                    TransactionType.INVESTMENT -> 1
-                    TransactionType.EXPENSE -> 2
-                    else -> 3
-                }
+
+        var comparator: Comparator<TransactionWithCategory> = compareBy {
+            when (it.type) {
+                TransactionType.INCOME -> 0
+                TransactionType.INVESTMENT -> 1
+                TransactionType.EXPENSE -> 2
             }
         }
-        sorted
+
+        for (criterion in secondarySorts) {
+            val selector: (TransactionWithCategory) -> Comparable<*>? = when (criterion.field) {
+                SortField.ID -> { t -> t.id }
+                SortField.DATE -> { t -> t.date }
+                SortField.AMOUNT -> { t -> t.amount }
+                SortField.CATEGORY -> { t -> t.categoryName }
+                SortField.DESCRIPTION -> { t -> t.note }
+                SortField.TYPE -> { t ->
+                    when (t.type) {
+                        TransactionType.INCOME -> 0
+                        TransactionType.INVESTMENT -> 1
+                        TransactionType.EXPENSE -> 2
+                    }
+                }
+            }
+            comparator = if (criterion.direction == SortDirection.ASC) {
+                comparator.thenBy(selector)
+            } else {
+                comparator.thenByDescending(selector)
+            }
+        }
+
+        filtered.sortedWith(comparator)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     fun setFilter(type: TransactionType?) {
         Log.d("TransactionsViewModel", "setFilter called – type: $type")
