@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.time.LocalDate
 
 // Dashboard ViewModel
@@ -98,10 +99,12 @@ class TransactionsViewModel(
         }
         sorted
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    fun setFilter(type: TransactionType?) {
+        Log.d("TransactionsViewModel", "setFilter called – type: $type")
+        _filterType.value = type
+    }
 
-    fun setFilter(type: TransactionType?) { _filterType.value = type }
     fun clearFilter() { setFilter(null) }
-
     fun deleteTransaction(transaction: TransactionWithCategory) {
         viewModelScope.launch {
             repository.deleteTransaction(transaction.toEntity())

@@ -62,6 +62,7 @@ fun TransactionsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+
                 FilterChip(
                     selected = filterType == null,
                     onClick = { viewModel.clearFilter() },
@@ -83,7 +84,6 @@ fun TransactionsScreen(
                     label = { Text("Expenses") }
                 )
             }
-
             if (!reorderEnabled) {
                 Text(
                     text = "Clear filters to drag and reorder transactions.",
@@ -102,31 +102,34 @@ fun TransactionsScreen(
                 } else {
                     listOf(filterType)
                 }
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                ) {
                     sections.forEach { type ->
                         val filtered = transactions.filter { it.type == type }
-                        if (filtered.isNotEmpty()) {
-                            val title = when (type) {
-                                TransactionType.INCOME -> "Income"
-                                TransactionType.INVESTMENT -> "Investment"
-                                TransactionType.EXPENSE -> "Expenses"
-                                else -> ""
-                            }
-                            TransactionHeaderRow(
-                                currentSort = viewModel.sortField.collectAsState().value,
-                                sortDirection = viewModel.sortDirection.collectAsState().value,
-                                onSortChange = viewModel::setSortField
-                            )
-                            TransactionSectionCard(
-                                title = title,
-                                transactions = filtered,
-                                reorderEnabled = reorderEnabled,
-                                onEditTransaction = onEditTransaction,
-                                onDeleteTransaction = viewModel::deleteTransaction,
-                                onReorder = viewModel::reorderTransactions,
-                                contentPadding = PaddingValues(bottom = 8.dp)
-                            )
+                        val title = when (type) {
+                            TransactionType.INCOME -> "Income"
+                            TransactionType.INVESTMENT -> "Investment"
+                            TransactionType.EXPENSE -> "Expenses"
+                            else -> ""
                         }
+                        TransactionHeaderRow(
+                            currentSort = viewModel.sortField.collectAsState().value,
+                            sortDirection = viewModel.sortDirection.collectAsState().value,
+                            onSortChange = viewModel::setSortField
+                        )
+                        TransactionSectionCard(
+                            title = title,
+                            transactions = filtered,
+                            reorderEnabled = reorderEnabled,
+                            onEditTransaction = onEditTransaction,
+                            onDeleteTransaction = viewModel::deleteTransaction,
+                            onReorder = viewModel::reorderTransactions,
+                            contentPadding = PaddingValues(bottom = 8.dp),
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
