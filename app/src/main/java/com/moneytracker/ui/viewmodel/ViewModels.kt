@@ -52,19 +52,32 @@ class TransactionsViewModel(
     enum class SortField { ID, DATE, AMOUNT, CATEGORY, DESCRIPTION, TYPE }
     enum class SortDirection { ASC, DESC }
 
-    // Secondary and multi-column sort priority list
+    // Secondary and multi-column sort priority list (default 2nd sort is AMOUNT)
     private val _secondarySorts = MutableStateFlow<List<SortCriterion>>(
-        listOf(SortCriterion(SortField.DATE, SortDirection.DESC))
+        listOf(SortCriterion(SortField.AMOUNT, SortDirection.DESC))
     )
     val secondarySorts: StateFlow<List<SortCriterion>> = _secondarySorts.asStateFlow()
 
     fun onHeaderClicked(field: SortField) {
         if (field == SortField.TYPE) return
         val current = _secondarySorts.value
-        if (current.isNotEmpty() && current.first().field == field) {
-            val first = current.first()
-            val newDirection = if (first.direction == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
-            _secondarySorts.value = listOf(first.copy(direction = newDirection))
+        if (current.size > 1) {
+            val index = current.indexOfFirst { it.field == field }
+            if (index >= 0) {
+                // Remove only the clicked multiple-sort item
+                _secondarySorts.value = current.filter { it.field != field }
+            } else {
+                // Short-click on an unselected item deactivates multi-sort and sets single 2nd sort
+                _secondarySorts.value = listOf(SortCriterion(field, SortDirection.ASC))
+            }
+        } else if (current.size == 1) {
+            val single = current.first()
+            if (single.field == field) {
+                val newDirection = if (single.direction == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+                _secondarySorts.value = listOf(single.copy(direction = newDirection))
+            } else {
+                _secondarySorts.value = listOf(SortCriterion(field, SortDirection.ASC))
+            }
         } else {
             _secondarySorts.value = listOf(SortCriterion(field, SortDirection.ASC))
         }
