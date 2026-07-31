@@ -50,9 +50,9 @@ private fun MonthSummaryCard(summary: MonthSummaryItem) {
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(text = month, style = MaterialTheme.typography.titleMedium)
-            Text(text = "Income: $${"${"$"}${summary.income}"}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Expense: $${"${"$"}${summary.expense}"}", style = MaterialTheme.typography.bodyMedium)
-            Text(text = "Balance: $${"${"$"}${summary.balance}"}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Income: ${com.moneytracker.util.CurrencyUtils.format(summary.income)}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Expense: ${com.moneytracker.util.CurrencyUtils.format(summary.expense)}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Balance: ${com.moneytracker.util.CurrencyUtils.format(summary.balance)}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

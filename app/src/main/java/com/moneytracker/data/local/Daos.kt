@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.CategorySummary
+import com.moneytracker.data.local.entity.SubCategoryEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
@@ -38,10 +39,34 @@ interface CategoryDao {
 }
 
 @Dao
+interface SubCategoryDao {
+    @Query("SELECT * FROM sub_categories ORDER BY name ASC")
+    fun observeAll(): Flow<List<SubCategoryEntity>>
+
+    @Query("SELECT * FROM sub_categories WHERE categoryId = :categoryId ORDER BY name ASC")
+    fun observeForCategory(categoryId: Long): Flow<List<SubCategoryEntity>>
+
+    @Query("SELECT * FROM sub_categories WHERE id = :id")
+    suspend fun getById(id: Long): SubCategoryEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(subCategory: SubCategoryEntity): Long
+
+    @Update
+    suspend fun update(subCategory: SubCategoryEntity)
+
+    @Delete
+    suspend fun delete(subCategory: SubCategoryEntity)
+
+    @Query("SELECT COUNT(*) FROM sub_categories")
+    suspend fun count(): Int
+}
+
+@Dao
 interface TransactionDao {
     @Query(
         """
-        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder,
+        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id
@@ -52,7 +77,7 @@ interface TransactionDao {
 
     @Query(
         """
-        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder,
+        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id

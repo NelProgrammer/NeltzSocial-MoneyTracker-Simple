@@ -1,9 +1,11 @@
 package com.moneytracker.data.repository
 
 import com.moneytracker.data.local.CategoryDao
+import com.moneytracker.data.local.SubCategoryDao
 import com.moneytracker.data.local.TransactionDao
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.CategorySummary
+import com.moneytracker.data.local.entity.SubCategoryEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
@@ -12,7 +14,8 @@ import kotlinx.coroutines.flow.combine
 
 class TransactionRepository(
     private val transactionDao: TransactionDao,
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
+    private val subCategoryDao: SubCategoryDao
 ) {
     fun observeAllTransactions(): Flow<List<TransactionWithCategory>> =
         transactionDao.observeAllWithCategory()
@@ -25,6 +28,12 @@ class TransactionRepository(
 
     fun observeAllCategories(): Flow<List<CategoryEntity>> =
         categoryDao.observeAll()
+
+    fun observeAllSubCategories(): Flow<List<SubCategoryEntity>> =
+        subCategoryDao.observeAll()
+
+    fun observeSubCategoriesForCategory(categoryId: Long): Flow<List<SubCategoryEntity>> =
+        subCategoryDao.observeForCategory(categoryId)
 
     fun observeMonthlySummary(startDate: Long, endDate: Long): Flow<MonthlySummary> {
         val income = transactionDao.observeTotalByTypeAndDateRange(
@@ -111,6 +120,19 @@ class TransactionRepository(
 
     suspend fun deleteCategory(category: CategoryEntity) {
         categoryDao.delete(category)
+    }
+
+    suspend fun saveSubCategory(subCategory: SubCategoryEntity): Long {
+        return if (subCategory.id == 0L) {
+            subCategoryDao.insert(subCategory)
+        } else {
+            subCategoryDao.update(subCategory)
+            subCategory.id
+        }
+    }
+
+    suspend fun deleteSubCategory(subCategory: SubCategoryEntity) {
+        subCategoryDao.delete(subCategory)
     }
 }
 

@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.moneytracker.data.local.entity.CategoryEntity
+import com.moneytracker.data.local.entity.RecurrenceFrequency
+import com.moneytracker.data.local.entity.SubCategoryEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 
@@ -18,14 +20,23 @@ class TransactionTypeConverter {
     fun toType(value: String): TransactionType = TransactionType.valueOf(value)
 }
 
+class RecurrenceFrequencyConverter {
+    @TypeConverter
+    fun fromFrequency(freq: RecurrenceFrequency?): String? = freq?.name
+
+    @TypeConverter
+    fun toFrequency(value: String?): RecurrenceFrequency? = value?.let { try { RecurrenceFrequency.valueOf(it) } catch (e: Exception) { null } }
+}
+
 @Database(
-    entities = [CategoryEntity::class, TransactionEntity::class],
-    version = 2,
+    entities = [CategoryEntity::class, SubCategoryEntity::class, TransactionEntity::class],
+    version = 6,
     exportSchema = false
 )
-@TypeConverters(TransactionTypeConverter::class)
+@TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
 abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
+    abstract fun subCategoryDao(): SubCategoryDao
     abstract fun transactionDao(): TransactionDao
 
     companion object {
@@ -44,7 +55,13 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                 MoneyTrackerDatabase::class.java,
                 "money_tracker.db"
             )
-                .addMigrations(DatabaseMigrations.MIGRATION_1_2)
+                .addMigrations(
+                    DatabaseMigrations.MIGRATION_1_2,
+                    DatabaseMigrations.MIGRATION_2_3,
+                    DatabaseMigrations.MIGRATION_3_4,
+                    DatabaseMigrations.MIGRATION_4_5,
+                    DatabaseMigrations.MIGRATION_5_6
+                )
                 .build()
         }
     }

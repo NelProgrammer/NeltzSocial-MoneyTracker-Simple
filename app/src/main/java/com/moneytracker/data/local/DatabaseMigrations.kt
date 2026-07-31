@@ -21,4 +21,40 @@ object DatabaseMigrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_sortOrder ON transactions(sortOrder)")
         }
     }
+
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE transactions ADD COLUMN subType TEXT NOT NULL DEFAULT ''")
+        }
+    }
+
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE transactions RENAME COLUMN subType TO subCategory")
+        }
+    }
+
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `sub_categories` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `categoryId` INTEGER,
+                    `iconName` TEXT NOT NULL DEFAULT 'default'
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE transactions ADD COLUMN isRecurring INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE transactions ADD COLUMN recurrenceFrequency TEXT")
+            db.execSQL("ALTER TABLE transactions ADD COLUMN recurTillDate INTEGER")
+            db.execSQL("ALTER TABLE transactions ADD COLUMN recurCount INTEGER")
+        }
+    }
 }

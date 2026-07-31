@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.CategorySummary
+import com.moneytracker.data.local.entity.RecurrenceFrequency
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
@@ -21,6 +22,48 @@ import kotlinx.coroutines.launch
 import android.util.Log
 import java.time.LocalDate
 
+// Sort Data Models
+data class SortCriterion(
+    val field: TransactionsViewModel.SortField,
+    val direction: TransactionsViewModel.SortDirection = TransactionsViewModel.SortDirection.ASC
+)
+
+fun buildTransactionComparator(secondarySorts: List<SortCriterion>): Comparator<TransactionWithCategory> {
+    // Fixed under-the-hood primary sorting hierarchy: Type => Category => SubCategory
+    var comparator: Comparator<TransactionWithCategory> = compareBy<TransactionWithCategory> {
+        when (it.type) {
+            TransactionType.INCOME -> 0
+            TransactionType.INVESTMENT -> 1
+            TransactionType.EXPENSE -> 2
+        }
+    }.thenBy { it.categoryName.lowercase() }
+     .thenBy { it.subCategory.lowercase() }
+
+    for (criterion in secondarySorts) {
+        val selector: (TransactionWithCategory) -> Comparable<*>? = when (criterion.field) {
+            TransactionsViewModel.SortField.ID -> { t -> t.id }
+            TransactionsViewModel.SortField.DATE -> { t -> t.date }
+            TransactionsViewModel.SortField.AMOUNT -> { t -> t.amount }
+            TransactionsViewModel.SortField.CATEGORY -> { t -> t.categoryName.lowercase() }
+            TransactionsViewModel.SortField.SUBCATEGORY -> { t -> t.subCategory.lowercase() }
+            TransactionsViewModel.SortField.DESCRIPTION -> { t -> t.note.lowercase() }
+            TransactionsViewModel.SortField.TYPE -> { t ->
+                when (t.type) {
+                    TransactionType.INCOME -> 0
+                    TransactionType.INVESTMENT -> 1
+                    TransactionType.EXPENSE -> 2
+                }
+            }
+        }
+        comparator = if (criterion.direction == TransactionsViewModel.SortDirection.ASC) {
+            comparator.thenBy(selector)
+        } else {
+            comparator.thenByDescending(selector)
+        }
+    }
+    return comparator
+}
+
 // Dashboard ViewModel
 class DashboardViewModel(
     private val repository: TransactionRepository
@@ -32,27 +75,74 @@ class DashboardViewModel(
         .observeMonthlySummary(monthStart, monthEnd)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
 
-    val recentTransactions: StateFlow<List<TransactionWithCategory>> = repository
-        .observeTransactionsForMonth(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // Selectable sort criteria for Dashboard (default: Amount DESC)
+    private val _secondarySorts = MutableStateFlow<List<SortCriterion>>(
+        listOf(SortCriterion(TransactionsViewModel.SortField.AMOUNT, TransactionsViewModel.SortDirection.DESC))
+    )
+    val secondarySorts: StateFlow<List<SortCriterion>> = _secondarySorts.asStateFlow()
+
+    fun onHeaderClicked(field: TransactionsViewModel.SortField) {
+        if (field == TransactionsViewModel.SortField.TYPE) return
+        val current = _secondarySorts.value
+        if (current.size > 1) {
+            val index = current.indexOfFirst { it.field == field }
+            if (index >= 0) {
+                _secondarySorts.value = current.filter { it.field != field }
+            } else {
+                _secondarySorts.value = listOf(SortCriterion(field, TransactionsViewModel.SortDirection.ASC))
+            }
+        } else if (current.size == 1) {
+            val single = current.first()
+            if (single.field == field) {
+                val newDirection = if (single.direction == TransactionsViewModel.SortDirection.ASC) TransactionsViewModel.SortDirection.DESC else TransactionsViewModel.SortDirection.ASC
+                _secondarySorts.value = listOf(single.copy(direction = newDirection))
+            } else {
+                _secondarySorts.value = listOf(SortCriterion(field, TransactionsViewModel.SortDirection.ASC))
+            }
+        } else {
+            _secondarySorts.value = listOf(SortCriterion(field, TransactionsViewModel.SortDirection.ASC))
+        }
+    }
+
+    fun onHeaderLongPressed(field: TransactionsViewModel.SortField) {
+        if (field == TransactionsViewModel.SortField.TYPE) return
+        val current = _secondarySorts.value.toMutableList()
+        val index = current.indexOfFirst { it.field == field }
+        if (index >= 0) {
+            val item = current[index]
+            val newDirection = if (item.direction == TransactionsViewModel.SortDirection.ASC) TransactionsViewModel.SortDirection.DESC else TransactionsViewModel.SortDirection.ASC
+            current[index] = item.copy(direction = newDirection)
+        } else {
+            current.add(SortCriterion(field, TransactionsViewModel.SortDirection.ASC))
+        }
+        _secondarySorts.value = current
+    }
+
+    val recentTransactions: StateFlow<List<TransactionWithCategory>> = combine(
+        repository.observeTransactionsForMonth(monthStart, monthEnd),
+        _secondarySorts
+    ) { list, secondarySorts ->
+        list.sortedWith(buildTransactionComparator(secondarySorts))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun reorderTransactions(reordered: List<TransactionWithCategory>) {
+        viewModelScope.launch {
+            repository.reorderTransactions(reordered.map { it.id })
+        }
+    }
 }
 
 // Transactions ViewModel
-data class SortCriterion(
-    val field: TransactionsViewModel.SortField,
-    val direction: TransactionsViewModel.SortDirection = TransactionsViewModel.SortDirection.ASC
-)
-
 class TransactionsViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
     private val _filterType = MutableStateFlow<TransactionType?>(null)
     val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
 
-    enum class SortField { ID, DATE, AMOUNT, CATEGORY, DESCRIPTION, TYPE }
+    enum class SortField { ID, DATE, AMOUNT, CATEGORY, SUBCATEGORY, DESCRIPTION, TYPE }
     enum class SortDirection { ASC, DESC }
 
-    // Secondary and multi-column sort priority list (default 2nd sort is AMOUNT)
+    // Secondary and multi-column sort priority list (default selectable sort is AMOUNT)
     private val _secondarySorts = MutableStateFlow<List<SortCriterion>>(
         listOf(SortCriterion(SortField.AMOUNT, SortDirection.DESC))
     )
@@ -64,10 +154,8 @@ class TransactionsViewModel(
         if (current.size > 1) {
             val index = current.indexOfFirst { it.field == field }
             if (index >= 0) {
-                // Remove only the clicked multiple-sort item
                 _secondarySorts.value = current.filter { it.field != field }
             } else {
-                // Short-click on an unselected item deactivates multi-sort and sets single 2nd sort
                 _secondarySorts.value = listOf(SortCriterion(field, SortDirection.ASC))
             }
         } else if (current.size == 1) {
@@ -103,45 +191,16 @@ class TransactionsViewModel(
         _secondarySorts
     ) { list, type, secondarySorts ->
         val filtered = if (type == null) list else list.filter { it.type == type }
-
-        var comparator: Comparator<TransactionWithCategory> = compareBy {
-            when (it.type) {
-                TransactionType.INCOME -> 0
-                TransactionType.INVESTMENT -> 1
-                TransactionType.EXPENSE -> 2
-            }
-        }
-
-        for (criterion in secondarySorts) {
-            val selector: (TransactionWithCategory) -> Comparable<*>? = when (criterion.field) {
-                SortField.ID -> { t -> t.id }
-                SortField.DATE -> { t -> t.date }
-                SortField.AMOUNT -> { t -> t.amount }
-                SortField.CATEGORY -> { t -> t.categoryName }
-                SortField.DESCRIPTION -> { t -> t.note }
-                SortField.TYPE -> { t ->
-                    when (t.type) {
-                        TransactionType.INCOME -> 0
-                        TransactionType.INVESTMENT -> 1
-                        TransactionType.EXPENSE -> 2
-                    }
-                }
-            }
-            comparator = if (criterion.direction == SortDirection.ASC) {
-                comparator.thenBy(selector)
-            } else {
-                comparator.thenByDescending(selector)
-            }
-        }
-
-        filtered.sortedWith(comparator)
+        filtered.sortedWith(buildTransactionComparator(secondarySorts))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun setFilter(type: TransactionType?) {
         Log.d("TransactionsViewModel", "setFilter called – type: $type")
         _filterType.value = type
     }
 
     fun clearFilter() { setFilter(null) }
+
     fun deleteTransaction(transaction: TransactionWithCategory) {
         viewModelScope.launch {
             repository.deleteTransaction(transaction.toEntity())
@@ -162,6 +221,11 @@ data class AddEditUiState(
     val categoryId: Long? = null,
     val date: LocalDate = LocalDate.now(),
     val note: String = "",
+    val subCategory: String = "",
+    val isRecurring: Boolean = false,
+    val recurrenceFrequency: RecurrenceFrequency = RecurrenceFrequency.MONTHLY,
+    val recurTillDate: LocalDate? = null,
+    val recurCount: String = "",
     val categories: List<CategoryEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
@@ -189,6 +253,11 @@ class AddEditViewModel(
                         categoryId = transaction.categoryId,
                         date = DateUtils.toLocalDate(transaction.date),
                         note = transaction.note,
+                        subCategory = transaction.subCategory,
+                        isRecurring = transaction.isRecurring,
+                        recurrenceFrequency = transaction.recurrenceFrequency ?: RecurrenceFrequency.MONTHLY,
+                        recurTillDate = transaction.recurTillDate?.let { DateUtils.toLocalDate(it) },
+                        recurCount = transaction.recurCount?.toString() ?: "",
                         isLoading = false
                     )
                     observeCategories(transaction.type)
@@ -243,6 +312,28 @@ class AddEditViewModel(
         _uiState.value = _uiState.value.copy(note = note)
     }
 
+    fun updateSubCategory(subCategory: String) {
+        _uiState.value = _uiState.value.copy(subCategory = subCategory)
+    }
+
+    fun updateIsRecurring(isRecurring: Boolean) {
+        _uiState.value = _uiState.value.copy(isRecurring = isRecurring)
+    }
+
+    fun updateRecurrenceFrequency(freq: RecurrenceFrequency) {
+        _uiState.value = _uiState.value.copy(recurrenceFrequency = freq)
+    }
+
+    fun updateRecurTillDate(date: LocalDate?) {
+        _uiState.value = _uiState.value.copy(recurTillDate = date)
+    }
+
+    fun updateRecurCount(count: String) {
+        if (count.isEmpty() || count.all { it.isDigit() }) {
+            _uiState.value = _uiState.value.copy(recurCount = count)
+        }
+    }
+
     fun save(onSuccess: () -> Unit) {
         val state = _uiState.value
         val amount = state.amount.toDoubleOrNull()
@@ -269,7 +360,12 @@ class AddEditViewModel(
                     categoryId = categoryId,
                     date = DateUtils.toEpochMillis(state.date),
                     note = state.note.trim(),
-                    sortOrder = existingSortOrder
+                    sortOrder = existingSortOrder,
+                    subCategory = state.subCategory.trim(),
+                    isRecurring = state.isRecurring,
+                    recurrenceFrequency = if (state.isRecurring) state.recurrenceFrequency else null,
+                    recurTillDate = if (state.isRecurring && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
+                    recurCount = if (state.isRecurring) state.recurCount.toIntOrNull() else null
                 )
             )
             _uiState.value = _uiState.value.copy(isSaving = false)
@@ -324,6 +420,7 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(DashboardViewModel::class.java) -> DashboardViewModel(repository) as T
             modelClass.isAssignableFrom(TransactionsViewModel::class.java) -> TransactionsViewModel(repository) as T
             modelClass.isAssignableFrom(CategoriesViewModel::class.java) -> CategoriesViewModel(repository) as T
+            modelClass.isAssignableFrom(SubCategoriesViewModel::class.java) -> SubCategoriesViewModel(repository) as T
             modelClass.isAssignableFrom(AddEditViewModel::class.java) -> AddEditViewModel(repository, transactionId) as T
             modelClass.isAssignableFrom(StatsViewModel::class.java) -> StatsViewModel(repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

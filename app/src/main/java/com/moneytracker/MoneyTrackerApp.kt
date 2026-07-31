@@ -2,6 +2,7 @@ package com.moneytracker
 
 import android.app.Application
 import com.moneytracker.data.local.DefaultCategories
+import com.moneytracker.data.local.DefaultSubCategories
 import com.moneytracker.data.local.MoneyTrackerDatabase
 import com.moneytracker.data.repository.TransactionRepository
 import dagger.hilt.android.HiltAndroidApp
@@ -22,10 +23,12 @@ class MoneyTrackerApp : Application() {
         val database = MoneyTrackerDatabase.getInstance(this)
         applicationScope.launch {
             DefaultCategories.seed(database.categoryDao())
+            DefaultSubCategories.seed(database.subCategoryDao())
         }
         repository = TransactionRepository(
             transactionDao = database.transactionDao(),
-            categoryDao = database.categoryDao()
+            categoryDao = database.categoryDao(),
+            subCategoryDao = database.subCategoryDao()
         )
     }
 }

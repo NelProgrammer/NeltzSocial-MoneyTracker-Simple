@@ -32,9 +32,9 @@ import com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField
 
 /**
  * Header row for the unified Card Table in TransactionsScreen.
- * Design:
- * - Header labels on top, sort priority badges & arrows positioned directly BELOW text to ensure clear visibility.
- * - Proportional column weights prevent overlapping (Type is hidden from headers).
+ * Features:
+ * - Header labels on top, sort priority badges & arrows positioned directly BELOW text.
+ * - 3 main header columns: Date, Category, Amount.
  * - Click amends or declicks, long-press adds/toggles multi-sort priority.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -75,20 +75,12 @@ fun TransactionHeaderRow(
                 modifier = Modifier.weight(1.2f)
             )
             HeaderItem(
-                label = "Description",
-                field = SortField.DESCRIPTION,
-                secondarySorts = secondarySorts,
-                onHeaderClicked = onHeaderClicked,
-                onHeaderLongPressed = onHeaderLongPressed,
-                modifier = Modifier.weight(1.3f)
-            )
-            HeaderItem(
                 label = "Amount",
                 field = SortField.AMOUNT,
                 secondarySorts = secondarySorts,
                 onHeaderClicked = onHeaderClicked,
                 onHeaderLongPressed = onHeaderLongPressed,
-                modifier = Modifier.weight(1.1f)
+                modifier = Modifier.weight(1f)
             )
         }
     }

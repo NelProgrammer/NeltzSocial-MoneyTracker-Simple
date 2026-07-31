@@ -4,6 +4,9 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.moneytracker.data.local.entity.CategoryEntity
+import com.moneytracker.data.local.entity.RecurrenceFrequency
+import com.moneytracker.data.local.entity.TransactionType
 
 @Entity(
     tableName = "transactions",
@@ -25,5 +28,10 @@ data class TransactionEntity(
     val categoryId: Long,
     val date: Long,
     val note: String = "",
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val subCategory: String = "",
+    val isRecurring: Boolean = false,
+    val recurrenceFrequency: RecurrenceFrequency? = null,
+    val recurTillDate: Long? = null,
+    val recurCount: Int? = null
 )

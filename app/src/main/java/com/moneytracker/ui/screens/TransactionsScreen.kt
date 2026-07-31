@@ -9,12 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -28,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.ReorderableTransactionList
-import com.moneytracker.ui.components.TransactionHeaderRow
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,11 +53,11 @@ fun TransactionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
@@ -93,42 +89,23 @@ fun TransactionsScreen(
                 Text(
                     text = "Clear filters to drag and reorder transactions.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // Single Card Table View for all transactions
-            Card(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                ) {
-                    TransactionHeaderRow(
-                        secondarySorts = secondarySorts,
-                        onHeaderClicked = viewModel::onHeaderClicked,
-                        onHeaderLongPressed = viewModel::onHeaderLongPressed
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    if (transactions.isEmpty()) {
-                        EmptyState("No transactions found.")
-                    } else {
-                        ReorderableTransactionList(
-                            transactions = transactions,
-                            reorderEnabled = reorderEnabled,
-                            onEditTransaction = onEditTransaction,
-                            onDeleteTransaction = viewModel::deleteTransaction,
-                            onReorder = viewModel::reorderTransactions
-                        )
-                    }
-                }
+            if (transactions.isEmpty()) {
+                EmptyState("No transactions found.")
+            } else {
+                ReorderableTransactionList(
+                    transactions = transactions,
+                    reorderEnabled = reorderEnabled,
+                    secondarySorts = secondarySorts,
+                    onHeaderClicked = viewModel::onHeaderClicked,
+                    onHeaderLongPressed = viewModel::onHeaderLongPressed,
+                    onEditTransaction = onEditTransaction,
+                    onDeleteTransaction = viewModel::deleteTransaction,
+                    onReorder = viewModel::reorderTransactions
+                )
             }
         }
     }

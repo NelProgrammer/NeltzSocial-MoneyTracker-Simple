@@ -124,6 +124,13 @@ fun TransactionRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (transaction.subCategory.isNotBlank()) {
+                        Text(
+                            text = transaction.subCategory,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Text(
                         text = DateUtils.formatDate(transaction.date),
                         style = MaterialTheme.typography.bodySmall,

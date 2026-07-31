@@ -118,6 +118,9 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onEditTransaction = { id ->
+                        navController.navigate(Screen.EditTransaction.createRoute(id))
                     }
                 )
             }
