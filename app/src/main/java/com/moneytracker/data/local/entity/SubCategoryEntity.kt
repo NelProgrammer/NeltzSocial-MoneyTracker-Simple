@@ -9,5 +9,6 @@ data class SubCategoryEntity(
     val id: Long = 0,
     val name: String,
     val categoryId: Long? = null,
-    val iconName: String = "default"
+    val iconName: String = "default",
+    val type: TransactionType? = null
 )

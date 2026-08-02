@@ -28,7 +28,8 @@ class MoneyTrackerApp : Application() {
         repository = TransactionRepository(
             transactionDao = database.transactionDao(),
             categoryDao = database.categoryDao(),
-            subCategoryDao = database.subCategoryDao()
+            subCategoryDao = database.subCategoryDao(),
+            detailDao = database.detailDao()
         )
     }
 }

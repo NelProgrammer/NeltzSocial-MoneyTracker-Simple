@@ -470,7 +470,7 @@ public final class TransactionDao_Impl implements TransactionDao {
   public Flow<Double> observeTotalByTypeAndDateRange(final TransactionType type,
       final long startDate, final long endDate) {
     final String _sql = "\n"
-            + "        SELECT COALESCE(SUM(amount), 0)\n"
+            + "        SELECT COALESCE(SUM(ABS(amount)), 0)\n"
             + "        FROM transactions\n"
             + "        WHERE type = ? AND date >= ? AND date < ?\n"
             + "        ";
@@ -513,7 +513,7 @@ public final class TransactionDao_Impl implements TransactionDao {
   public Flow<List<CategorySummary>> observeCategorySummaries(final TransactionType type,
       final long startDate, final long endDate) {
     final String _sql = "\n"
-            + "        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(t.amount), 0) AS total\n"
+            + "        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total\n"
             + "        FROM categories c\n"
             + "        LEFT JOIN transactions t ON t.categoryId = c.id\n"
             + "            AND t.type = ?\n"
@@ -588,6 +588,167 @@ public final class TransactionDao_Impl implements TransactionDao {
             _result = _tmp;
           } else {
             _result = 0;
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object getRecurringTransactions(
+      final Continuation<? super List<TransactionEntity>> $completion) {
+    final String _sql = "SELECT * FROM transactions WHERE isRecurring = 1";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<TransactionEntity>>() {
+      @Override
+      @NonNull
+      public List<TransactionEntity> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
+          final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
+          final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
+          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
+          final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
+          final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
+          final int _cursorIndexOfIsRecurring = CursorUtil.getColumnIndexOrThrow(_cursor, "isRecurring");
+          final int _cursorIndexOfRecurrenceFrequency = CursorUtil.getColumnIndexOrThrow(_cursor, "recurrenceFrequency");
+          final int _cursorIndexOfRecurTillDate = CursorUtil.getColumnIndexOrThrow(_cursor, "recurTillDate");
+          final int _cursorIndexOfRecurCount = CursorUtil.getColumnIndexOrThrow(_cursor, "recurCount");
+          final List<TransactionEntity> _result = new ArrayList<TransactionEntity>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final TransactionEntity _item;
+            final long _tmpId;
+            _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final double _tmpAmount;
+            _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
+            final TransactionType _tmpType;
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfType);
+            _tmpType = __transactionTypeConverter.toType(_tmp);
+            final long _tmpCategoryId;
+            _tmpCategoryId = _cursor.getLong(_cursorIndexOfCategoryId);
+            final long _tmpDate;
+            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
+            final String _tmpNote;
+            _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final int _tmpSortOrder;
+            _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
+            final String _tmpSubCategory;
+            _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final boolean _tmpIsRecurring;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsRecurring);
+            _tmpIsRecurring = _tmp_1 != 0;
+            final RecurrenceFrequency _tmpRecurrenceFrequency;
+            final String _tmp_2;
+            if (_cursor.isNull(_cursorIndexOfRecurrenceFrequency)) {
+              _tmp_2 = null;
+            } else {
+              _tmp_2 = _cursor.getString(_cursorIndexOfRecurrenceFrequency);
+            }
+            _tmpRecurrenceFrequency = __recurrenceFrequencyConverter.toFrequency(_tmp_2);
+            final Long _tmpRecurTillDate;
+            if (_cursor.isNull(_cursorIndexOfRecurTillDate)) {
+              _tmpRecurTillDate = null;
+            } else {
+              _tmpRecurTillDate = _cursor.getLong(_cursorIndexOfRecurTillDate);
+            }
+            final Integer _tmpRecurCount;
+            if (_cursor.isNull(_cursorIndexOfRecurCount)) {
+              _tmpRecurCount = null;
+            } else {
+              _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
+            }
+            _item = new TransactionEntity(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object getAllEntities(final Continuation<? super List<TransactionEntity>> $completion) {
+    final String _sql = "SELECT * FROM transactions";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<TransactionEntity>>() {
+      @Override
+      @NonNull
+      public List<TransactionEntity> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
+          final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
+          final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
+          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
+          final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
+          final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
+          final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
+          final int _cursorIndexOfIsRecurring = CursorUtil.getColumnIndexOrThrow(_cursor, "isRecurring");
+          final int _cursorIndexOfRecurrenceFrequency = CursorUtil.getColumnIndexOrThrow(_cursor, "recurrenceFrequency");
+          final int _cursorIndexOfRecurTillDate = CursorUtil.getColumnIndexOrThrow(_cursor, "recurTillDate");
+          final int _cursorIndexOfRecurCount = CursorUtil.getColumnIndexOrThrow(_cursor, "recurCount");
+          final List<TransactionEntity> _result = new ArrayList<TransactionEntity>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final TransactionEntity _item;
+            final long _tmpId;
+            _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final double _tmpAmount;
+            _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
+            final TransactionType _tmpType;
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfType);
+            _tmpType = __transactionTypeConverter.toType(_tmp);
+            final long _tmpCategoryId;
+            _tmpCategoryId = _cursor.getLong(_cursorIndexOfCategoryId);
+            final long _tmpDate;
+            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
+            final String _tmpNote;
+            _tmpNote = _cursor.getString(_cursorIndexOfNote);
+            final int _tmpSortOrder;
+            _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
+            final String _tmpSubCategory;
+            _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final boolean _tmpIsRecurring;
+            final int _tmp_1;
+            _tmp_1 = _cursor.getInt(_cursorIndexOfIsRecurring);
+            _tmpIsRecurring = _tmp_1 != 0;
+            final RecurrenceFrequency _tmpRecurrenceFrequency;
+            final String _tmp_2;
+            if (_cursor.isNull(_cursorIndexOfRecurrenceFrequency)) {
+              _tmp_2 = null;
+            } else {
+              _tmp_2 = _cursor.getString(_cursorIndexOfRecurrenceFrequency);
+            }
+            _tmpRecurrenceFrequency = __recurrenceFrequencyConverter.toFrequency(_tmp_2);
+            final Long _tmpRecurTillDate;
+            if (_cursor.isNull(_cursorIndexOfRecurTillDate)) {
+              _tmpRecurTillDate = null;
+            } else {
+              _tmpRecurTillDate = _cursor.getLong(_cursorIndexOfRecurTillDate);
+            }
+            final Integer _tmpRecurCount;
+            if (_cursor.isNull(_cursorIndexOfRecurCount)) {
+              _tmpRecurCount = null;
+            } else {
+              _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
+            }
+            _item = new TransactionEntity(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _result.add(_item);
           }
           return _result;
         } finally {

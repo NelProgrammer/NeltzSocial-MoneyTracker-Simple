@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,10 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.moneytracker.ui.components.BalanceCard
-import com.moneytracker.ui.components.EmptyState
-import com.moneytracker.ui.components.ReorderableTransactionList
+import com.moneytracker.ui.components.*
 import com.moneytracker.ui.viewmodel.DashboardViewModel
+import com.moneytracker.util.DateUtils
+import com.moneytracker.util.SettingsManager
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -38,17 +40,27 @@ fun DashboardScreen(
     contentPadding: PaddingValues,
     onAddTransaction: () -> Unit,
     onViewAll: () -> Unit,
-    onEditTransaction: (Long) -> Unit = {}
+    onEditTransaction: (Long) -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     val summary by viewModel.summary.collectAsState()
-    val transactions by viewModel.recentTransactions.collectAsState()
-    val secondarySorts by viewModel.secondarySorts.collectAsState()
-    val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+    val subCategorySummaries by viewModel.subCategorySummaries.collectAsState()
+
+    val payDateDay = SettingsManager.getPayDateDay()
+    val currentPayMonthDate = DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay)
+    val formattedMonth = currentPayMonthDate.format(DateTimeFormatter.ofPattern("yyyy-MMM"))
 
     Scaffold(
         modifier = Modifier,
         topBar = {
-            TopAppBar(title = { Text("Money Tracker") })
+            TopAppBar(
+                title = { Text("Money Tracker") },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddTransaction) {
@@ -64,11 +76,12 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = monthLabel,
-                style = MaterialTheme.typography.titleMedium,
+                text = "Current Month: $formattedMonth",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            // Balance Section displaying category totals and Net Balance Sum/Difference calculation
             BalanceCard(
                 balance = summary.balance,
                 income = summary.income,
@@ -76,32 +89,29 @@ fun DashboardScreen(
                 expense = summary.expense
             )
 
+            // Category Summary Section Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Recent Transactions",
+                    text = "Category Summary",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 TextButton(onClick = onViewAll) {
-                    Text("View all")
+                    Text("View all transactions")
                 }
             }
 
-            if (transactions.isEmpty()) {
-                EmptyState("No transactions this month. Tap + to add one.")
+            // Category Summary Table with Running Total
+            if (subCategorySummaries.isEmpty()) {
+                EmptyState("No categories recorded. Tap + to add a transaction.")
             } else {
-                ReorderableTransactionList(
-                    transactions = transactions,
-                    reorderEnabled = true,
-                    secondarySorts = secondarySorts,
-                    onHeaderClicked = viewModel::onHeaderClicked,
-                    onHeaderLongPressed = viewModel::onHeaderLongPressed,
-                    onReorder = viewModel::reorderTransactions,
-                    onEditTransaction = onEditTransaction
+                CategorySummaryTable(
+                    summaries = subCategorySummaries,
+                    contentPadding = contentPadding
                 )
             }
         }

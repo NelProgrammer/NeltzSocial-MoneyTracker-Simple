@@ -12,10 +12,14 @@ import com.moneytracker.data.local.entity.TransactionWithCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
+import com.moneytracker.data.local.DetailDao
+import com.moneytracker.data.local.entity.DetailEntity
+
 class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
-    private val subCategoryDao: SubCategoryDao
+    private val subCategoryDao: SubCategoryDao,
+    private val detailDao: DetailDao
 ) {
     fun observeAllTransactions(): Flow<List<TransactionWithCategory>> =
         transactionDao.observeAllWithCategory()
@@ -35,6 +39,9 @@ class TransactionRepository(
     fun observeSubCategoriesForCategory(categoryId: Long): Flow<List<SubCategoryEntity>> =
         subCategoryDao.observeForCategory(categoryId)
 
+    fun observeAllDetails(): Flow<List<DetailEntity>> =
+        detailDao.observeAll()
+
     fun observeMonthlySummary(startDate: Long, endDate: Long): Flow<MonthlySummary> {
         val income = transactionDao.observeTotalByTypeAndDateRange(
             TransactionType.INCOME,
@@ -52,11 +59,14 @@ class TransactionRepository(
             endDate
         )
         return combine(income, investment, expense) { incomeTotal, investmentTotal, expenseTotal ->
+            val absIncome = kotlin.math.abs(incomeTotal)
+            val absInvestment = kotlin.math.abs(investmentTotal)
+            val absExpense = kotlin.math.abs(expenseTotal)
             MonthlySummary(
-                income = incomeTotal,
-                investment = investmentTotal,
-                expense = expenseTotal,
-                balance = incomeTotal + investmentTotal - expenseTotal
+                income = absIncome,
+                investment = absInvestment,
+                expense = absExpense,
+                balance = absIncome - absInvestment - absExpense
             )
         }
     }
@@ -81,6 +91,12 @@ class TransactionRepository(
 
     suspend fun getTransaction(id: Long): TransactionEntity? =
         transactionDao.getById(id)
+
+    suspend fun getRecurringTransactions(): List<TransactionEntity> =
+        transactionDao.getRecurringTransactions()
+
+    suspend fun getAllEntities(): List<TransactionEntity> =
+        transactionDao.getAllEntities()
 
     suspend fun getCategory(id: Long): CategoryEntity? =
         categoryDao.getById(id)
@@ -133,6 +149,19 @@ class TransactionRepository(
 
     suspend fun deleteSubCategory(subCategory: SubCategoryEntity) {
         subCategoryDao.delete(subCategory)
+    }
+
+    suspend fun saveDetail(detail: DetailEntity): Long {
+        return if (detail.id == 0L) {
+            detailDao.insert(detail)
+        } else {
+            detailDao.update(detail)
+            detail.id
+        }
+    }
+
+    suspend fun deleteDetail(detail: DetailEntity) {
+        detailDao.delete(detail)
     }
 }
 

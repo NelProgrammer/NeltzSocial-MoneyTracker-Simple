@@ -57,4 +57,34 @@ object DatabaseMigrations {
             db.execSQL("ALTER TABLE transactions ADD COLUMN recurCount INTEGER")
         }
     }
+
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE sub_categories ADD COLUMN type TEXT")
+        }
+    }
+
+    val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `details` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `subCategoryId` INTEGER,
+                    `categoryId` INTEGER,
+                    `iconName` TEXT NOT NULL DEFAULT 'default',
+                    `type` TEXT
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // Foreign key cascade schema update
+        }
+    }
 }
+

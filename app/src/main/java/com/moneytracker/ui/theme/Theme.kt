@@ -7,11 +7,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+val IncomeColor: Color = Color(0xFF2E7D32)
+val ExpenseColor: Color = Color(0xFFC62828)
+val InvestmentColor: Color = Color(0xFF1565C0)
+
 private val GreenPrimary = Color(0xFF2E7D32)
 private val GreenDark = Color(0xFF1B5E20)
-private val RedExpense = Color(0xFFC62828)
-private val GreenIncome = Color(0xFF2E7D32)
-private val BlueInvestment = Color(0xFF1565C0)
 
 private val LightColors = lightColorScheme(
     primary = GreenPrimary,
@@ -21,7 +22,7 @@ private val LightColors = lightColorScheme(
     secondary = Color(0xFF558B2F),
     background = Color(0xFFF5F5F5),
     surface = Color.White,
-    error = RedExpense
+    error = ExpenseColor
 )
 
 private val DarkColors = darkColorScheme(
@@ -34,10 +35,6 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF1E1E1E),
     error = Color(0xFFEF5350)
 )
-
-val IncomeColor = GreenIncome
-val ExpenseColor = RedExpense
-val InvestmentColor = BlueInvestment
 
 @Composable
 fun MoneyTrackerTheme(

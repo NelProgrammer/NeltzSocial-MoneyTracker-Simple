@@ -6,10 +6,11 @@ import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CategoriesViewModel(
@@ -50,7 +51,7 @@ class CategoriesViewModel(
 
     fun saveCategory(onDone: () -> Unit = {}) {
         val state = _editState.value
-        if (state.name.isBlank()) return // could add error handling
+        if (state.name.isBlank()) return
         viewModelScope.launch {
             repository.saveCategory(
                 CategoryEntity(
@@ -60,11 +61,25 @@ class CategoriesViewModel(
                     iconName = state.iconName
                 )
             )
+            runSortProcess()
             onDone()
         }
     }
 
-    fun deleteCategory(category: CategoryEntity) {
-        viewModelScope.launch { repository.deleteCategory(category) }
+    fun deleteCategory(category: CategoryEntity, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                repository.deleteCategory(category)
+                runSortProcess()
+            } catch (e: Exception) {
+                onError("Failed to delete category: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    private suspend fun runSortProcess() {
+        val all = repository.observeAllTransactions().firstOrNull() ?: emptyList()
+        val sorted = all.sortedWith(buildTransactionComparator(emptyList()))
+        repository.reorderTransactions(sorted.map { it.id })
     }
 }

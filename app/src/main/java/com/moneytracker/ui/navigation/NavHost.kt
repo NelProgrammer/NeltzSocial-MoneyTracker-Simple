@@ -6,7 +6,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
-// import removed: hierarchy extension not needed
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
@@ -30,11 +29,13 @@ import com.moneytracker.ui.screens.GroceriesScreen
 import com.moneytracker.ui.screens.TaxiFareScreen
 import com.moneytracker.ui.screens.MonthComparisonScreen
 import com.moneytracker.ui.screens.CategoriesScreen
+import com.moneytracker.ui.screens.SettingsScreen
 import com.moneytracker.ui.viewmodel.AddEditViewModel
 import com.moneytracker.ui.viewmodel.DashboardViewModel
 import com.moneytracker.ui.viewmodel.StatsViewModel
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 import com.moneytracker.ui.viewmodel.CategoriesViewModel
+import com.moneytracker.ui.viewmodel.SettingsViewModel
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.ui.viewmodel.MonthComparisonViewModel
 import com.moneytracker.ui.viewmodel.ViewModelFactory
@@ -49,6 +50,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object TaxiFare : Screen("taxi", "Taxi", Icons.Default.DirectionsCar)
     object MonthComparison : Screen("monthComparison", "Month Compare", Icons.Default.CalendarMonth)
     object Categories : Screen("categories", "Categories", Icons.Default.Category)
+    object Settings : Screen("settings", "Settings", Icons.Default.Settings)
     object AddTransaction : Screen("addTransaction", "Add", Icons.Default.Add)
     object EditTransaction : Screen("editTransaction/{transactionId}", "Edit", Icons.Default.Edit) {
         fun createRoute(transactionId: Long) = "editTransaction/$transactionId"
@@ -121,6 +123,9 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     },
                     onEditTransaction = { id ->
                         navController.navigate(Screen.EditTransaction.createRoute(id))
+                    },
+                    onOpenSettings = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }
@@ -168,6 +173,16 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                 CategoriesScreen(
                     viewModel = viewModel,
                     contentPadding = innerPadding
+                )
+            }
+            composable(Screen.Settings.route) {
+                val viewModel: SettingsViewModel = viewModel(
+                    factory = ViewModelFactory(repository)
+                )
+                SettingsScreen(
+                    viewModel = viewModel,
+                    contentPadding = innerPadding,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(Screen.AddTransaction.route) {

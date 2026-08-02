@@ -31,28 +31,32 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
 
   private volatile SubCategoryDao _subCategoryDao;
 
+  private volatile DetailDao _detailDao;
+
   private volatile TransactionDao _transactionDao;
 
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(6) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(9) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `categories` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `iconName` TEXT NOT NULL)");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `sub_categories` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `categoryId` INTEGER, `iconName` TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `sub_categories` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `categoryId` INTEGER, `iconName` TEXT NOT NULL, `type` TEXT)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `details` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `subCategoryId` INTEGER, `categoryId` INTEGER, `iconName` TEXT NOT NULL, `type` TEXT)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `transactions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `amount` REAL NOT NULL, `type` TEXT NOT NULL, `categoryId` INTEGER NOT NULL, `date` INTEGER NOT NULL, `note` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, `subCategory` TEXT NOT NULL, `isRecurring` INTEGER NOT NULL, `recurrenceFrequency` TEXT, `recurTillDate` INTEGER, `recurCount` INTEGER, FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_categoryId` ON `transactions` (`categoryId`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)");
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_sortOrder` ON `transactions` (`sortOrder`)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '704bea1fc0c5edc0e3ce41c572d1a1d6')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '05a807abbc85c7964e353c03ee173c94')");
       }
 
       @Override
       public void dropAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("DROP TABLE IF EXISTS `categories`");
         db.execSQL("DROP TABLE IF EXISTS `sub_categories`");
+        db.execSQL("DROP TABLE IF EXISTS `details`");
         db.execSQL("DROP TABLE IF EXISTS `transactions`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
@@ -112,11 +116,12 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
                   + " Expected:\n" + _infoCategories + "\n"
                   + " Found:\n" + _existingCategories);
         }
-        final HashMap<String, TableInfo.Column> _columnsSubCategories = new HashMap<String, TableInfo.Column>(4);
+        final HashMap<String, TableInfo.Column> _columnsSubCategories = new HashMap<String, TableInfo.Column>(5);
         _columnsSubCategories.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsSubCategories.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsSubCategories.put("categoryId", new TableInfo.Column("categoryId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsSubCategories.put("iconName", new TableInfo.Column("iconName", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubCategories.put("type", new TableInfo.Column("type", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysSubCategories = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesSubCategories = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoSubCategories = new TableInfo("sub_categories", _columnsSubCategories, _foreignKeysSubCategories, _indicesSubCategories);
@@ -125,6 +130,22 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
           return new RoomOpenHelper.ValidationResult(false, "sub_categories(com.moneytracker.data.local.entity.SubCategoryEntity).\n"
                   + " Expected:\n" + _infoSubCategories + "\n"
                   + " Found:\n" + _existingSubCategories);
+        }
+        final HashMap<String, TableInfo.Column> _columnsDetails = new HashMap<String, TableInfo.Column>(6);
+        _columnsDetails.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDetails.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDetails.put("subCategoryId", new TableInfo.Column("subCategoryId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDetails.put("categoryId", new TableInfo.Column("categoryId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDetails.put("iconName", new TableInfo.Column("iconName", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsDetails.put("type", new TableInfo.Column("type", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysDetails = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesDetails = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoDetails = new TableInfo("details", _columnsDetails, _foreignKeysDetails, _indicesDetails);
+        final TableInfo _existingDetails = TableInfo.read(db, "details");
+        if (!_infoDetails.equals(_existingDetails)) {
+          return new RoomOpenHelper.ValidationResult(false, "details(com.moneytracker.data.local.entity.DetailEntity).\n"
+                  + " Expected:\n" + _infoDetails + "\n"
+                  + " Found:\n" + _existingDetails);
         }
         final HashMap<String, TableInfo.Column> _columnsTransactions = new HashMap<String, TableInfo.Column>(12);
         _columnsTransactions.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
@@ -154,7 +175,7 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "704bea1fc0c5edc0e3ce41c572d1a1d6", "2f5d9874e000d24092eb34b94bdbdb3f");
+    }, "05a807abbc85c7964e353c03ee173c94", "10eeb4c8271cdfd51ca3cf525e2e4ada");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -165,7 +186,7 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "categories","sub_categories","transactions");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "categories","sub_categories","details","transactions");
   }
 
   @Override
@@ -183,6 +204,7 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
       }
       _db.execSQL("DELETE FROM `categories`");
       _db.execSQL("DELETE FROM `sub_categories`");
+      _db.execSQL("DELETE FROM `details`");
       _db.execSQL("DELETE FROM `transactions`");
       super.setTransactionSuccessful();
     } finally {
@@ -203,6 +225,7 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
     final HashMap<Class<?>, List<Class<?>>> _typeConvertersMap = new HashMap<Class<?>, List<Class<?>>>();
     _typeConvertersMap.put(CategoryDao.class, CategoryDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(SubCategoryDao.class, SubCategoryDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(DetailDao.class, DetailDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(TransactionDao.class, TransactionDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
@@ -246,6 +269,20 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
           _subCategoryDao = new SubCategoryDao_Impl(this);
         }
         return _subCategoryDao;
+      }
+    }
+  }
+
+  @Override
+  public DetailDao detailDao() {
+    if (_detailDao != null) {
+      return _detailDao;
+    } else {
+      synchronized(this) {
+        if(_detailDao == null) {
+          _detailDao = new DetailDao_Impl(this);
+        }
+        return _detailDao;
       }
     }
   }

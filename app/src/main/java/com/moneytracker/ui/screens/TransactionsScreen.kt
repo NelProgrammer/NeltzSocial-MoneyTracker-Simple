@@ -13,7 +13,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -24,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.EmptyState
-import com.moneytracker.ui.components.ReorderableTransactionList
+import com.moneytracker.ui.components.TransactionTable
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +37,6 @@ fun TransactionsScreen(
     val transactions by viewModel.transactions.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
     val secondarySorts by viewModel.secondarySorts.collectAsState()
-    val reorderEnabled = filterType == null
 
     Scaffold(
         modifier = Modifier,
@@ -85,26 +83,17 @@ fun TransactionsScreen(
                     label = { Text("Expenses", maxLines = 1) }
                 )
             }
-            if (!reorderEnabled) {
-                Text(
-                    text = "Clear filters to drag and reorder transactions.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             if (transactions.isEmpty()) {
                 EmptyState("No transactions found.")
             } else {
-                ReorderableTransactionList(
+                TransactionTable(
                     transactions = transactions,
-                    reorderEnabled = reorderEnabled,
                     secondarySorts = secondarySorts,
                     onHeaderClicked = viewModel::onHeaderClicked,
                     onHeaderLongPressed = viewModel::onHeaderLongPressed,
                     onEditTransaction = onEditTransaction,
-                    onDeleteTransaction = viewModel::deleteTransaction,
-                    onReorder = viewModel::reorderTransactions
+                    onDeleteTransaction = viewModel::deleteTransaction
                 )
             }
         }

@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.CategorySummary
+import com.moneytracker.data.local.entity.DetailEntity
 import com.moneytracker.data.local.entity.SubCategoryEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
@@ -63,6 +64,27 @@ interface SubCategoryDao {
 }
 
 @Dao
+interface DetailDao {
+    @Query("SELECT * FROM details ORDER BY name ASC")
+    fun observeAll(): Flow<List<DetailEntity>>
+
+    @Query("SELECT * FROM details WHERE id = :id")
+    suspend fun getById(id: Long): DetailEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(detail: DetailEntity): Long
+
+    @Update
+    suspend fun update(detail: DetailEntity)
+
+    @Delete
+    suspend fun delete(detail: DetailEntity)
+
+    @Query("SELECT COUNT(*) FROM details")
+    suspend fun count(): Int
+}
+
+@Dao
 interface TransactionDao {
     @Query(
         """
@@ -92,7 +114,7 @@ interface TransactionDao {
 
     @Query(
         """
-        SELECT COALESCE(SUM(amount), 0)
+        SELECT COALESCE(SUM(ABS(amount)), 0)
         FROM transactions
         WHERE type = :type AND date >= :startDate AND date < :endDate
         """
@@ -105,7 +127,7 @@ interface TransactionDao {
 
     @Query(
         """
-        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(t.amount), 0) AS total
+        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total
         FROM categories c
         LEFT JOIN transactions t ON t.categoryId = c.id
             AND t.type = :type
@@ -137,4 +159,10 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
+
+    @Query("SELECT * FROM transactions WHERE isRecurring = 1")
+    suspend fun getRecurringTransactions(): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions")
+    suspend fun getAllEntities(): List<TransactionEntity>
 }

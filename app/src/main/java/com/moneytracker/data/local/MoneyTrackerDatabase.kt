@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.moneytracker.data.local.entity.CategoryEntity
+import com.moneytracker.data.local.entity.DetailEntity
 import com.moneytracker.data.local.entity.RecurrenceFrequency
 import com.moneytracker.data.local.entity.SubCategoryEntity
 import com.moneytracker.data.local.entity.TransactionEntity
@@ -25,18 +26,21 @@ class RecurrenceFrequencyConverter {
     fun fromFrequency(freq: RecurrenceFrequency?): String? = freq?.name
 
     @TypeConverter
-    fun toFrequency(value: String?): RecurrenceFrequency? = value?.let { try { RecurrenceFrequency.valueOf(it) } catch (e: Exception) { null } }
+    fun toFrequency(value: String?): RecurrenceFrequency? = value?.let {
+        try { RecurrenceFrequency.valueOf(it) } catch (e: Exception) { RecurrenceFrequency.MONTHLY }
+    }
 }
 
 @Database(
-    entities = [CategoryEntity::class, SubCategoryEntity::class, TransactionEntity::class],
-    version = 6,
+    entities = [CategoryEntity::class, SubCategoryEntity::class, DetailEntity::class, TransactionEntity::class],
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
 abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun subCategoryDao(): SubCategoryDao
+    abstract fun detailDao(): DetailDao
     abstract fun transactionDao(): TransactionDao
 
     companion object {
@@ -60,8 +64,12 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_2_3,
                     DatabaseMigrations.MIGRATION_3_4,
                     DatabaseMigrations.MIGRATION_4_5,
-                    DatabaseMigrations.MIGRATION_5_6
+                    DatabaseMigrations.MIGRATION_5_6,
+                    DatabaseMigrations.MIGRATION_6_7,
+                    DatabaseMigrations.MIGRATION_7_8,
+                    DatabaseMigrations.MIGRATION_8_9
                 )
+                .fallbackToDestructiveMigration()
                 .build()
         }
     }

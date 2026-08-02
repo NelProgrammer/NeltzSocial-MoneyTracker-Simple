@@ -4,8 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -16,16 +16,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneytracker.data.local.entity.TransactionType
-import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
 import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.util.CurrencyUtils
-import com.moneytracker.util.DateUtils
 
+/**
+ * Balance Card for Dashboard displaying Category Totals and Net Balance.
+ * Formula: Income − Investment − Expense.
+ */
 @Composable
 fun BalanceCard(
     balance: Double,
@@ -34,125 +36,60 @@ fun BalanceCard(
     expense: Double,
     modifier: Modifier = Modifier
 ) {
+    val absIncome = kotlin.math.abs(income)
+    val absInvestment = kotlin.math.abs(investment)
+    val absExpense = kotlin.math.abs(expense)
+    val calculatedBalance = absIncome - absInvestment - absExpense
+
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Current Balance",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Text(
-                text = CurrencyUtils.format(balance),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (balance >= 0) IncomeColor else ExpenseColor
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                SummaryChip(label = "Income", amount = income, color = IncomeColor)
-                SummaryChip(label = "Investment", amount = investment, color = InvestmentColor)
-                SummaryChip(label = "Expenses", amount = expense, color = ExpenseColor)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryChip(label: String, amount: Double, color: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
-        Text(
-            text = CurrencyUtils.format(amount),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color
-        )
-    }
-}
-
-@Composable
-fun TransactionRow(
-    transaction: TransactionWithCategory,
-    modifier: Modifier = Modifier,
-    leadingContent: (@Composable () -> Unit)? = null
-) {
-    val isIncome = transaction.type == TransactionType.INCOME
-    val prefix = if (isIncome) "+" else "-"
-    val color = if (isIncome) IncomeColor else ExpenseColor
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            leadingContent?.invoke()
-
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = if (leadingContent != null) 4.dp else 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 12.dp)
-                ) {
-                    Text(
-                        text = transaction.categoryName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (transaction.subCategory.isNotBlank()) {
-                        Text(
-                            text = transaction.subCategory,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        text = DateUtils.formatDate(transaction.date),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (transaction.note.isNotBlank()) {
-                        Text(
-                            text = transaction.note,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+            // Net Balance Title & Amount
+            Column {
                 Text(
-                    text = "$prefix${CurrencyUtils.format(transaction.amount)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = color,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip
+                    text = "Net Balance",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = CurrencyUtils.format(calculatedBalance),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = if (calculatedBalance >= 0) IncomeColor else ExpenseColor
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+
+            // Category Totals Grid (Income +, Investment -, Expense -)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                CategoryBalanceItem(
+                    label = "Income (+)",
+                    amount = absIncome,
+                    color = IncomeColor,
+                    modifier = Modifier.weight(1f)
+                )
+                CategoryBalanceItem(
+                    label = "Investment (−)",
+                    amount = absInvestment,
+                    color = InvestmentColor,
+                    modifier = Modifier.weight(1f)
+                )
+                CategoryBalanceItem(
+                    label = "Expense (−)",
+                    amount = absExpense,
+                    color = ExpenseColor,
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -160,22 +97,45 @@ fun TransactionRow(
 }
 
 @Composable
-fun TransactionListDivider(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier = modifier.padding(start = 16.dp))
+private fun CategoryBalanceItem(
+    label: String,
+    amount: Double,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+        )
+        Text(
+            text = CurrencyUtils.format(amount),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
 fun EmptyState(message: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(24.dp)
         )
     }
 }

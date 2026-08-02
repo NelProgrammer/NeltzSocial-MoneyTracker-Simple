@@ -8,18 +8,33 @@ object DefaultCategories {
         if (categoryDao.count() > 0) return
 
         val categories = listOf(
-            CategoryEntity(name = "Salary", type = TransactionType.INCOME, iconName = "salary"),
-            CategoryEntity(name = "Freelance", type = TransactionType.INCOME, iconName = "freelance"),
-            CategoryEntity(name = "Investment", type = TransactionType.INVESTMENT, iconName = "investment"),
-            CategoryEntity(name = "Gift", type = TransactionType.INCOME, iconName = "gift"),
+            // Income Categories
+            CategoryEntity(name = "Salary & Wages", type = TransactionType.INCOME, iconName = "salary"),
+            CategoryEntity(name = "Business & Freelance", type = TransactionType.INCOME, iconName = "freelance"),
+            CategoryEntity(name = "Investments & Dividends", type = TransactionType.INCOME, iconName = "investment"),
+            CategoryEntity(name = "Gifts & Grants", type = TransactionType.INCOME, iconName = "gift"),
+            CategoryEntity(name = "Rental Income", type = TransactionType.INCOME, iconName = "rent"),
             CategoryEntity(name = "Other Income", type = TransactionType.INCOME, iconName = "other"),
-            CategoryEntity(name = "Food", type = TransactionType.EXPENSE, iconName = "food"),
-            CategoryEntity(name = "Transport", type = TransactionType.EXPENSE, iconName = "transport"),
-            CategoryEntity(name = "Rent", type = TransactionType.EXPENSE, iconName = "rent"),
-            CategoryEntity(name = "Utilities", type = TransactionType.EXPENSE, iconName = "utilities"),
-            CategoryEntity(name = "Shopping", type = TransactionType.EXPENSE, iconName = "shopping"),
-            CategoryEntity(name = "Entertainment", type = TransactionType.EXPENSE, iconName = "entertainment"),
-            CategoryEntity(name = "Healthcare", type = TransactionType.EXPENSE, iconName = "healthcare"),
+
+            // Investment Categories
+            CategoryEntity(name = "Stocks & Shares", type = TransactionType.INVESTMENT, iconName = "investment"),
+            CategoryEntity(name = "Real Estate & Property", type = TransactionType.INVESTMENT, iconName = "rent"),
+            CategoryEntity(name = "Crypto & Digital Assets", type = TransactionType.INVESTMENT, iconName = "other"),
+            CategoryEntity(name = "Savings & Fixed Deposit", type = TransactionType.INVESTMENT, iconName = "salary"),
+            CategoryEntity(name = "Retirement & Pension", type = TransactionType.INVESTMENT, iconName = "investment"),
+
+            // Expense Categories
+            CategoryEntity(name = "Food & Dining", type = TransactionType.EXPENSE, iconName = "food"),
+            CategoryEntity(name = "Housing & Rent", type = TransactionType.EXPENSE, iconName = "rent"),
+            CategoryEntity(name = "Utilities & Bills", type = TransactionType.EXPENSE, iconName = "utilities"),
+            CategoryEntity(name = "Transportation", type = TransactionType.EXPENSE, iconName = "transport"),
+            CategoryEntity(name = "Shopping & Retail", type = TransactionType.EXPENSE, iconName = "shopping"),
+            CategoryEntity(name = "Entertainment & Leisure", type = TransactionType.EXPENSE, iconName = "entertainment"),
+            CategoryEntity(name = "Healthcare & Medical", type = TransactionType.EXPENSE, iconName = "healthcare"),
+            CategoryEntity(name = "Education & School", type = TransactionType.EXPENSE, iconName = "school"),
+            CategoryEntity(name = "Insurances", type = TransactionType.EXPENSE, iconName = "insurance"),
+            CategoryEntity(name = "Debts & Bank Charges", type = TransactionType.EXPENSE, iconName = "debt"),
+            CategoryEntity(name = "Black Tax & Charity", type = TransactionType.EXPENSE, iconName = "gift"),
             CategoryEntity(name = "Other Expense", type = TransactionType.EXPENSE, iconName = "other")
         )
 

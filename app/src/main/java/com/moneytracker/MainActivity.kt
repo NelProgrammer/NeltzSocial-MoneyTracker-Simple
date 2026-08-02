@@ -11,6 +11,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        com.moneytracker.util.SettingsManager.init(applicationContext)
         val repository = (application as MoneyTrackerApp).repository
         setContent {
             MoneyTrackerTheme {
