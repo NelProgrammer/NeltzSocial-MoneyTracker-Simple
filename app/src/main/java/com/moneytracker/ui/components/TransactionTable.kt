@@ -42,8 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
+import com.moneytracker.ui.theme.EducationColor
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.viewmodel.SortCriterion
 import com.moneytracker.ui.viewmodel.TransactionsViewModel.SortDirection
 import com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField
@@ -177,7 +179,7 @@ fun TransactionTable(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TableHeaderCell(
+internal fun TableHeaderCell(
     label: String,
     field: SortField?,
     secondarySorts: List<SortCriterion>,
@@ -217,7 +219,7 @@ private fun TableHeaderCell(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Category (Fixed #1)",
+                    text = "Category",
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -282,19 +284,21 @@ private fun TableHeaderCell(
 }
 
 @Composable
-private fun TableRow(
+internal fun TableRow(
     transaction: TransactionWithCategory,
     onEditTransaction: (Long) -> Unit
 ) {
-    val amountColor = when (transaction.type) {
+    val categoryColor = when (transaction.type) {
         TransactionType.INCOME -> IncomeColor
+        TransactionType.INVESTMENT -> InvestmentColor
+        TransactionType.EDUCATION -> EducationColor
         TransactionType.EXPENSE -> ExpenseColor
-        TransactionType.INVESTMENT -> MaterialTheme.colorScheme.tertiary
     }
     val prefix = when (transaction.type) {
         TransactionType.INCOME -> "+"
-        TransactionType.EXPENSE -> "-"
         TransactionType.INVESTMENT -> "-"
+        TransactionType.EDUCATION -> "-"
+        TransactionType.EXPENSE -> "-"
     }
     val gridLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
 
@@ -318,27 +322,19 @@ private fun TableRow(
 
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 
-            // 2. Category (Transaction Type)
+            // 2. Category (Income, Investment, Education, Expense)
             Box(
                 modifier = Modifier.width(95.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    color = when (transaction.type) {
-                        TransactionType.INCOME -> IncomeColor.copy(alpha = 0.15f)
-                        TransactionType.EXPENSE -> ExpenseColor.copy(alpha = 0.15f)
-                        TransactionType.INVESTMENT -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-                    },
+                    color = categoryColor.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = transaction.type.name,
+                        text = transaction.categoryName,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = when (transaction.type) {
-                            TransactionType.INCOME -> IncomeColor
-                            TransactionType.EXPENSE -> ExpenseColor
-                            TransactionType.INVESTMENT -> MaterialTheme.colorScheme.tertiary
-                        },
+                        color = categoryColor,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -349,9 +345,9 @@ private fun TableRow(
 
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 
-            // 3. SubCategory (Category Name)
+            // 3. SubCategory (Salary, Credit & Bank Charges, Utilities, etc.)
             Text(
-                text = transaction.categoryName,
+                text = transaction.subCategory,
                 modifier = Modifier.width(115.dp),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                 textAlign = TextAlign.Center,
@@ -361,12 +357,12 @@ private fun TableRow(
 
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 
-            // 4. Detail (SubCategory text)
+            // 4. Detail (Normal, Bonus, Home Loan, Credit Card R40, etc.)
             Text(
-                text = if (transaction.subCategory.isNotBlank()) transaction.subCategory else "-",
+                text = if (transaction.detail.isNotBlank()) transaction.detail else "-",
                 modifier = Modifier.width(115.dp),
                 style = MaterialTheme.typography.bodySmall,
-                color = if (transaction.subCategory.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                color = if (transaction.detail.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -379,7 +375,7 @@ private fun TableRow(
                 text = "$prefix${CurrencyUtils.format(transaction.amount)}",
                 modifier = Modifier.width(95.dp),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                color = amountColor,
+                color = categoryColor,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -387,7 +383,7 @@ private fun TableRow(
 
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 
-            // 6. Note (End of Table)
+            // 6. Note / Comments
             Text(
                 text = if (transaction.note.isNotBlank()) transaction.note else "-",
                 modifier = Modifier.width(120.dp),

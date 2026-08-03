@@ -59,38 +59,40 @@ public final class TransactionDao_Impl implements TransactionDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `transactions` (`id`,`amount`,`type`,`categoryId`,`date`,`note`,`sortOrder`,`subCategory`,`isRecurring`,`recurrenceFrequency`,`recurTillDate`,`recurCount`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `transactions` (`id`,`profileId`,`amount`,`type`,`categoryId`,`date`,`note`,`sortOrder`,`subCategory`,`detail`,`isRecurring`,`recurrenceFrequency`,`recurTillDate`,`recurCount`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final TransactionEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindDouble(2, entity.getAmount());
+        statement.bindLong(2, entity.getProfileId());
+        statement.bindDouble(3, entity.getAmount());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(3, _tmp);
-        statement.bindLong(4, entity.getCategoryId());
-        statement.bindLong(5, entity.getDate());
-        statement.bindString(6, entity.getNote());
-        statement.bindLong(7, entity.getSortOrder());
-        statement.bindString(8, entity.getSubCategory());
+        statement.bindString(4, _tmp);
+        statement.bindLong(5, entity.getCategoryId());
+        statement.bindLong(6, entity.getDate());
+        statement.bindString(7, entity.getNote());
+        statement.bindLong(8, entity.getSortOrder());
+        statement.bindString(9, entity.getSubCategory());
+        statement.bindString(10, entity.getDetail());
         final int _tmp_1 = entity.isRecurring() ? 1 : 0;
-        statement.bindLong(9, _tmp_1);
+        statement.bindLong(11, _tmp_1);
         final String _tmp_2 = __recurrenceFrequencyConverter.fromFrequency(entity.getRecurrenceFrequency());
         if (_tmp_2 == null) {
-          statement.bindNull(10);
-        } else {
-          statement.bindString(10, _tmp_2);
-        }
-        if (entity.getRecurTillDate() == null) {
-          statement.bindNull(11);
-        } else {
-          statement.bindLong(11, entity.getRecurTillDate());
-        }
-        if (entity.getRecurCount() == null) {
           statement.bindNull(12);
         } else {
-          statement.bindLong(12, entity.getRecurCount());
+          statement.bindString(12, _tmp_2);
+        }
+        if (entity.getRecurTillDate() == null) {
+          statement.bindNull(13);
+        } else {
+          statement.bindLong(13, entity.getRecurTillDate());
+        }
+        if (entity.getRecurCount() == null) {
+          statement.bindNull(14);
+        } else {
+          statement.bindLong(14, entity.getRecurCount());
         }
       }
     };
@@ -111,40 +113,42 @@ public final class TransactionDao_Impl implements TransactionDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `transactions` SET `id` = ?,`amount` = ?,`type` = ?,`categoryId` = ?,`date` = ?,`note` = ?,`sortOrder` = ?,`subCategory` = ?,`isRecurring` = ?,`recurrenceFrequency` = ?,`recurTillDate` = ?,`recurCount` = ? WHERE `id` = ?";
+        return "UPDATE OR ABORT `transactions` SET `id` = ?,`profileId` = ?,`amount` = ?,`type` = ?,`categoryId` = ?,`date` = ?,`note` = ?,`sortOrder` = ?,`subCategory` = ?,`detail` = ?,`isRecurring` = ?,`recurrenceFrequency` = ?,`recurTillDate` = ?,`recurCount` = ? WHERE `id` = ?";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final TransactionEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindDouble(2, entity.getAmount());
+        statement.bindLong(2, entity.getProfileId());
+        statement.bindDouble(3, entity.getAmount());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(3, _tmp);
-        statement.bindLong(4, entity.getCategoryId());
-        statement.bindLong(5, entity.getDate());
-        statement.bindString(6, entity.getNote());
-        statement.bindLong(7, entity.getSortOrder());
-        statement.bindString(8, entity.getSubCategory());
+        statement.bindString(4, _tmp);
+        statement.bindLong(5, entity.getCategoryId());
+        statement.bindLong(6, entity.getDate());
+        statement.bindString(7, entity.getNote());
+        statement.bindLong(8, entity.getSortOrder());
+        statement.bindString(9, entity.getSubCategory());
+        statement.bindString(10, entity.getDetail());
         final int _tmp_1 = entity.isRecurring() ? 1 : 0;
-        statement.bindLong(9, _tmp_1);
+        statement.bindLong(11, _tmp_1);
         final String _tmp_2 = __recurrenceFrequencyConverter.fromFrequency(entity.getRecurrenceFrequency());
         if (_tmp_2 == null) {
-          statement.bindNull(10);
-        } else {
-          statement.bindString(10, _tmp_2);
-        }
-        if (entity.getRecurTillDate() == null) {
-          statement.bindNull(11);
-        } else {
-          statement.bindLong(11, entity.getRecurTillDate());
-        }
-        if (entity.getRecurCount() == null) {
           statement.bindNull(12);
         } else {
-          statement.bindLong(12, entity.getRecurCount());
+          statement.bindString(12, _tmp_2);
         }
-        statement.bindLong(13, entity.getId());
+        if (entity.getRecurTillDate() == null) {
+          statement.bindNull(13);
+        } else {
+          statement.bindLong(13, entity.getRecurTillDate());
+        }
+        if (entity.getRecurCount() == null) {
+          statement.bindNull(14);
+        } else {
+          statement.bindLong(14, entity.getRecurCount());
+        }
+        statement.bindLong(15, entity.getId());
       }
     };
     this.__preparedStmtOfUpdateSortOrder = new SharedSQLiteStatement(__db) {
@@ -243,15 +247,18 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Flow<List<TransactionWithCategory>> observeAllWithCategory() {
+  public Flow<List<TransactionWithCategory>> observeAllWithCategory(final long profileId) {
     final String _sql = "\n"
-            + "        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,\n"
+            + "        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,\n"
             + "               c.name AS categoryName, c.iconName AS categoryIconName\n"
             + "        FROM transactions t\n"
             + "        INNER JOIN categories c ON t.categoryId = c.id\n"
+            + "        WHERE t.profileId = ?\n"
             + "        ORDER BY t.sortOrder ASC, t.date DESC, t.id DESC\n"
             + "        ";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"transactions",
         "categories"}, new Callable<List<TransactionWithCategory>>() {
       @Override
@@ -267,8 +274,9 @@ public final class TransactionDao_Impl implements TransactionDao {
           final int _cursorIndexOfNote = 5;
           final int _cursorIndexOfSortOrder = 6;
           final int _cursorIndexOfSubCategory = 7;
-          final int _cursorIndexOfCategoryName = 8;
-          final int _cursorIndexOfCategoryIconName = 9;
+          final int _cursorIndexOfDetail = 8;
+          final int _cursorIndexOfCategoryName = 9;
+          final int _cursorIndexOfCategoryIconName = 10;
           final List<TransactionWithCategory> _result = new ArrayList<TransactionWithCategory>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final TransactionWithCategory _item;
@@ -290,11 +298,13 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
             final String _tmpSubCategory;
             _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final String _tmpDetail;
+            _tmpDetail = _cursor.getString(_cursorIndexOfDetail);
             final String _tmpCategoryName;
             _tmpCategoryName = _cursor.getString(_cursorIndexOfCategoryName);
             final String _tmpCategoryIconName;
             _tmpCategoryIconName = _cursor.getString(_cursorIndexOfCategoryIconName);
-            _item = new TransactionWithCategory(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpCategoryName,_tmpCategoryIconName);
+            _item = new TransactionWithCategory(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpCategoryName,_tmpCategoryIconName);
             _result.add(_item);
           }
           return _result;
@@ -311,20 +321,22 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Flow<List<TransactionWithCategory>> observeByDateRange(final long startDate,
-      final long endDate) {
+  public Flow<List<TransactionWithCategory>> observeByDateRange(final long profileId,
+      final long startDate, final long endDate) {
     final String _sql = "\n"
-            + "        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,\n"
+            + "        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,\n"
             + "               c.name AS categoryName, c.iconName AS categoryIconName\n"
             + "        FROM transactions t\n"
             + "        INNER JOIN categories c ON t.categoryId = c.id\n"
-            + "        WHERE t.date >= ? AND t.date < ?\n"
+            + "        WHERE t.profileId = ? AND t.date >= ? AND t.date < ?\n"
             + "        ORDER BY t.sortOrder ASC, t.date DESC, t.id DESC\n"
             + "        ";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 2);
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 3);
     int _argIndex = 1;
-    _statement.bindLong(_argIndex, startDate);
+    _statement.bindLong(_argIndex, profileId);
     _argIndex = 2;
+    _statement.bindLong(_argIndex, startDate);
+    _argIndex = 3;
     _statement.bindLong(_argIndex, endDate);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"transactions",
         "categories"}, new Callable<List<TransactionWithCategory>>() {
@@ -341,8 +353,9 @@ public final class TransactionDao_Impl implements TransactionDao {
           final int _cursorIndexOfNote = 5;
           final int _cursorIndexOfSortOrder = 6;
           final int _cursorIndexOfSubCategory = 7;
-          final int _cursorIndexOfCategoryName = 8;
-          final int _cursorIndexOfCategoryIconName = 9;
+          final int _cursorIndexOfDetail = 8;
+          final int _cursorIndexOfCategoryName = 9;
+          final int _cursorIndexOfCategoryIconName = 10;
           final List<TransactionWithCategory> _result = new ArrayList<TransactionWithCategory>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final TransactionWithCategory _item;
@@ -364,11 +377,13 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
             final String _tmpSubCategory;
             _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final String _tmpDetail;
+            _tmpDetail = _cursor.getString(_cursorIndexOfDetail);
             final String _tmpCategoryName;
             _tmpCategoryName = _cursor.getString(_cursorIndexOfCategoryName);
             final String _tmpCategoryIconName;
             _tmpCategoryIconName = _cursor.getString(_cursorIndexOfCategoryIconName);
-            _item = new TransactionWithCategory(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpCategoryName,_tmpCategoryIconName);
+            _item = new TransactionWithCategory(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpCategoryName,_tmpCategoryIconName);
             _result.add(_item);
           }
           return _result;
@@ -398,6 +413,7 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
@@ -405,6 +421,7 @@ public final class TransactionDao_Impl implements TransactionDao {
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
+          final int _cursorIndexOfDetail = CursorUtil.getColumnIndexOrThrow(_cursor, "detail");
           final int _cursorIndexOfIsRecurring = CursorUtil.getColumnIndexOrThrow(_cursor, "isRecurring");
           final int _cursorIndexOfRecurrenceFrequency = CursorUtil.getColumnIndexOrThrow(_cursor, "recurrenceFrequency");
           final int _cursorIndexOfRecurTillDate = CursorUtil.getColumnIndexOrThrow(_cursor, "recurTillDate");
@@ -413,6 +430,8 @@ public final class TransactionDao_Impl implements TransactionDao {
           if (_cursor.moveToFirst()) {
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final TransactionType _tmpType;
@@ -429,6 +448,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
             final String _tmpSubCategory;
             _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final String _tmpDetail;
+            _tmpDetail = _cursor.getString(_cursorIndexOfDetail);
             final boolean _tmpIsRecurring;
             final int _tmp_1;
             _tmp_1 = _cursor.getInt(_cursorIndexOfIsRecurring);
@@ -453,7 +474,7 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _result = new TransactionEntity(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _result = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
           } else {
             _result = null;
           }
@@ -467,20 +488,22 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Flow<Double> observeTotalByTypeAndDateRange(final TransactionType type,
-      final long startDate, final long endDate) {
+  public Flow<Double> observeTotalByTypeAndDateRange(final long profileId,
+      final TransactionType type, final long startDate, final long endDate) {
     final String _sql = "\n"
             + "        SELECT COALESCE(SUM(ABS(amount)), 0)\n"
             + "        FROM transactions\n"
-            + "        WHERE type = ? AND date >= ? AND date < ?\n"
+            + "        WHERE profileId = ? AND type = ? AND date >= ? AND date < ?\n"
             + "        ";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 3);
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 4);
     int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
+    _argIndex = 2;
     final String _tmp = __transactionTypeConverter.fromType(type);
     _statement.bindString(_argIndex, _tmp);
-    _argIndex = 2;
-    _statement.bindLong(_argIndex, startDate);
     _argIndex = 3;
+    _statement.bindLong(_argIndex, startDate);
+    _argIndex = 4;
     _statement.bindLong(_argIndex, endDate);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"transactions"}, new Callable<Double>() {
       @Override
@@ -510,29 +533,34 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Flow<List<CategorySummary>> observeCategorySummaries(final TransactionType type,
-      final long startDate, final long endDate) {
+  public Flow<List<CategorySummary>> observeCategorySummaries(final long profileId,
+      final TransactionType type, final long startDate, final long endDate) {
     final String _sql = "\n"
             + "        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total\n"
             + "        FROM categories c\n"
             + "        LEFT JOIN transactions t ON t.categoryId = c.id\n"
+            + "            AND t.profileId = ?\n"
             + "            AND t.type = ?\n"
             + "            AND t.date >= ?\n"
             + "            AND t.date < ?\n"
-            + "        WHERE c.type = ?\n"
+            + "        WHERE c.profileId = ? AND c.type = ?\n"
             + "        GROUP BY c.id, c.name\n"
             + "        HAVING total > 0\n"
             + "        ORDER BY total DESC\n"
             + "        ";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 4);
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 6);
     int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
+    _argIndex = 2;
     final String _tmp = __transactionTypeConverter.fromType(type);
     _statement.bindString(_argIndex, _tmp);
-    _argIndex = 2;
-    _statement.bindLong(_argIndex, startDate);
     _argIndex = 3;
-    _statement.bindLong(_argIndex, endDate);
+    _statement.bindLong(_argIndex, startDate);
     _argIndex = 4;
+    _statement.bindLong(_argIndex, endDate);
+    _argIndex = 5;
+    _statement.bindLong(_argIndex, profileId);
+    _argIndex = 6;
     final String _tmp_1 = __transactionTypeConverter.fromType(type);
     _statement.bindString(_argIndex, _tmp_1);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"categories",
@@ -571,9 +599,12 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Object nextSortOrder(final Continuation<? super Integer> $completion) {
-    final String _sql = "SELECT COALESCE(MIN(sortOrder), 0) - 1 FROM transactions";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+  public Object nextSortOrder(final long profileId,
+      final Continuation<? super Integer> $completion) {
+    final String _sql = "SELECT COALESCE(MIN(sortOrder), 0) - 1 FROM transactions WHERE profileId = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
     return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<Integer>() {
       @Override
@@ -599,10 +630,12 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Object getRecurringTransactions(
+  public Object getRecurringTransactions(final long profileId,
       final Continuation<? super List<TransactionEntity>> $completion) {
-    final String _sql = "SELECT * FROM transactions WHERE isRecurring = 1";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    final String _sql = "SELECT * FROM transactions WHERE profileId = ? AND isRecurring = 1";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
     return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<TransactionEntity>>() {
       @Override
@@ -611,6 +644,7 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
@@ -618,6 +652,7 @@ public final class TransactionDao_Impl implements TransactionDao {
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
+          final int _cursorIndexOfDetail = CursorUtil.getColumnIndexOrThrow(_cursor, "detail");
           final int _cursorIndexOfIsRecurring = CursorUtil.getColumnIndexOrThrow(_cursor, "isRecurring");
           final int _cursorIndexOfRecurrenceFrequency = CursorUtil.getColumnIndexOrThrow(_cursor, "recurrenceFrequency");
           final int _cursorIndexOfRecurTillDate = CursorUtil.getColumnIndexOrThrow(_cursor, "recurTillDate");
@@ -627,6 +662,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             final TransactionEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final TransactionType _tmpType;
@@ -643,6 +680,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
             final String _tmpSubCategory;
             _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final String _tmpDetail;
+            _tmpDetail = _cursor.getString(_cursorIndexOfDetail);
             final boolean _tmpIsRecurring;
             final int _tmp_1;
             _tmp_1 = _cursor.getInt(_cursorIndexOfIsRecurring);
@@ -667,7 +706,7 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _item = new TransactionEntity(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _item = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
             _result.add(_item);
           }
           return _result;
@@ -680,9 +719,12 @@ public final class TransactionDao_Impl implements TransactionDao {
   }
 
   @Override
-  public Object getAllEntities(final Continuation<? super List<TransactionEntity>> $completion) {
-    final String _sql = "SELECT * FROM transactions";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+  public Object getAllEntities(final long profileId,
+      final Continuation<? super List<TransactionEntity>> $completion) {
+    final String _sql = "SELECT * FROM transactions WHERE profileId = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
     return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<TransactionEntity>>() {
       @Override
@@ -691,6 +733,7 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
@@ -698,6 +741,7 @@ public final class TransactionDao_Impl implements TransactionDao {
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
+          final int _cursorIndexOfDetail = CursorUtil.getColumnIndexOrThrow(_cursor, "detail");
           final int _cursorIndexOfIsRecurring = CursorUtil.getColumnIndexOrThrow(_cursor, "isRecurring");
           final int _cursorIndexOfRecurrenceFrequency = CursorUtil.getColumnIndexOrThrow(_cursor, "recurrenceFrequency");
           final int _cursorIndexOfRecurTillDate = CursorUtil.getColumnIndexOrThrow(_cursor, "recurTillDate");
@@ -707,6 +751,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             final TransactionEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
             _tmpAmount = _cursor.getDouble(_cursorIndexOfAmount);
             final TransactionType _tmpType;
@@ -723,6 +769,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpSortOrder = _cursor.getInt(_cursorIndexOfSortOrder);
             final String _tmpSubCategory;
             _tmpSubCategory = _cursor.getString(_cursorIndexOfSubCategory);
+            final String _tmpDetail;
+            _tmpDetail = _cursor.getString(_cursorIndexOfDetail);
             final boolean _tmpIsRecurring;
             final int _tmp_1;
             _tmp_1 = _cursor.getInt(_cursorIndexOfIsRecurring);
@@ -747,8 +795,39 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _item = new TransactionEntity(_tmpId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _item = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
             _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object countForProfile(final long profileId,
+      final Continuation<? super Integer> $completion) {
+    final String _sql = "SELECT COUNT(*) FROM transactions WHERE profileId = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<Integer>() {
+      @Override
+      @NonNull
+      public Integer call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final Integer _result;
+          if (_cursor.moveToFirst()) {
+            final int _tmp;
+            _tmp = _cursor.getInt(0);
+            _result = _tmp;
+          } else {
+            _result = 0;
           }
           return _result;
         } finally {

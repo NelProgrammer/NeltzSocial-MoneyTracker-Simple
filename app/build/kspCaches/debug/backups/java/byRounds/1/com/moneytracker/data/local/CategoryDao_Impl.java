@@ -9,6 +9,7 @@ import androidx.room.EntityDeletionOrUpdateAdapter;
 import androidx.room.EntityInsertionAdapter;
 import androidx.room.RoomDatabase;
 import androidx.room.RoomSQLiteQuery;
+import androidx.room.SharedSQLiteStatement;
 import androidx.room.util.CursorUtil;
 import androidx.room.util.DBUtil;
 import androidx.sqlite.db.SupportSQLiteStatement;
@@ -44,23 +45,26 @@ public final class CategoryDao_Impl implements CategoryDao {
 
   private final EntityDeletionOrUpdateAdapter<CategoryEntity> __updateAdapterOfCategoryEntity;
 
+  private final SharedSQLiteStatement __preparedStmtOfDeleteAllForProfile;
+
   public CategoryDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfCategoryEntity = new EntityInsertionAdapter<CategoryEntity>(__db) {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `categories` (`id`,`name`,`type`,`iconName`) VALUES (nullif(?, 0),?,?,?)";
+        return "INSERT OR REPLACE INTO `categories` (`id`,`profileId`,`name`,`type`,`iconName`) VALUES (nullif(?, 0),?,?,?,?)";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final CategoryEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindString(2, entity.getName());
+        statement.bindLong(2, entity.getProfileId());
+        statement.bindString(3, entity.getName());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(3, _tmp);
-        statement.bindString(4, entity.getIconName());
+        statement.bindString(4, _tmp);
+        statement.bindString(5, entity.getIconName());
       }
     };
     this.__deletionAdapterOfCategoryEntity = new EntityDeletionOrUpdateAdapter<CategoryEntity>(__db) {
@@ -80,18 +84,27 @@ public final class CategoryDao_Impl implements CategoryDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `categories` SET `id` = ?,`name` = ?,`type` = ?,`iconName` = ? WHERE `id` = ?";
+        return "UPDATE OR ABORT `categories` SET `id` = ?,`profileId` = ?,`name` = ?,`type` = ?,`iconName` = ? WHERE `id` = ?";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final CategoryEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindString(2, entity.getName());
+        statement.bindLong(2, entity.getProfileId());
+        statement.bindString(3, entity.getName());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(3, _tmp);
-        statement.bindString(4, entity.getIconName());
-        statement.bindLong(5, entity.getId());
+        statement.bindString(4, _tmp);
+        statement.bindString(5, entity.getIconName());
+        statement.bindLong(6, entity.getId());
+      }
+    };
+    this.__preparedStmtOfDeleteAllForProfile = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM categories WHERE profileId = ?";
+        return _query;
       }
     };
   }
@@ -154,9 +167,37 @@ public final class CategoryDao_Impl implements CategoryDao {
   }
 
   @Override
-  public Flow<List<CategoryEntity>> observeAll() {
-    final String _sql = "SELECT * FROM categories ORDER BY name ASC";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+  public Object deleteAllForProfile(final long profileId,
+      final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteAllForProfile.acquire();
+        int _argIndex = 1;
+        _stmt.bindLong(_argIndex, profileId);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfDeleteAllForProfile.release(_stmt);
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Flow<List<CategoryEntity>> observeAll(final long profileId) {
+    final String _sql = "SELECT * FROM categories WHERE profileId = ? ORDER BY name ASC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"categories"}, new Callable<List<CategoryEntity>>() {
       @Override
       @NonNull
@@ -164,6 +205,7 @@ public final class CategoryDao_Impl implements CategoryDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfName = CursorUtil.getColumnIndexOrThrow(_cursor, "name");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfIconName = CursorUtil.getColumnIndexOrThrow(_cursor, "iconName");
@@ -172,6 +214,8 @@ public final class CategoryDao_Impl implements CategoryDao {
             final CategoryEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final String _tmpName;
             _tmpName = _cursor.getString(_cursorIndexOfName);
             final TransactionType _tmpType;
@@ -180,7 +224,7 @@ public final class CategoryDao_Impl implements CategoryDao {
             _tmpType = __transactionTypeConverter.toType(_tmp);
             final String _tmpIconName;
             _tmpIconName = _cursor.getString(_cursorIndexOfIconName);
-            _item = new CategoryEntity(_tmpId,_tmpName,_tmpType,_tmpIconName);
+            _item = new CategoryEntity(_tmpId,_tmpProfileId,_tmpName,_tmpType,_tmpIconName);
             _result.add(_item);
           }
           return _result;
@@ -197,10 +241,13 @@ public final class CategoryDao_Impl implements CategoryDao {
   }
 
   @Override
-  public Flow<List<CategoryEntity>> observeByType(final TransactionType type) {
-    final String _sql = "SELECT * FROM categories WHERE type = ? ORDER BY name ASC";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+  public Flow<List<CategoryEntity>> observeByType(final long profileId,
+      final TransactionType type) {
+    final String _sql = "SELECT * FROM categories WHERE profileId = ? AND type = ? ORDER BY name ASC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 2);
     int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
+    _argIndex = 2;
     final String _tmp = __transactionTypeConverter.fromType(type);
     _statement.bindString(_argIndex, _tmp);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"categories"}, new Callable<List<CategoryEntity>>() {
@@ -210,6 +257,7 @@ public final class CategoryDao_Impl implements CategoryDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfName = CursorUtil.getColumnIndexOrThrow(_cursor, "name");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfIconName = CursorUtil.getColumnIndexOrThrow(_cursor, "iconName");
@@ -218,6 +266,8 @@ public final class CategoryDao_Impl implements CategoryDao {
             final CategoryEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final String _tmpName;
             _tmpName = _cursor.getString(_cursorIndexOfName);
             final TransactionType _tmpType;
@@ -226,7 +276,7 @@ public final class CategoryDao_Impl implements CategoryDao {
             _tmpType = __transactionTypeConverter.toType(_tmp_1);
             final String _tmpIconName;
             _tmpIconName = _cursor.getString(_cursorIndexOfIconName);
-            _item = new CategoryEntity(_tmpId,_tmpName,_tmpType,_tmpIconName);
+            _item = new CategoryEntity(_tmpId,_tmpProfileId,_tmpName,_tmpType,_tmpIconName);
             _result.add(_item);
           }
           return _result;
@@ -256,6 +306,7 @@ public final class CategoryDao_Impl implements CategoryDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfName = CursorUtil.getColumnIndexOrThrow(_cursor, "name");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfIconName = CursorUtil.getColumnIndexOrThrow(_cursor, "iconName");
@@ -263,6 +314,8 @@ public final class CategoryDao_Impl implements CategoryDao {
           if (_cursor.moveToFirst()) {
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final String _tmpName;
             _tmpName = _cursor.getString(_cursorIndexOfName);
             final TransactionType _tmpType;
@@ -271,7 +324,7 @@ public final class CategoryDao_Impl implements CategoryDao {
             _tmpType = __transactionTypeConverter.toType(_tmp);
             final String _tmpIconName;
             _tmpIconName = _cursor.getString(_cursorIndexOfIconName);
-            _result = new CategoryEntity(_tmpId,_tmpName,_tmpType,_tmpIconName);
+            _result = new CategoryEntity(_tmpId,_tmpProfileId,_tmpName,_tmpType,_tmpIconName);
           } else {
             _result = null;
           }
@@ -285,9 +338,11 @@ public final class CategoryDao_Impl implements CategoryDao {
   }
 
   @Override
-  public Object count(final Continuation<? super Integer> $completion) {
-    final String _sql = "SELECT COUNT(*) FROM categories";
-    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+  public Object count(final long profileId, final Continuation<? super Integer> $completion) {
+    final String _sql = "SELECT COUNT(*) FROM categories WHERE profileId = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
     final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
     return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<Integer>() {
       @Override

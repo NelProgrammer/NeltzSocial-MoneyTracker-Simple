@@ -22,7 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.TransactionType
-import com.moneytracker.ui.components.EmptyState
+import com.moneytracker.ui.components.PayMonthFilterHeader
 import com.moneytracker.ui.components.TransactionTable
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 
@@ -37,6 +37,7 @@ fun TransactionsScreen(
     val transactions by viewModel.transactions.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
     val secondarySorts by viewModel.secondarySorts.collectAsState()
+    val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
         modifier = Modifier,
@@ -54,9 +55,16 @@ fun TransactionsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // PayMonth Filter Header (Prev, Current, Next, Dropdown)
+            PayMonthFilterHeader(
+                selectedPayMonthDate = selectedPayMonthDate,
+                onPayMonthSelected = { viewModel.setPayMonth(it) }
+            )
+
+            // Category Filter Chips
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 FilterChip(
                     modifier = Modifier.weight(1f),
@@ -74,28 +82,31 @@ fun TransactionsScreen(
                     modifier = Modifier.weight(1f),
                     selected = filterType == TransactionType.INVESTMENT,
                     onClick = { viewModel.setFilter(TransactionType.INVESTMENT) },
-                    label = { Text("Investment", maxLines = 1) }
+                    label = { Text("Invest", maxLines = 1) }
+                )
+                FilterChip(
+                    modifier = Modifier.weight(1f),
+                    selected = filterType == TransactionType.EDUCATION,
+                    onClick = { viewModel.setFilter(TransactionType.EDUCATION) },
+                    label = { Text("Edu", maxLines = 1) }
                 )
                 FilterChip(
                     modifier = Modifier.weight(1f),
                     selected = filterType == TransactionType.EXPENSE,
                     onClick = { viewModel.setFilter(TransactionType.EXPENSE) },
-                    label = { Text("Expenses", maxLines = 1) }
+                    label = { Text("Expense", maxLines = 1) }
                 )
             }
 
-            if (transactions.isEmpty()) {
-                EmptyState("No transactions found.")
-            } else {
-                TransactionTable(
-                    transactions = transactions,
-                    secondarySorts = secondarySorts,
-                    onHeaderClicked = viewModel::onHeaderClicked,
-                    onHeaderLongPressed = viewModel::onHeaderLongPressed,
-                    onEditTransaction = onEditTransaction,
-                    onDeleteTransaction = viewModel::deleteTransaction
-                )
-            }
+            // Clean, crisp Grid Table without drag handles
+            TransactionTable(
+                transactions = transactions,
+                secondarySorts = secondarySorts,
+                onHeaderClicked = { viewModel.onHeaderClicked(it) },
+                onHeaderLongPressed = { viewModel.onHeaderLongPressed(it) },
+                onEditTransaction = { id -> onEditTransaction(id) },
+                onDeleteTransaction = { viewModel.deleteTransaction(it) }
+            )
         }
     }
 }

@@ -9,19 +9,55 @@ import androidx.room.Update
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.data.local.entity.CategorySummary
 import com.moneytracker.data.local.entity.DetailEntity
+import com.moneytracker.data.local.entity.GroceryItemEntity
+import com.moneytracker.data.local.entity.ProfileEntity
 import com.moneytracker.data.local.entity.SubCategoryEntity
+import com.moneytracker.data.local.entity.TaxiFareEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface CategoryDao {
-    @Query("SELECT * FROM categories ORDER BY name ASC")
-    fun observeAll(): Flow<List<CategoryEntity>>
+interface ProfileDao {
+    @Query("SELECT * FROM profiles ORDER BY isGuest DESC, username ASC")
+    fun observeAll(): Flow<List<ProfileEntity>>
 
-    @Query("SELECT * FROM categories WHERE type = :type ORDER BY name ASC")
-    fun observeByType(type: TransactionType): Flow<List<CategoryEntity>>
+    @Query("SELECT * FROM profiles WHERE isGuest = 0 ORDER BY username ASC")
+    fun observePermanentProfiles(): Flow<List<ProfileEntity>>
+
+    @Query("SELECT * FROM profiles")
+    suspend fun getAllProfiles(): List<ProfileEntity>
+
+    @Query("SELECT * FROM profiles WHERE isGuest = 1 LIMIT 1")
+    suspend fun getGuestProfile(): ProfileEntity?
+
+    @Query("SELECT * FROM profiles WHERE id = :id")
+    suspend fun getById(id: Long): ProfileEntity?
+
+    @Query("SELECT * FROM profiles WHERE username = :username LIMIT 1")
+    suspend fun getByUsername(username: String): ProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(profile: ProfileEntity): Long
+
+    @Update
+    suspend fun update(profile: ProfileEntity)
+
+    @Delete
+    suspend fun delete(profile: ProfileEntity)
+
+    @Query("SELECT COUNT(*) FROM profiles")
+    suspend fun count(): Int
+}
+
+@Dao
+interface CategoryDao {
+    @Query("SELECT * FROM categories WHERE profileId = :profileId ORDER BY name ASC")
+    fun observeAll(profileId: Long): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM categories WHERE profileId = :profileId AND type = :type ORDER BY name ASC")
+    fun observeByType(profileId: Long, type: TransactionType): Flow<List<CategoryEntity>>
 
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getById(id: Long): CategoryEntity?
@@ -35,17 +71,20 @@ interface CategoryDao {
     @Delete
     suspend fun delete(category: CategoryEntity)
 
-    @Query("SELECT COUNT(*) FROM categories")
-    suspend fun count(): Int
+    @Query("DELETE FROM categories WHERE profileId = :profileId")
+    suspend fun deleteAllForProfile(profileId: Long)
+
+    @Query("SELECT COUNT(*) FROM categories WHERE profileId = :profileId")
+    suspend fun count(profileId: Long): Int
 }
 
 @Dao
 interface SubCategoryDao {
-    @Query("SELECT * FROM sub_categories ORDER BY name ASC")
-    fun observeAll(): Flow<List<SubCategoryEntity>>
+    @Query("SELECT * FROM sub_categories WHERE profileId = :profileId ORDER BY name ASC")
+    fun observeAll(profileId: Long): Flow<List<SubCategoryEntity>>
 
-    @Query("SELECT * FROM sub_categories WHERE categoryId = :categoryId ORDER BY name ASC")
-    fun observeForCategory(categoryId: Long): Flow<List<SubCategoryEntity>>
+    @Query("SELECT * FROM sub_categories WHERE profileId = :profileId AND categoryId = :categoryId ORDER BY name ASC")
+    fun observeForCategory(profileId: Long, categoryId: Long): Flow<List<SubCategoryEntity>>
 
     @Query("SELECT * FROM sub_categories WHERE id = :id")
     suspend fun getById(id: Long): SubCategoryEntity?
@@ -59,14 +98,17 @@ interface SubCategoryDao {
     @Delete
     suspend fun delete(subCategory: SubCategoryEntity)
 
-    @Query("SELECT COUNT(*) FROM sub_categories")
-    suspend fun count(): Int
+    @Query("DELETE FROM sub_categories WHERE profileId = :profileId")
+    suspend fun deleteAllForProfile(profileId: Long)
+
+    @Query("SELECT COUNT(*) FROM sub_categories WHERE profileId = :profileId")
+    suspend fun count(profileId: Long): Int
 }
 
 @Dao
 interface DetailDao {
-    @Query("SELECT * FROM details ORDER BY name ASC")
-    fun observeAll(): Flow<List<DetailEntity>>
+    @Query("SELECT * FROM details WHERE profileId = :profileId ORDER BY name ASC")
+    fun observeAll(profileId: Long): Flow<List<DetailEntity>>
 
     @Query("SELECT * FROM details WHERE id = :id")
     suspend fun getById(id: Long): DetailEntity?
@@ -80,34 +122,38 @@ interface DetailDao {
     @Delete
     suspend fun delete(detail: DetailEntity)
 
-    @Query("SELECT COUNT(*) FROM details")
-    suspend fun count(): Int
+    @Query("DELETE FROM details WHERE profileId = :profileId")
+    suspend fun deleteAllForProfile(profileId: Long)
+
+    @Query("SELECT COUNT(*) FROM details WHERE profileId = :profileId")
+    suspend fun count(profileId: Long): Int
 }
 
 @Dao
 interface TransactionDao {
     @Query(
         """
-        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,
+        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id
+        WHERE t.profileId = :profileId
         ORDER BY t.sortOrder ASC, t.date DESC, t.id DESC
         """
     )
-    fun observeAllWithCategory(): Flow<List<TransactionWithCategory>>
+    fun observeAllWithCategory(profileId: Long): Flow<List<TransactionWithCategory>>
 
     @Query(
         """
-        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory,
+        SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id
-        WHERE t.date >= :startDate AND t.date < :endDate
+        WHERE t.profileId = :profileId AND t.date >= :startDate AND t.date < :endDate
         ORDER BY t.sortOrder ASC, t.date DESC, t.id DESC
         """
     )
-    fun observeByDateRange(startDate: Long, endDate: Long): Flow<List<TransactionWithCategory>>
+    fun observeByDateRange(profileId: Long, startDate: Long, endDate: Long): Flow<List<TransactionWithCategory>>
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getById(id: Long): TransactionEntity?
@@ -116,10 +162,11 @@ interface TransactionDao {
         """
         SELECT COALESCE(SUM(ABS(amount)), 0)
         FROM transactions
-        WHERE type = :type AND date >= :startDate AND date < :endDate
+        WHERE profileId = :profileId AND type = :type AND date >= :startDate AND date < :endDate
         """
     )
     fun observeTotalByTypeAndDateRange(
+        profileId: Long,
         type: TransactionType,
         startDate: Long,
         endDate: Long
@@ -130,16 +177,18 @@ interface TransactionDao {
         SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total
         FROM categories c
         LEFT JOIN transactions t ON t.categoryId = c.id
+            AND t.profileId = :profileId
             AND t.type = :type
             AND t.date >= :startDate
             AND t.date < :endDate
-        WHERE c.type = :type
+        WHERE c.profileId = :profileId AND c.type = :type
         GROUP BY c.id, c.name
         HAVING total > 0
         ORDER BY total DESC
         """
     )
     fun observeCategorySummaries(
+        profileId: Long,
         type: TransactionType,
         startDate: Long,
         endDate: Long
@@ -154,15 +203,51 @@ interface TransactionDao {
     @Delete
     suspend fun delete(transaction: TransactionEntity)
 
-    @Query("SELECT COALESCE(MIN(sortOrder), 0) - 1 FROM transactions")
-    suspend fun nextSortOrder(): Int
+    @Query("SELECT COALESCE(MIN(sortOrder), 0) - 1 FROM transactions WHERE profileId = :profileId")
+    suspend fun nextSortOrder(profileId: Long): Int
 
     @Query("UPDATE transactions SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
-    @Query("SELECT * FROM transactions WHERE isRecurring = 1")
-    suspend fun getRecurringTransactions(): List<TransactionEntity>
+    @Query("SELECT * FROM transactions WHERE profileId = :profileId AND isRecurring = 1")
+    suspend fun getRecurringTransactions(profileId: Long): List<TransactionEntity>
 
-    @Query("SELECT * FROM transactions")
-    suspend fun getAllEntities(): List<TransactionEntity>
+    @Query("SELECT * FROM transactions WHERE profileId = :profileId")
+    suspend fun getAllEntities(profileId: Long): List<TransactionEntity>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE profileId = :profileId")
+    suspend fun countForProfile(profileId: Long): Int
+}
+
+@Dao
+interface GroceryDao {
+    @Query("SELECT * FROM grocery_items WHERE profileId = :profileId ORDER BY date DESC, id DESC")
+    fun observeAll(profileId: Long): Flow<List<GroceryItemEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: GroceryItemEntity): Long
+
+    @Update
+    suspend fun update(item: GroceryItemEntity)
+
+    @Delete
+    suspend fun delete(item: GroceryItemEntity)
+
+    @Query("DELETE FROM grocery_items WHERE profileId = :profileId")
+    suspend fun deleteAll(profileId: Long)
+}
+
+@Dao
+interface TaxiFareDao {
+    @Query("SELECT * FROM taxi_fares WHERE profileId = :profileId ORDER BY date DESC, id DESC")
+    fun observeAll(profileId: Long): Flow<List<TaxiFareEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(fare: TaxiFareEntity): Long
+
+    @Update
+    suspend fun update(fare: TaxiFareEntity)
+
+    @Delete
+    suspend fun delete(fare: TaxiFareEntity)
 }

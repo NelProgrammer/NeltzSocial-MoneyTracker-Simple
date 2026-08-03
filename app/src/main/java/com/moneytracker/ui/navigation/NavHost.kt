@@ -30,12 +30,16 @@ import com.moneytracker.ui.screens.TaxiFareScreen
 import com.moneytracker.ui.screens.MonthComparisonScreen
 import com.moneytracker.ui.screens.CategoriesScreen
 import com.moneytracker.ui.screens.SettingsScreen
+import com.moneytracker.ui.screens.ProfileSelectionScreen
 import com.moneytracker.ui.viewmodel.AddEditViewModel
 import com.moneytracker.ui.viewmodel.DashboardViewModel
 import com.moneytracker.ui.viewmodel.StatsViewModel
 import com.moneytracker.ui.viewmodel.TransactionsViewModel
 import com.moneytracker.ui.viewmodel.CategoriesViewModel
 import com.moneytracker.ui.viewmodel.SettingsViewModel
+import com.moneytracker.ui.viewmodel.GroceriesViewModel
+import com.moneytracker.ui.viewmodel.TaxiFareViewModel
+import com.moneytracker.ui.viewmodel.ProfileViewModel
 import com.moneytracker.data.local.entity.CategoryEntity
 import com.moneytracker.ui.viewmodel.MonthComparisonViewModel
 import com.moneytracker.ui.viewmodel.ViewModelFactory
@@ -43,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
+    object ProfileSelection : Screen("profileSelection", "Profile", Icons.Default.Person)
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
     object Transactions : Screen("transactions", "Transactions", Icons.Default.List)
     object Stats : Screen("stats", "Stats", Icons.Default.PieChart)
@@ -60,14 +65,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 @Composable
 fun MoneyTrackerNavHost(repository: TransactionRepository) {
     val navController = rememberNavController()
+    val profileViewModel: ProfileViewModel = viewModel(factory = ViewModelFactory(repository))
+    val activeProfile by profileViewModel.activeProfile.collectAsState()
+
     val categoriesViewModel: CategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
     val categories by categoriesViewModel.categories.collectAsState(initial = emptyList())
-    var showDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var categoryToDelete by remember { mutableStateOf<CategoryEntity?>(null) }
-    var editingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
-    var deletingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
-    var showCategoryDialog by remember { mutableStateOf(false) }
+
     val bottomNavItems = listOf(
         Screen.Dashboard,
         Screen.Transactions,
@@ -77,139 +80,173 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.MonthComparison
     )
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-                bottomNavItems.forEach { screen ->
-                    NavigationBarItem(
-                        selected = currentDestination?.route == screen.route,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) }
-                    )
+    if (activeProfile == null) {
+        ProfileSelectionScreen(
+            viewModel = profileViewModel,
+            onProfileSelected = {
+                navController.navigate(Screen.Dashboard.route) {
+                    popUpTo(0) { inclusive = true }
                 }
             }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Dashboard.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.Dashboard.route) {
-                val viewModel: DashboardViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                DashboardScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding,
-                    onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
-                    onViewAll = {
-                        navController.navigate(Screen.Transactions.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+        )
+    } else {
+        Scaffold(
+            bottomBar = {
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+
+                if (currentRoute != Screen.ProfileSelection.route) {
+                    NavigationBar {
+                        bottomNavItems.forEach { screen ->
+                            NavigationBarItem(
+                                selected = currentRoute == screen.route,
+                                onClick = {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                                label = { Text(screen.label) }
+                            )
                         }
-                    },
-                    onEditTransaction = { id ->
-                        navController.navigate(Screen.EditTransaction.createRoute(id))
-                    },
-                    onOpenSettings = {
-                        navController.navigate(Screen.Settings.route)
                     }
-                )
+                }
             }
-            composable(Screen.Transactions.route) {
-                val viewModel: TransactionsViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                TransactionsScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding,
-                    onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
-                    onEditTransaction = { id ->
-                        navController.navigate(Screen.EditTransaction.createRoute(id))
-                    }
-                )
-            }
-            composable(Screen.Stats.route) {
-                val viewModel: StatsViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                StatsScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding
-                )
-            }
-            composable(Screen.Groceries.route) {
-                GroceriesScreen(contentPadding = innerPadding)
-            }
-            composable(Screen.TaxiFare.route) {
-                TaxiFareScreen(contentPadding = innerPadding)
-            }
-            composable(Screen.MonthComparison.route) {
-                val viewModel: MonthComparisonViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                MonthComparisonScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding
-                )
-            }
-            composable(Screen.Categories.route) {
-                val viewModel: CategoriesViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                CategoriesScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding
-                )
-            }
-            composable(Screen.Settings.route) {
-                val viewModel: SettingsViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                SettingsScreen(
-                    viewModel = viewModel,
-                    contentPadding = innerPadding,
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-            composable(Screen.AddTransaction.route) {
-                val viewModel: AddEditViewModel = viewModel(
-                    factory = ViewModelFactory(repository)
-                )
-                AddEditScreen(
-                    viewModel = viewModel,
-                    repository = repository,
-                    title = "Add Transaction",
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-            composable(
-                route = Screen.EditTransaction.route,
-                arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
-            ) { backStackEntry ->
-                val transactionId = backStackEntry.arguments?.getLong("transactionId") ?: return@composable
-                val viewModel: AddEditViewModel = viewModel(
-                    factory = ViewModelFactory(repository, transactionId)
-                )
-                AddEditScreen(
-                    viewModel = viewModel,
-                    repository = repository,
-                    title = "Edit Transaction",
-                    onNavigateBack = { navController.popBackStack() }
-                )
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Dashboard.route,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.ProfileSelection.route) {
+                    ProfileSelectionScreen(
+                        viewModel = profileViewModel,
+                        onProfileSelected = {
+                            navController.navigate(Screen.Dashboard.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+                composable(Screen.Dashboard.route) {
+                    val viewModel: DashboardViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    DashboardScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding,
+                        onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
+                        onViewAll = { navController.navigate(Screen.Transactions.route) },
+                        onEditTransaction = { id ->
+                            navController.navigate(Screen.EditTransaction.createRoute(id))
+                        },
+                        onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                    )
+                }
+                composable(Screen.Transactions.route) {
+                    val viewModel: TransactionsViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    TransactionsScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding,
+                        onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
+                        onEditTransaction = { id ->
+                            navController.navigate(Screen.EditTransaction.createRoute(id))
+                        }
+                    )
+                }
+                composable(Screen.Stats.route) {
+                    val viewModel: StatsViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    StatsScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.Groceries.route) {
+                    val viewModel: GroceriesViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    GroceriesScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.TaxiFare.route) {
+                    val viewModel: TaxiFareViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    TaxiFareScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.MonthComparison.route) {
+                    val viewModel: MonthComparisonViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    MonthComparisonScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.Categories.route) {
+                    val viewModel: CategoriesViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    CategoriesScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.Settings.route) {
+                    val viewModel: SettingsViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        profileViewModel = profileViewModel,
+                        contentPadding = innerPadding,
+                        onNavigateBack = { navController.popBackStack() },
+                        onSwitchProfile = {
+                            navController.navigate(Screen.ProfileSelection.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+                composable(Screen.AddTransaction.route) {
+                    val viewModel: AddEditViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    AddEditScreen(
+                        viewModel = viewModel,
+                        repository = repository,
+                        title = "Add Transaction",
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = Screen.EditTransaction.route,
+                    arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val transactionId = backStackEntry.arguments?.getLong("transactionId") ?: return@composable
+                    val viewModel: AddEditViewModel = viewModel(
+                        factory = ViewModelFactory(repository, transactionId)
+                    )
+                    AddEditScreen(
+                        viewModel = viewModel,
+                        repository = repository,
+                        title = "Edit Transaction",
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
             }
         }
     }

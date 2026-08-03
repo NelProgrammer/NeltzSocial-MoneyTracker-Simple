@@ -126,86 +126,113 @@ fun AddEditScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 1. Category Section (Displays Income, Investment, Expense dropdown & chips)
-            var categoryDropdownExpanded by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
-                expanded = categoryDropdownExpanded,
-                onExpandedChange = { categoryDropdownExpanded = it },
+            // 1. Category Section (Editable Dropdown: Income, Investment, Education, Expense)
+            var categoryTypeDropdownExpanded by remember { mutableStateOf(false) }
+            val categoryTypeNames = remember {
+                listOf(
+                    TransactionType.INCOME to "Income",
+                    TransactionType.INVESTMENT to "Investment",
+                    TransactionType.EDUCATION to "Education",
+                    TransactionType.EXPENSE to "Expense"
+                )
+            }
+            var categoryInputText by remember(state.type) {
+                mutableStateOf(categoryTypeNames.find { it.first == state.type }?.second ?: state.type.name)
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = when (state.type) {
-                        TransactionType.INCOME -> "Income"
-                        TransactionType.INVESTMENT -> "Investment"
-                        TransactionType.EXPENSE -> "Expense"
-                    },
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Category") },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowDropDown,
-                            contentDescription = "Dropdown"
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    singleLine = true
-                )
-                DropdownMenu(
-                    expanded = categoryDropdownExpanded,
-                    onDismissRequest = { categoryDropdownExpanded = false }
+                ExposedDropdownMenuBox(
+                    expanded = categoryTypeDropdownExpanded,
+                    onExpandedChange = { categoryTypeDropdownExpanded = it },
+                    modifier = Modifier.weight(1f)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Income") },
-                        onClick = {
-                            viewModel.updateType(TransactionType.INCOME)
-                            categoryDropdownExpanded = false
-                        }
+                    OutlinedTextField(
+                        value = categoryInputText,
+                        onValueChange = { input ->
+                            categoryInputText = input
+                            val matched = categoryTypeNames.find { it.second.equals(input, ignoreCase = true) }
+                            if (matched != null) {
+                                viewModel.updateType(matched.first)
+                            }
+                        },
+                        label = { Text("Category") },
+                        placeholder = { Text("Select or type Category") },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Dropdown"
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        singleLine = true
                     )
-                    DropdownMenuItem(
-                        text = { Text("Investment") },
-                        onClick = {
-                            viewModel.updateType(TransactionType.INVESTMENT)
-                            categoryDropdownExpanded = false
+                    DropdownMenu(
+                        expanded = categoryTypeDropdownExpanded,
+                        onDismissRequest = { categoryTypeDropdownExpanded = false }
+                    ) {
+                        for ((type, name) in categoryTypeNames) {
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                trailingIcon = {
+                                    Row {
+                                        IconButton(onClick = {
+                                            val catEntity = categories.find { it.name.equals(name, ignoreCase = true) }
+                                            editingCategory = catEntity ?: CategoryEntity(id = 0, name = name, type = type)
+                                            showCategoryDialog = true
+                                        }) {
+                                            Icon(Icons.Filled.Edit, contentDescription = "Edit Category")
+                                        }
+                                        IconButton(onClick = {
+                                            val catEntity = categories.find { it.name.equals(name, ignoreCase = true) }
+                                            if (catEntity != null) {
+                                                deletingCategory = catEntity
+                                                categoriesViewModel.deleteCategory(catEntity)
+                                            }
+                                        }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "Delete Category")
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    categoryInputText = name
+                                    viewModel.updateType(type)
+                                    categoryTypeDropdownExpanded = false
+                                }
+                            )
                         }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Expense") },
-                        onClick = {
-                            viewModel.updateType(TransactionType.EXPENSE)
-                            categoryDropdownExpanded = false
-                        }
-                    )
+                    }
+                }
+                IconButton(
+                    onClick = { editingCategory = null; showCategoryDialog = true },
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add Category")
                 }
             }
 
-            // Category filter chips (Income, Investment, Expense)
+            // Category Chips for quick 1-tap selection
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
             ) {
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = state.type == TransactionType.INCOME,
-                    onClick = { viewModel.updateType(TransactionType.INCOME) },
-                    label = { Text("Income") }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = state.type == TransactionType.INVESTMENT,
-                    onClick = { viewModel.updateType(TransactionType.INVESTMENT) },
-                    label = { Text("Investment") }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = state.type == TransactionType.EXPENSE,
-                    onClick = { viewModel.updateType(TransactionType.EXPENSE) },
-                    label = { Text("Expense") }
-                )
+                for ((type, name) in categoryTypeNames) {
+                    FilterChip(
+                        modifier = Modifier.weight(1f),
+                        selected = state.type == type,
+                        onClick = {
+                            categoryInputText = name
+                            viewModel.updateType(type)
+                        },
+                        label = { Text(if (name == "Investment") "Invest" else name, maxLines = 1) }
+                    )
+                }
             }
 
             // Divider 1: After Category Section
@@ -217,11 +244,12 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 2. SubCategory Section (Category items like Salary, Utilities, Food, etc.)
+            // 2. SubCategory Section (Salary, Credit & Bank Charges, Utilities, University, Certificate, School, etc. from seed data)
+            val availableSubCategories = remember(dbSubCategories, state.type) {
+                dbSubCategories.filter { it.type == state.type }.distinctBy { it.name }
+            }
+
             var subCategoryDropdownExpanded by remember { mutableStateOf(false) }
-            val availableSubCategories = categories.filter { it.type == state.type }.sortedByPriority()
-            val selectedSubCategory = availableSubCategories.find { it.id == state.categoryId }
-            val selectedSubCategoryText = selectedSubCategory?.name ?: ""
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -233,11 +261,10 @@ fun AddEditScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     OutlinedTextField(
-                        value = selectedSubCategoryText,
-                        onValueChange = {},
-                        readOnly = true,
+                        value = state.subCategory,
+                        onValueChange = viewModel::updateSubCategory,
                         label = { Text("SubCategory") },
-                        placeholder = { Text("Select SubCategory") },
+                        placeholder = { Text("Select or type SubCategory") },
                         trailingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.ArrowDropDown,
@@ -253,24 +280,23 @@ fun AddEditScreen(
                         expanded = subCategoryDropdownExpanded,
                         onDismissRequest = { subCategoryDropdownExpanded = false }
                     ) {
-                        for (cat in availableSubCategories) {
+                        for (subCat in availableSubCategories) {
                             DropdownMenuItem(
-                                text = { Text(cat.name) },
+                                text = { Text(subCat.name) },
                                 trailingIcon = {
                                     Row {
-                                        IconButton(onClick = { editingCategory = cat; showCategoryDialog = true }) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
+                                        IconButton(onClick = { editingSubCategory = subCat; showSubCategoryDialog = true }) {
+                                            Icon(Icons.Filled.Edit, contentDescription = "Edit SubCategory")
+                                        }
                                         IconButton(onClick = {
-                                            deletingCategory = cat
-                                            categoriesViewModel.deleteCategory(cat)
-                                            if (state.categoryId == cat.id) {
-                                                val remaining = availableSubCategories.filter { it.id != cat.id }
-                                                remaining.firstOrNull()?.let { viewModel.updateCategory(it.id) }
-                                            }
-                                        }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+                                            subCategoriesViewModel.deleteSubCategory(subCat)
+                                        }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "Delete SubCategory")
+                                        }
                                     }
                                 },
                                 onClick = {
-                                    viewModel.updateCategory(cat.id)
+                                    viewModel.updateSubCategory(subCat.name)
                                     subCategoryDropdownExpanded = false
                                 }
                             )
@@ -278,14 +304,14 @@ fun AddEditScreen(
                     }
                 }
                 IconButton(
-                    onClick = { editingCategory = null; showCategoryDialog = true },
+                    onClick = { editingSubCategory = null; showSubCategoryDialog = true },
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Add SubCategory")
                 }
             }
 
-            // SubCategory chips
+            // SubCategory chips for quick 1-tap selection
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -293,11 +319,11 @@ fun AddEditScreen(
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
             ) {
-                for (cat in availableSubCategories.take(8)) {
+                for (subCat in availableSubCategories.take(8)) {
                     FilterChip(
-                        selected = state.categoryId == cat.id,
-                        onClick = { viewModel.updateCategory(cat.id) },
-                        label = { Text(cat.name, style = MaterialTheme.typography.labelSmall) }
+                        selected = state.subCategory == subCat.name,
+                        onClick = { viewModel.updateSubCategory(subCat.name) },
+                        label = { Text(subCat.name, style = MaterialTheme.typography.labelSmall) }
                     )
                 }
             }
@@ -311,37 +337,32 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 3. Detail Section (Singular Detail dropdown, chips & text input)
-            val categoryTypeMap = remember(categories) { categories.associate { it.id to it.type } }
-            val filteredDetails = remember(dbSubCategories, dbDetails, state.type, state.categoryId, categoryTypeMap) {
-                val fromSubCats = dbSubCategories.map { subCat ->
-                    DetailEntity(id = subCat.id, name = subCat.name, categoryId = subCat.categoryId, type = subCat.type)
-                }
-                (fromSubCats + dbDetails).distinctBy { it.name }.filter { detail ->
-                    val catType = detail.categoryId?.let { categoryTypeMap[it] }
-                    when {
-                        detail.categoryId != null -> detail.categoryId == state.categoryId || catType == state.type
-                        detail.type != null -> detail.type == state.type
-                        else -> true
-                    }
-                }
+            // 3. Detail Section (Details matching selected SubCategory / Category from seed data)
+            val selectedSubCatObj = dbSubCategories.find { it.name.equals(state.subCategory, ignoreCase = true) }
+            val availableDetails = remember(dbDetails, state.type, state.subCategory, selectedSubCatObj) {
+                if (selectedSubCatObj != null) {
+                    dbDetails.filter { it.subCategoryId == selectedSubCatObj.id || it.type == state.type }
+                } else {
+                    dbDetails.filter { it.type == state.type }
+                }.distinctBy { it.name }
             }
 
-            var detailExpanded by remember { mutableStateOf(false) }
+            var detailDropdownExpanded by remember { mutableStateOf(false) }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 ExposedDropdownMenuBox(
-                    expanded = detailExpanded,
-                    onExpandedChange = { detailExpanded = it },
+                    expanded = detailDropdownExpanded,
+                    onExpandedChange = { detailDropdownExpanded = it },
                     modifier = Modifier.weight(1f)
                 ) {
                     OutlinedTextField(
-                        value = state.subCategory,
-                        onValueChange = viewModel::updateSubCategory,
+                        value = state.detail,
+                        onValueChange = viewModel::updateDetail,
                         label = { Text("Detail (optional)") },
-                        placeholder = { Text("e.g. Specific item or detail") },
+                        placeholder = { Text("Select or type Detail") },
                         trailingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.ArrowDropDown,
@@ -354,21 +375,27 @@ fun AddEditScreen(
                         singleLine = true
                     )
                     DropdownMenu(
-                        expanded = detailExpanded,
-                        onDismissRequest = { detailExpanded = false }
+                        expanded = detailDropdownExpanded,
+                        onDismissRequest = { detailDropdownExpanded = false }
                     ) {
-                        for (detail in filteredDetails) {
+                        for (detail in availableDetails) {
                             DropdownMenuItem(
                                 text = { Text(detail.name) },
                                 trailingIcon = {
                                     Row {
-                                        IconButton(onClick = { editingDetail = detail; showDetailDialog = true }) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
-                                        IconButton(onClick = { detailsViewModel.deleteDetail(detail) }) { Icon(Icons.Filled.Delete, contentDescription = "Delete") }
+                                        IconButton(onClick = { editingDetail = detail; showDetailDialog = true }) {
+                                            Icon(Icons.Filled.Edit, contentDescription = "Edit Detail")
+                                        }
+                                        IconButton(onClick = {
+                                            detailsViewModel.deleteDetail(detail)
+                                        }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "Delete Detail")
+                                        }
                                     }
                                 },
                                 onClick = {
-                                    viewModel.updateSubCategory(detail.name)
-                                    detailExpanded = false
+                                    viewModel.updateDetail(detail.name)
+                                    detailDropdownExpanded = false
                                 }
                             )
                         }
@@ -382,7 +409,7 @@ fun AddEditScreen(
                 }
             }
 
-            // Detail chips in FlowRow
+            // Detail chips for quick 1-tap selection
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -390,10 +417,10 @@ fun AddEditScreen(
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
             ) {
-                for (detail in filteredDetails.take(8)) {
+                for (detail in availableDetails.take(8)) {
                     FilterChip(
-                        selected = state.subCategory == detail.name,
-                        onClick = { viewModel.updateSubCategory(detail.name) },
+                        selected = state.detail == detail.name,
+                        onClick = { viewModel.updateDetail(detail.name) },
                         label = { Text(detail.name, style = MaterialTheme.typography.labelSmall) }
                     )
                 }

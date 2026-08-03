@@ -7,9 +7,10 @@ import androidx.room.PrimaryKey
 data class DetailEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val profileId: Long = 1,
     val name: String,
-    val subCategoryId: Long? = null,
     val categoryId: Long? = null,
+    val subCategoryId: Long? = null,
     val iconName: String = "default",
     val type: TransactionType? = null
 )

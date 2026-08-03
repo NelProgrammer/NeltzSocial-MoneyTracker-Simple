@@ -8,8 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 val IncomeColor: Color = Color(0xFF2E7D32)
-val ExpenseColor: Color = Color(0xFFC62828)
 val InvestmentColor: Color = Color(0xFF1565C0)
+val EducationColor: Color = Color(0xFF8E24AA) // Premium Vibrant Violet / Purple
+val ExpenseColor: Color = Color(0xFFC62828)
 
 private val GreenPrimary = Color(0xFF2E7D32)
 private val GreenDark = Color(0xFF1B5E20)

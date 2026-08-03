@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val profileId: Long = 1,
     val name: String,
     val type: TransactionType,
     val iconName: String = "default"

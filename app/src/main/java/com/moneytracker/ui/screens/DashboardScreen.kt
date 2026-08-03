@@ -24,14 +24,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moneytracker.ui.components.*
 import com.moneytracker.ui.viewmodel.DashboardViewModel
-import com.moneytracker.util.DateUtils
-import com.moneytracker.util.SettingsManager
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,10 +40,7 @@ fun DashboardScreen(
 ) {
     val summary by viewModel.summary.collectAsState()
     val subCategorySummaries by viewModel.subCategorySummaries.collectAsState()
-
-    val payDateDay = SettingsManager.getPayDateDay()
-    val currentPayMonthDate = DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay)
-    val formattedMonth = currentPayMonthDate.format(DateTimeFormatter.ofPattern("yyyy-MMM"))
+    val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
         modifier = Modifier,
@@ -75,45 +67,38 @@ fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Current Month: $formattedMonth",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            // PayMonth Filter Header (Prev, Current, Next, Dropdown)
+            PayMonthFilterHeader(
+                selectedPayMonthDate = selectedPayMonthDate,
+                onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
 
-            // Balance Section displaying category totals and Net Balance Sum/Difference calculation
             BalanceCard(
                 balance = summary.balance,
                 income = summary.income,
                 investment = summary.investment,
+                education = summary.education,
                 expense = summary.expense
             )
 
-            // Category Summary Section Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Category Summary",
+                    text = "Sub-Category Breakdown",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = onViewAll) {
-                    Text("View all transactions")
+                    Text("View All")
                 }
             }
 
-            // Category Summary Table with Running Total
-            if (subCategorySummaries.isEmpty()) {
-                EmptyState("No categories recorded. Tap + to add a transaction.")
-            } else {
-                CategorySummaryTable(
-                    summaries = subCategorySummaries,
-                    contentPadding = contentPadding
-                )
-            }
+            CategorySummaryTable(
+                summaries = subCategorySummaries
+            )
         }
     }
 }

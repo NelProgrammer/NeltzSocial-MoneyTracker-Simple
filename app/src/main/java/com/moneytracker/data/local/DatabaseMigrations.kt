@@ -86,5 +86,70 @@ object DatabaseMigrations {
             // Foreign key cascade schema update
         }
     }
-}
 
+    val MIGRATION_9_10 = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `grocery_items` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `date` INTEGER NOT NULL,
+                    `itemName` TEXT NOT NULL,
+                    `size` REAL NOT NULL DEFAULT 1.0,
+                    `sizeUnit` TEXT NOT NULL DEFAULT 'pack',
+                    `category` TEXT NOT NULL DEFAULT 'Beverages',
+                    `subCategory` TEXT NOT NULL DEFAULT 'Milk',
+                    `unitPrice` REAL NOT NULL DEFAULT 0.0,
+                    `quantity` INTEGER NOT NULL DEFAULT 1,
+                    `totalPrice` REAL NOT NULL DEFAULT 0.0,
+                    `isChecked` INTEGER NOT NULL DEFAULT 0,
+                    `transactionId` INTEGER
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `taxi_fares` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `routeName` TEXT NOT NULL,
+                    `farePerTrip` REAL NOT NULL,
+                    `tripsPerDay` INTEGER NOT NULL DEFAULT 2,
+                    `workingDaysPerMonth` INTEGER NOT NULL DEFAULT 20,
+                    `monthlyTotal` REAL NOT NULL,
+                    `date` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `profiles` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `username` TEXT NOT NULL,
+                    `isGuest` INTEGER NOT NULL DEFAULT 0,
+                    `isPasswordProtected` INTEGER NOT NULL DEFAULT 0,
+                    `passwordHash` TEXT,
+                    `createdAt` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL("ALTER TABLE transactions ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE categories ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE sub_categories ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE details ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE grocery_items ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("ALTER TABLE taxi_fares ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_profileId ON transactions(profileId)")
+        }
+    }
+
+    val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE transactions ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
+        }
+    }
+}

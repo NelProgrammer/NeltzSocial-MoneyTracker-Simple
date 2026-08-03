@@ -164,6 +164,7 @@ object RecurringTransactionManager {
                         date = candidateEpoch,
                         note = parent.note,
                         subCategory = parent.subCategory,
+                        detail = parent.detail,
                         isRecurring = false,
                         recurrenceFrequency = null,
                         recurTillDate = null,

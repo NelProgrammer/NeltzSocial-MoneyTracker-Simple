@@ -12,12 +12,14 @@ import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.data.repository.MonthlySummary
 import com.moneytracker.data.repository.TransactionRepository
 import com.moneytracker.util.DateUtils
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,7 +38,8 @@ fun buildTransactionComparator(secondarySorts: List<SortCriterion>): Comparator<
         when (t.type) {
             TransactionType.INCOME -> 0
             TransactionType.INVESTMENT -> 1
-            TransactionType.EXPENSE -> 2
+            TransactionType.EDUCATION -> 2
+            TransactionType.EXPENSE -> 3
         }
     }
 
@@ -90,30 +93,43 @@ class DashboardViewModel(
         }
     }
 
-    private val payMonthTransactions = repository
-        .observeTransactionsForMonth(
-            DateUtils.startOfPayMonth(),
-            DateUtils.startOfNextPayMonth() - 1
-        )
+    private val payDateDay = com.moneytracker.util.SettingsManager.getPayDateDay()
+    private val _selectedPayMonthDate = MutableStateFlow(DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay))
+    val selectedPayMonthDate: StateFlow<LocalDate> = _selectedPayMonthDate.asStateFlow()
+
+    fun setPayMonth(date: LocalDate) {
+        _selectedPayMonthDate.value = date
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val payMonthTransactions = _selectedPayMonthDate.flatMapLatest { date ->
+        val startMillis = DateUtils.toEpochMillis(date)
+        val nextMonthDate = date.plusMonths(1)
+        val endMillis = DateUtils.toEpochMillis(nextMonthDate) - 1
+        repository.observeTransactionsForMonth(startMillis, endMillis)
+    }
 
     val summary: StateFlow<MonthlySummary> = payMonthTransactions
         .map { list ->
             val incomeTotal = list.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
             val investTotal = list.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
+            val eduTotal = list.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
             val expenseTotal = list.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
             MonthlySummary(
                 income = incomeTotal,
                 investment = investTotal,
+                education = eduTotal,
                 expense = expenseTotal,
-                balance = incomeTotal - investTotal - expenseTotal
+                balance = incomeTotal - investTotal - eduTotal - expenseTotal
             )
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary())
 
     val subCategorySummaries: StateFlow<List<SubCategorySummary>> = payMonthTransactions
         .map { list ->
             val incomeTotal = list.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
             val investTotal = list.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
+            val eduTotal = list.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
             val expenseTotal = list.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
 
             list.groupBy { it.categoryId }
@@ -123,6 +139,7 @@ class DashboardViewModel(
                     val typeTotal = when (first.type) {
                         TransactionType.INCOME -> incomeTotal
                         TransactionType.INVESTMENT -> investTotal
+                        TransactionType.EDUCATION -> eduTotal
                         TransactionType.EXPENSE -> expenseTotal
                     }
                     val pct = if (typeTotal > 0.0) (total / typeTotal) * 100.0 else 0.0
@@ -141,7 +158,8 @@ class DashboardViewModel(
                         when (it.type) {
                             TransactionType.INCOME -> 0
                             TransactionType.INVESTMENT -> 1
-                            TransactionType.EXPENSE -> 2
+                            TransactionType.EDUCATION -> 2
+                            TransactionType.EXPENSE -> 3
                         }
                     }.thenByDescending { it.totalAmount }
                 )
@@ -216,6 +234,14 @@ class TransactionsViewModel(
         }
     }
 
+    private val payDateDay = com.moneytracker.util.SettingsManager.getPayDateDay()
+    private val _selectedPayMonthDate = MutableStateFlow(DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay))
+    val selectedPayMonthDate: StateFlow<LocalDate> = _selectedPayMonthDate.asStateFlow()
+
+    fun setPayMonth(date: LocalDate) {
+        _selectedPayMonthDate.value = date
+    }
+
     private val _filterType = MutableStateFlow<TransactionType?>(null)
     val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
 
@@ -268,9 +294,13 @@ class TransactionsViewModel(
     val transactions: StateFlow<List<TransactionWithCategory>> = combine(
         repository.observeAllTransactions(),
         _filterType,
-        _secondarySorts
-    ) { list, type, secondarySorts ->
-        val filtered = if (type == null) list else list.filter { it.type == type }
+        _secondarySorts,
+        _selectedPayMonthDate
+    ) { list, type, secondarySorts, monthDate ->
+        val startMillis = DateUtils.toEpochMillis(monthDate)
+        val endMillis = DateUtils.toEpochMillis(monthDate.plusMonths(1)) - 1
+        val monthFiltered = list.filter { it.date in startMillis..endMillis }
+        val filtered = if (type == null) monthFiltered else monthFiltered.filter { it.type == type }
         filtered.sortedWith(buildTransactionComparator(secondarySorts))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -302,6 +332,7 @@ data class AddEditUiState(
     val date: LocalDate = LocalDate.now(),
     val note: String = "",
     val subCategory: String = "",
+    val detail: String = "",
     val isRecurring: Boolean = false,
     val recurrenceFrequency: RecurrenceFrequency = RecurrenceFrequency.MONTHLY,
     val recurTillDate: LocalDate? = null,
@@ -334,6 +365,7 @@ class AddEditViewModel(
                         date = DateUtils.toLocalDate(transaction.date),
                         note = transaction.note,
                         subCategory = transaction.subCategory,
+                        detail = transaction.detail,
                         isRecurring = transaction.isRecurring,
                         recurrenceFrequency = transaction.recurrenceFrequency ?: RecurrenceFrequency.MONTHLY,
                         recurTillDate = transaction.recurTillDate?.let { DateUtils.toLocalDate(it) },
@@ -396,6 +428,10 @@ class AddEditViewModel(
 
     fun updateSubCategory(subCategory: String) {
         _uiState.value = _uiState.value.copy(subCategory = subCategory)
+    }
+
+    fun updateDetail(detail: String) {
+        _uiState.value = _uiState.value.copy(detail = detail)
     }
 
     fun updateIsRecurring(isRecurring: Boolean) {
@@ -477,6 +513,7 @@ class AddEditViewModel(
                 note = state.note.trim(),
                 sortOrder = existingSortOrder,
                 subCategory = state.subCategory.trim(),
+                detail = state.detail.trim(),
                 isRecurring = state.isRecurring,
                 recurrenceFrequency = if (state.isRecurring) state.recurrenceFrequency else null,
                 recurTillDate = if (state.isRecurring && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
@@ -505,8 +542,13 @@ class AddEditViewModel(
 class StatsViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
-    private val monthStart = DateUtils.startOfMonth()
-    private val monthEnd = DateUtils.startOfNextMonth()
+    private val payDateDay = com.moneytracker.util.SettingsManager.getPayDateDay()
+    private val _selectedPayMonthDate = MutableStateFlow(DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay))
+    val selectedPayMonthDate: StateFlow<LocalDate> = _selectedPayMonthDate.asStateFlow()
+
+    fun setPayMonth(date: LocalDate) {
+        _selectedPayMonthDate.value = date
+    }
 
     private val _filterType = MutableStateFlow<TransactionType?>(null)
     val filterType: StateFlow<TransactionType?> = _filterType.asStateFlow()
@@ -519,21 +561,33 @@ class StatsViewModel(
         setFilter(null)
     }
 
-    val summary: StateFlow<MonthlySummary> = repository
-        .observeMonthlySummary(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val summary: StateFlow<MonthlySummary> = _selectedPayMonthDate.flatMapLatest { date ->
+        val startMillis = DateUtils.toEpochMillis(date)
+        val endMillis = DateUtils.toEpochMillis(date.plusMonths(1)) - 1
+        repository.observeMonthlySummary(startMillis, endMillis)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary(0.0, 0.0, 0.0, 0.0))
 
-    val expenseBreakdown: StateFlow<List<CategorySummary>> = repository
-        .observeExpenseCategorySummaries(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val expenseBreakdown: StateFlow<List<CategorySummary>> = _selectedPayMonthDate.flatMapLatest { date ->
+        val startMillis = DateUtils.toEpochMillis(date)
+        val endMillis = DateUtils.toEpochMillis(date.plusMonths(1)) - 1
+        repository.observeExpenseCategorySummaries(startMillis, endMillis)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val incomeBreakdown: StateFlow<List<CategorySummary>> = repository
-        .observeIncomeCategorySummaries(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val incomeBreakdown: StateFlow<List<CategorySummary>> = _selectedPayMonthDate.flatMapLatest { date ->
+        val startMillis = DateUtils.toEpochMillis(date)
+        val endMillis = DateUtils.toEpochMillis(date.plusMonths(1)) - 1
+        repository.observeIncomeCategorySummaries(startMillis, endMillis)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val investmentBreakdown: StateFlow<List<CategorySummary>> = repository
-        .observeInvestmentCategorySummaries(monthStart, monthEnd)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val investmentBreakdown: StateFlow<List<CategorySummary>> = _selectedPayMonthDate.flatMapLatest { date ->
+        val startMillis = DateUtils.toEpochMillis(date)
+        val endMillis = DateUtils.toEpochMillis(date.plusMonths(1)) - 1
+        repository.observeInvestmentCategorySummaries(startMillis, endMillis)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
 
 // Settings ViewModel
@@ -546,6 +600,10 @@ class SettingsViewModel : ViewModel() {
 
     fun updateCutoffDay(day: Int) {
         com.moneytracker.util.SettingsManager.updateCutoffDay(day)
+    }
+
+    fun updateIsRyuHidden(hidden: Boolean) {
+        com.moneytracker.util.SettingsManager.updateIsRyuHidden(hidden)
     }
 }
 
@@ -565,6 +623,10 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(AddEditViewModel::class.java) -> AddEditViewModel(repository, transactionId) as T
             modelClass.isAssignableFrom(StatsViewModel::class.java) -> StatsViewModel(repository) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> SettingsViewModel() as T
+            modelClass.isAssignableFrom(GroceriesViewModel::class.java) -> GroceriesViewModel(repository) as T
+            modelClass.isAssignableFrom(MonthComparisonViewModel::class.java) -> MonthComparisonViewModel(repository) as T
+            modelClass.isAssignableFrom(TaxiFareViewModel::class.java) -> TaxiFareViewModel(repository) as T
+            modelClass.isAssignableFrom(ProfileViewModel::class.java) -> ProfileViewModel(repository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }
     }

@@ -1,0 +1,412 @@
+[
+  {
+    "categoryName": "Income",
+    "subCategory": "Salary",
+    "detail": "Normal",
+    "amount": 9387.5,
+    "note": "You don't Own Your Income",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Income",
+    "subCategory": "Salary",
+    "detail": "Bonus",
+    "amount": 13750.0,
+    "note": "Once Off",
+    "isRecurring": false,
+    "recurrenceFrequency": null,
+    "recurCount": null
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Credit & Bank Charges",
+    "detail": "Home Loan",
+    "amount": -1550.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Credit & Bank Charges",
+    "detail": "Credit Card R40",
+    "amount": -412.5,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Credit & Bank Charges",
+    "detail": "Loan R120",
+    "amount": -875.0,
+    "note": "Collapse?",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Credit & Bank Charges",
+    "detail": "Bank Fees",
+    "amount": -138.75,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Investment",
+    "subCategory": "Shares",
+    "detail": "Share Type",
+    "amount": -375.0,
+    "note": "Observe Laws of Gold",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Investment",
+    "subCategory": "Cash Investment",
+    "detail": "Save",
+    "amount": -568.75,
+    "note": "Richest Man in Babylon",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Education",
+    "subCategory": "University",
+    "detail": "University To Be Confirmed",
+    "amount": -1125.0,
+    "note": "Invest in YourSelf",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Education",
+    "subCategory": "Certificate",
+    "detail": "Java OCA",
+    "amount": -500.0,
+    "note": "Java Cert Once off",
+    "isRecurring": false,
+    "recurrenceFrequency": null,
+    "recurCount": null
+  },
+  {
+    "categoryName": "Education",
+    "subCategory": "Certificate",
+    "detail": "CIMA",
+    "amount": -750.0,
+    "note": "Management Accounting",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 6
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Grocery",
+    "detail": "Primary Grocery",
+    "amount": -625.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Grocery",
+    "detail": "Weekly Guard",
+    "amount": -500.0,
+    "note": "=-(500*4)",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Utilities",
+    "detail": "City Council",
+    "amount": -700.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Utilities",
+    "detail": "Electricity",
+    "amount": -400.0,
+    "note": "CHG 2 Solar?",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Utilities",
+    "detail": "Gas Emergency Guard",
+    "amount": -75.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "House Keeping",
+    "detail": "Yard Cleaners",
+    "amount": -100.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "School",
+    "detail": "School fees",
+    "amount": -125.0,
+    "note": "Fees - 2026",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "School",
+    "detail": "School Transport",
+    "amount": -125.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Grocery",
+    "detail": "Lunch Bread 2x5x4",
+    "amount": -140.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Education",
+    "subCategory": "School",
+    "detail": "Child's R10s Carry",
+    "amount": -25.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Family",
+    "detail": "Black Tax",
+    "amount": -300.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "House Keeping",
+    "detail": "Street Security",
+    "amount": -112.5,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Family",
+    "detail": "Baby Mama Allowance",
+    "amount": -500.0,
+    "note": "Yes, I am avery Foolish Man",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Life Cover",
+    "amount": -200.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Nuclear Family",
+    "amount": -100.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Sibling - Scara",
+    "amount": -37.5,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Sibling - Randy",
+    "amount": -25.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Sibling - Loz",
+    "amount": -25.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Sibling - Kay",
+    "amount": -25.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Funeral Plan - Extended Family - Aunts & Cuz",
+    "amount": -125.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Insurance",
+    "detail": "Burial Society - Cuzs",
+    "amount": 0.0,
+    "note": "I gave up trying",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Pocket Money",
+    "detail": "Kid's Weekend Pocket",
+    "amount": -125.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Family",
+    "detail": "Clothes BlackTax",
+    "amount": 0.0,
+    "note": "",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Work",
+    "detail": "Taxi 2 Work",
+    "amount": -250.0,
+    "note": "=-(25*2*5*4)",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Work",
+    "detail": "Uber 2 Work",
+    "amount": -275.0,
+    "note": "=-(25*2*22)",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Pocket Money",
+    "detail": "Pocket Money",
+    "amount": -500.0,
+    "note": "Me =-(500*4)",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Pocket Money",
+    "detail": "Maslow's",
+    "amount": -500.0,
+    "note": "Hk up",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Family",
+    "detail": "Other",
+    "amount": 0.0,
+    "note": "Nephew Uniform",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "House Keeping",
+    "detail": "Ad-hoc???",
+    "amount": 0.0,
+    "note": "No Need",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  },
+  {
+    "categoryName": "Expense",
+    "subCategory": "Family",
+    "detail": "Ad-hoc???",
+    "amount": 0.0,
+    "note": "No Need",
+    "isRecurring": true,
+    "recurrenceFrequency": "MONTHLY",
+    "recurCount": 24
+  }
+]

@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class SubCategoryEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val profileId: Long = 1,
     val name: String,
     val categoryId: Long? = null,
     val iconName: String = "default",

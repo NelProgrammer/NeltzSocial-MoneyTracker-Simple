@@ -28,18 +28,22 @@ import com.moneytracker.util.CurrencyUtils
  * Balance Card for Dashboard displaying Category Totals and Net Balance.
  * Formula: Income − Investment − Expense.
  */
+import com.moneytracker.ui.theme.EducationColor
+
 @Composable
 fun BalanceCard(
     balance: Double,
     income: Double,
     investment: Double,
+    education: Double = 0.0,
     expense: Double,
     modifier: Modifier = Modifier
 ) {
     val absIncome = kotlin.math.abs(income)
     val absInvestment = kotlin.math.abs(investment)
+    val absEducation = kotlin.math.abs(education)
     val absExpense = kotlin.math.abs(expense)
-    val calculatedBalance = absIncome - absInvestment - absExpense
+    val calculatedBalance = absIncome - absInvestment - absEducation - absExpense
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -68,7 +72,7 @@ fun BalanceCard(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
 
-            // Category Totals Grid (Income +, Investment -, Expense -)
+            // Category Totals Grid (Income +, Investment -, Education -, Expense -)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -83,6 +87,12 @@ fun BalanceCard(
                     label = "Investment (−)",
                     amount = absInvestment,
                     color = InvestmentColor,
+                    modifier = Modifier.weight(1f)
+                )
+                CategoryBalanceItem(
+                    label = "Education (−)",
+                    amount = absEducation,
+                    color = EducationColor,
                     modifier = Modifier.weight(1f)
                 )
                 CategoryBalanceItem(

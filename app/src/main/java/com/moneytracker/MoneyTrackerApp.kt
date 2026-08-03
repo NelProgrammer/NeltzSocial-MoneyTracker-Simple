@@ -1,10 +1,10 @@
 package com.moneytracker
 
 import android.app.Application
-import com.moneytracker.data.local.DefaultCategories
-import com.moneytracker.data.local.DefaultSubCategories
 import com.moneytracker.data.local.MoneyTrackerDatabase
 import com.moneytracker.data.repository.TransactionRepository
+import com.moneytracker.util.ProfileManager
+import com.moneytracker.util.SettingsManager
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,15 +21,20 @@ class MoneyTrackerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val database = MoneyTrackerDatabase.getInstance(this)
-        applicationScope.launch {
-            DefaultCategories.seed(database.categoryDao())
-            DefaultSubCategories.seed(database.subCategoryDao())
-        }
+        SettingsManager.init(this)
+
         repository = TransactionRepository(
             transactionDao = database.transactionDao(),
             categoryDao = database.categoryDao(),
             subCategoryDao = database.subCategoryDao(),
-            detailDao = database.detailDao()
+            detailDao = database.detailDao(),
+            groceryDao = database.groceryDao(),
+            taxiFareDao = database.taxiFareDao(),
+            profileDao = database.profileDao()
         )
+
+        applicationScope.launch {
+            ProfileManager.initSession(this@MoneyTrackerApp, database, repository)
+        }
     }
 }

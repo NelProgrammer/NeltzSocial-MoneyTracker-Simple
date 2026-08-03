@@ -46,7 +46,7 @@ fun StatsScreen(
     val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
     val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
-    val monthLabel = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+    val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
         modifier = Modifier,
@@ -60,10 +60,9 @@ fun StatsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text(
-                    text = monthLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                com.moneytracker.ui.components.PayMonthFilterHeader(
+                    selectedPayMonthDate = selectedPayMonthDate,
+                    onPayMonthSelected = { viewModel.setPayMonth(it) }
                 )
             }
 
