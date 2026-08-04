@@ -177,7 +177,7 @@ fun CategoryPieChartCard(
                                         )
                                     }
                                     Text(
-                                        text = "${String.format("%.1f", pct * 100)}%",
+                                        text = "${CurrencyUtils.format(summary.total)} (${String.format("%.1f", pct * 100)}%)",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = color
