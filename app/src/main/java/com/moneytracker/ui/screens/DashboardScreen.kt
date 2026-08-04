@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -18,15 +19,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextAlign
-import com.moneytracker.ui.components.*
+import com.moneytracker.ui.components.AppTopBar
+import com.moneytracker.ui.components.BalanceCard
+import com.moneytracker.ui.components.CategoryPieChartCard
+import com.moneytracker.ui.components.PayMonthFilterHeader
+import com.moneytracker.ui.theme.EducationColor
+import com.moneytracker.ui.theme.ExpenseColor
+import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.viewmodel.DashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,11 +46,13 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val summary by viewModel.summary.collectAsState()
-    val subCategorySummaries by viewModel.subCategorySummaries.collectAsState()
+    val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
+    val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
+    val educationBreakdown by viewModel.educationBreakdown.collectAsState()
+    val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
-        modifier = Modifier,
         topBar = {
             AppTopBar(
                 screenTitle = "Dashboard",
@@ -62,50 +70,95 @@ fun DashboardScreen(
             }
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(contentPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // PayMonth Filter Header (Prev, Current, Next, Dropdown)
-            PayMonthFilterHeader(
-                selectedPayMonthDate = selectedPayMonthDate,
-                onPayMonthSelected = { viewModel.setPayMonth(it) }
-            )
-
-            // Balance Card
-            BalanceCard(
-                balance = summary.balance,
-                income = summary.income,
-                investment = summary.investment,
-                education = summary.education,
-                expense = summary.expense
-            )
-
-            // Sub-Category Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Sub-Category Breakdown",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            // 1. PayMonth Filter Header (Prev, Current, Next, Dropdown)
+            item {
+                PayMonthFilterHeader(
+                    selectedPayMonthDate = selectedPayMonthDate,
+                    onPayMonthSelected = { viewModel.setPayMonth(it) }
                 )
-                TextButton(onClick = onViewAll) {
-                    Text("View All")
+            }
+
+            // 2. Balance Card Overview
+            item {
+                BalanceCard(
+                    balance = summary.balance,
+                    income = summary.income,
+                    investment = summary.investment,
+                    education = summary.education,
+                    expense = summary.expense
+                )
+            }
+
+            // 3. Section Header for Visual Breakdown Charts with View Table Button
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Category Analytics & Visual Graphs",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = onViewAll) {
+                        Text("View Table")
+                    }
                 }
             }
 
-            // Table takes remaining space
-            CategorySummaryTable(
-                summaries = subCategorySummaries,
-                modifier = Modifier.weight(1f)
-            )
+            // 4. Income Pie Chart (Where Income Comes From)
+            item {
+                CategoryPieChartCard(
+                    title = "Income Sources (Where Money Comes From)",
+                    summaries = incomeBreakdown,
+                    totalAmount = summary.income,
+                    baseColor = IncomeColor,
+                    emptyMessage = "No income recorded for this pay period."
+                )
+            }
+
+            // 5. Investments Pie Chart (Where Money is Invested)
+            item {
+                CategoryPieChartCard(
+                    title = "Investment Distribution",
+                    summaries = investmentBreakdown,
+                    totalAmount = summary.investment,
+                    baseColor = InvestmentColor,
+                    emptyMessage = "No investments recorded for this pay period."
+                )
+            }
+
+            // 6. Expense Pie Chart (Where Money is Spent)
+            item {
+                CategoryPieChartCard(
+                    title = "Expense Breakdown (Where Money is Spent)",
+                    summaries = expenseBreakdown,
+                    totalAmount = summary.expense,
+                    baseColor = ExpenseColor,
+                    emptyMessage = "No expenses recorded for this pay period."
+                )
+            }
+
+            // 7. Education Pie Chart (If Education records exist)
+            if (educationBreakdown.isNotEmpty() || summary.education > 0) {
+                item {
+                    CategoryPieChartCard(
+                        title = "Education & Training",
+                        summaries = educationBreakdown,
+                        totalAmount = summary.education,
+                        baseColor = EducationColor,
+                        emptyMessage = "No education expenses recorded for this pay period."
+                    )
+                }
+            }
         }
     }
 }

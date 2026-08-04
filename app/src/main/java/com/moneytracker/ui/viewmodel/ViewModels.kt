@@ -161,8 +161,68 @@ class DashboardViewModel(
                             TransactionType.EDUCATION -> 2
                             TransactionType.EXPENSE -> 3
                         }
-                    }.thenByDescending { it.totalAmount }
+                    }.thenBy { it.categoryName.lowercase() }
                 )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val incomeBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.INCOME }
+                .groupBy { it.categoryId }
+                .map { (catId, txns) ->
+                    CategorySummary(
+                        categoryId = catId,
+                        categoryName = txns.first().categoryName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val investmentBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.INVESTMENT }
+                .groupBy { it.categoryId }
+                .map { (catId, txns) ->
+                    CategorySummary(
+                        categoryId = catId,
+                        categoryName = txns.first().categoryName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val educationBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.EDUCATION }
+                .groupBy { it.categoryId }
+                .map { (catId, txns) ->
+                    CategorySummary(
+                        categoryId = catId,
+                        categoryName = txns.first().categoryName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val expenseBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.EXPENSE }
+                .groupBy { it.categoryId }
+                .map { (catId, txns) ->
+                    CategorySummary(
+                        categoryId = catId,
+                        categoryName = txns.first().categoryName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
