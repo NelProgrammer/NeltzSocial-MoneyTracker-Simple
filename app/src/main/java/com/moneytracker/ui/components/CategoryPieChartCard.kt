@@ -147,7 +147,7 @@ fun CategoryPieChartCard(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        summaries.take(5).forEachIndexed { index, summary ->
+                        summaries.forEachIndexed { index, summary ->
                             val color = getSliceColor(index, baseColor)
                             val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
 
@@ -193,13 +193,6 @@ fun CategoryPieChartCard(
                                     trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                             }
-                        }
-                        if (summaries.size > 5) {
-                            Text(
-                                text = "+ ${summaries.size - 5} more categories",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
