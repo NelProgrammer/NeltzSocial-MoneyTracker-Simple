@@ -18,13 +18,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import com.moneytracker.ui.components.*
 import com.moneytracker.ui.viewmodel.DashboardViewModel
 
@@ -45,8 +46,9 @@ fun DashboardScreen(
     Scaffold(
         modifier = Modifier,
         topBar = {
-            TopAppBar(
-                title = { Text("Money Tracker") },
+            AppTopBar(
+                screenTitle = "Dashboard",
+                showBack = false,
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -64,7 +66,8 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(contentPadding)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // PayMonth Filter Header (Prev, Current, Next, Dropdown)
@@ -73,6 +76,7 @@ fun DashboardScreen(
                 onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
 
+            // Balance Card
             BalanceCard(
                 balance = summary.balance,
                 income = summary.income,
@@ -81,6 +85,7 @@ fun DashboardScreen(
                 expense = summary.expense
             )
 
+            // Sub-Category Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -96,8 +101,10 @@ fun DashboardScreen(
                 }
             }
 
+            // Table takes remaining space
             CategorySummaryTable(
-                summaries = subCategorySummaries
+                summaries = subCategorySummaries,
+                modifier = Modifier.weight(1f)
             )
         }
     }

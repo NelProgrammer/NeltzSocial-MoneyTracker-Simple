@@ -57,7 +57,10 @@ fun BalanceCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Net Balance Title & Amount
-            Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = "Net Balance",
                     style = MaterialTheme.typography.labelMedium,

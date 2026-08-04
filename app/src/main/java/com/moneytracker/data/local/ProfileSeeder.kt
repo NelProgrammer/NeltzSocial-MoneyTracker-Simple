@@ -24,7 +24,8 @@ data class SeedItem(
     val note: String,
     val isRecurring: Boolean,
     val recurrenceFrequency: RecurrenceFrequency?,
-    val recurCount: Int?
+    val recurCount: Int?,
+    val date: Long? = null
 )
 
 object ProfileSeeder {
@@ -51,6 +52,15 @@ object ProfileSeeder {
             val isRec = obj.optBoolean("isRecurring", false)
             val freqStr = if (obj.has("recurrenceFrequency") && !obj.isNull("recurrenceFrequency")) obj.getString("recurrenceFrequency") else null
             val recurCount = if (obj.has("recurCount") && !obj.isNull("recurCount")) obj.getInt("recurCount") else null
+            val dateMillis = if (obj.has("date") && !obj.isNull("date")) {
+                // Expect ISO-8601 date string, e.g., "2026-07-20"
+                try {
+                    val parsed = java.time.LocalDate.parse(obj.getString("date"))
+                    parsed.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
 
             val type = when (catName.trim().uppercase()) {
                 "INCOME" -> TransactionType.INCOME
@@ -166,7 +176,7 @@ object ProfileSeeder {
                     subCategory = item.subCategory,
                     detail = item.detail,
                     note = item.note,
-                    date = SEED_DATE_MILLIS,
+                    date = item.date ?: SEED_DATE_MILLIS,
                     isRecurring = item.isRecurring,
                     recurrenceFrequency = item.recurrenceFrequency,
                     recurCount = item.recurCount

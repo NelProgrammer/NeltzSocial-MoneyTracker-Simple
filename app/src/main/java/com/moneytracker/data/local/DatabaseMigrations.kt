@@ -152,4 +152,46 @@ object DatabaseMigrations {
             db.execSQL("ALTER TABLE transactions ADD COLUMN detail TEXT NOT NULL DEFAULT ''")
         }
     }
+
+    // Migration 12 -> 13: Reorder columns so `date` is the first user column
+    val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // 1. Create new table with correct column order
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `transactions_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `date` INTEGER NOT NULL,
+                    `profileId` INTEGER NOT NULL,
+                    `amount` REAL NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `categoryId` INTEGER NOT NULL,
+                    `note` TEXT NOT NULL,
+                    `sortOrder` INTEGER NOT NULL,
+                    `subCategory` TEXT NOT NULL,
+                    `detail` TEXT NOT NULL,
+                    `isRecurring` INTEGER NOT NULL,
+                    `recurrenceFrequency` TEXT,
+                    `recurTillDate` INTEGER,
+                    `recurCount` INTEGER,
+                    FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            // 2. Copy data from old table to new table preserving values
+            db.execSQL(
+                """
+                INSERT INTO `transactions_new` (id, date, profileId, amount, type, categoryId, note, sortOrder, subCategory, detail, isRecurring, recurrenceFrequency, recurTillDate, recurCount)
+                SELECT id, date, profileId, amount, type, categoryId, note, sortOrder, subCategory, detail, isRecurring, recurrenceFrequency, recurTillDate, recurCount FROM `transactions`
+                """.trimIndent()
+            )
+            // 3. Drop old table and rename new one
+            db.execSQL("DROP TABLE `transactions`")
+            db.execSQL("ALTER TABLE `transactions_new` RENAME TO `transactions`")
+            // 4. Re‑create indexes used elsewhere
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_date ON transactions(date)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_sortOrder ON transactions(sortOrder)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_profileId ON transactions(profileId)")
+        }
+    }
 }

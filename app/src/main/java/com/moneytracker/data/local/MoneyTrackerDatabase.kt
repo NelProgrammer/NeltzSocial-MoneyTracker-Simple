@@ -44,7 +44,7 @@ class RecurrenceFrequencyConverter {
         TaxiFareEntity::class,
         ProfileEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
@@ -84,7 +84,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_8_9,
                     DatabaseMigrations.MIGRATION_9_10,
                     DatabaseMigrations.MIGRATION_10_11,
-                    DatabaseMigrations.MIGRATION_11_12
+                    DatabaseMigrations.MIGRATION_11_12,
+                    DatabaseMigrations.MIGRATION_12_13
                 )
                 .build()
         }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -65,7 +66,7 @@ fun PayMonthFilterHeader(
     }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().height(48.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -74,16 +75,17 @@ fun PayMonthFilterHeader(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 4.dp),
+            verticalArrangement = Arrangement.Center
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Label / Status Header
+                // Label
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -93,18 +95,41 @@ fun PayMonthFilterHeader(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = if (isAnchorCenteringMode) "Anchor Month Filter" else "PayMonth Filter",
+                        text = if (isAnchorCenteringMode) "Anchor Month" else "PayMonth",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Dropdown Button
+                // Quick Select Segmented Buttons (Prev, Curr, Next)
+                SingleChoiceSegmentedButtonRow {
+                    val labels = listOf("Prev", "Curr", "Next")
+                    labels.forEachIndexed { index, label ->
+                        val targetDate = when (index) {
+                            0 -> currentPayMonthDate.minusMonths(1)
+                            1 -> currentPayMonthDate
+                            else -> currentPayMonthDate.plusMonths(1)
+                        }
+                        SegmentedButton(
+                            selected = segmentedIndex == index,
+                            onClick = { onPayMonthSelected(targetDate) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = labels.size)
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+
+                // Dropdown Button (Month Picker) positioned to the right
                 Box {
                     OutlinedButton(
                         onClick = { dropdownExpanded = true },
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(40.dp)
                     ) {
                         Text(
                             text = formatPayMonthShort(selectedPayMonthDate, payDateDay),
@@ -137,31 +162,6 @@ fun PayMonthFilterHeader(
                                 }
                             )
                         }
-                    }
-                }
-            }
-
-            // Quick Select Segmented Buttons Row: [Prev] [Current] [Next]
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val labels = listOf("Prev", "Current", "Next")
-                labels.forEachIndexed { index, label ->
-                    val targetDate = when (index) {
-                        0 -> currentPayMonthDate.minusMonths(1)
-                        1 -> currentPayMonthDate
-                        else -> currentPayMonthDate.plusMonths(1)
-                    }
-
-                    SegmentedButton(
-                        selected = segmentedIndex == index,
-                        onClick = { onPayMonthSelected(targetDate) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = labels.size)
-                    ) {
-                        Text(
-                            text = if (isAnchorCenteringMode && index == 1) "Anchor (Curr)" else label,
-                            style = MaterialTheme.typography.labelSmall
-                        )
                     }
                 }
             }

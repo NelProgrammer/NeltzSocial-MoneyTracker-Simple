@@ -46,9 +46,12 @@ import com.moneytracker.ui.viewmodel.ViewModelFactory
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 
+import com.moneytracker.ui.screens.SummaryTableScreen
+
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object ProfileSelection : Screen("profileSelection", "Profile", Icons.Default.Person)
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
+    object SummaryTable : Screen("summaryTable", "Table", Icons.Default.TableChart)
     object Transactions : Screen("transactions", "Transactions", Icons.Default.List)
     object Stats : Screen("stats", "Stats", Icons.Default.PieChart)
     object Groceries : Screen("groceries", "Groceries", Icons.Default.ShoppingCart)
@@ -73,6 +76,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
 
     val bottomNavItems = listOf(
         Screen.Dashboard,
+        Screen.SummaryTable,
         Screen.Transactions,
         Screen.Stats,
         Screen.Groceries,
@@ -140,11 +144,20 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                         viewModel = viewModel,
                         contentPadding = innerPadding,
                         onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
-                        onViewAll = { navController.navigate(Screen.Transactions.route) },
+                        onViewAll = { navController.navigate(Screen.SummaryTable.route) },
                         onEditTransaction = { id ->
                             navController.navigate(Screen.EditTransaction.createRoute(id))
                         },
                         onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                    )
+                }
+                composable(Screen.SummaryTable.route) {
+                    val viewModel: DashboardViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    SummaryTableScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
                     )
                 }
                 composable(Screen.Transactions.route) {
@@ -157,7 +170,8 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                         onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
                         onEditTransaction = { id ->
                             navController.navigate(Screen.EditTransaction.createRoute(id))
-                        }
+                        },
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.Stats.route) {
@@ -166,7 +180,8 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     )
                     StatsScreen(
                         viewModel = viewModel,
-                        contentPadding = innerPadding
+                        contentPadding = innerPadding,
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.Groceries.route) {

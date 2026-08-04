@@ -9,18 +9,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.ExperimentalMaterial3Api
+//
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
+
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.ui.components.PayMonthFilterHeader
 import com.moneytracker.ui.components.TransactionTable
@@ -32,7 +37,8 @@ fun TransactionsScreen(
     viewModel: TransactionsViewModel,
     contentPadding: PaddingValues,
     onAddTransaction: () -> Unit,
-    onEditTransaction: (Long) -> Unit
+    onEditTransaction: (Long) -> Unit,
+    onNavigateBack: () -> Unit
 ) {
     val transactions by viewModel.transactions.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
@@ -40,14 +46,19 @@ fun TransactionsScreen(
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
-        modifier = Modifier,
-        topBar = { TopAppBar(title = { Text("Transactions") }) },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onAddTransaction) {
-                Icon(Icons.Default.Add, contentDescription = "Add transaction")
-            }
+    modifier = Modifier,
+    topBar = {
+        AppTopBar(
+            screenTitle = "Transactions",
+            showBack = false
+        )
+    },
+    floatingActionButton = {
+        FloatingActionButton(onClick = onAddTransaction) {
+            Icon(Icons.Default.Add, contentDescription = "Add transaction")
         }
-    ) { padding ->
+    }
+) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

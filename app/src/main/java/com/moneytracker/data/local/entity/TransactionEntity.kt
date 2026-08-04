@@ -12,7 +12,7 @@ import androidx.room.PrimaryKey
             entity = CategoryEntity::class,
             parentColumns = ["id"],
             childColumns = ["categoryId"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [Index("categoryId"), Index("date"), Index("sortOrder"), Index("profileId")]
@@ -20,11 +20,11 @@ import androidx.room.PrimaryKey
 data class TransactionEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val date: Long,
     val profileId: Long = 1,
     val amount: Double,
     val type: TransactionType,
     val categoryId: Long,
-    val date: Long,
     val note: String = "",
     val sortOrder: Int = 0,
     val subCategory: String = "",

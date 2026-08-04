@@ -1,5 +1,6 @@
 [
   {
+    "date": "2026-07-20",
     "categoryName": "Income",
     "subCategory": "Salary",
     "detail": "Normal",
@@ -10,6 +11,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Income",
     "subCategory": "Salary",
     "detail": "Bonus",
@@ -20,6 +22,7 @@
     "recurCount": null
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Credit & Bank Charges",
     "detail": "Home Loan",
@@ -30,6 +33,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Credit & Bank Charges",
     "detail": "Credit Card R40",
@@ -40,6 +44,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Credit & Bank Charges",
     "detail": "Loan R120",
@@ -50,6 +55,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Credit & Bank Charges",
     "detail": "Bank Fees",
@@ -60,6 +66,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Investment",
     "subCategory": "Shares",
     "detail": "Share Type",
@@ -70,6 +77,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Investment",
     "subCategory": "Cash Investment",
     "detail": "Save",
@@ -80,6 +88,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Education",
     "subCategory": "University",
     "detail": "University To Be Confirmed",
@@ -90,6 +99,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Education",
     "subCategory": "Certificate",
     "detail": "Java OCA",
@@ -100,6 +110,7 @@
     "recurCount": null
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Education",
     "subCategory": "Certificate",
     "detail": "CIMA",
@@ -110,6 +121,7 @@
     "recurCount": 6
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Grocery",
     "detail": "Primary Grocery",
@@ -120,6 +132,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Grocery",
     "detail": "Weekly Guard",
@@ -130,6 +143,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Utilities",
     "detail": "City Council",
@@ -140,6 +154,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Utilities",
     "detail": "Electricity",
@@ -150,6 +165,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Utilities",
     "detail": "Gas Emergency Guard",
@@ -160,6 +176,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "House Keeping",
     "detail": "Yard Cleaners",
@@ -170,6 +187,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "School",
     "detail": "School fees",
@@ -180,6 +198,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "School",
     "detail": "School Transport",
@@ -190,6 +209,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Grocery",
     "detail": "Lunch Bread 2x5x4",
@@ -200,6 +220,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Education",
     "subCategory": "School",
     "detail": "Child's R10s Carry",
@@ -210,6 +231,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Family",
     "detail": "Black Tax",
@@ -220,6 +242,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "House Keeping",
     "detail": "Street Security",
@@ -230,6 +253,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Family",
     "detail": "Baby Mama Allowance",
@@ -240,6 +264,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Life Cover",
@@ -250,6 +275,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Nuclear Family",
@@ -260,6 +286,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Sibling - Scara",
@@ -270,6 +297,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Sibling - Randy",
@@ -280,6 +308,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Sibling - Loz",
@@ -290,6 +319,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Sibling - Kay",
@@ -300,6 +330,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Funeral Plan - Extended Family - Aunts & Cuz",
@@ -310,6 +341,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Insurance",
     "detail": "Burial Society - Cuzs",
@@ -320,6 +352,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Pocket Money",
     "detail": "Kid's Weekend Pocket",
@@ -330,6 +363,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Family",
     "detail": "Clothes BlackTax",
@@ -340,6 +374,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Work",
     "detail": "Taxi 2 Work",
@@ -350,6 +385,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Work",
     "detail": "Uber 2 Work",
@@ -360,6 +396,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Pocket Money",
     "detail": "Pocket Money",
@@ -370,6 +407,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Pocket Money",
     "detail": "Maslow's",
@@ -380,6 +418,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Family",
     "detail": "Other",
@@ -390,6 +429,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "House Keeping",
     "detail": "Ad-hoc???",
@@ -400,6 +440,7 @@
     "recurCount": 24
   },
   {
+    "date": "2026-07-20",
     "categoryName": "Expense",
     "subCategory": "Family",
     "detail": "Ad-hoc???",

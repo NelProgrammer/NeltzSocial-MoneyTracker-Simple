@@ -33,7 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,8 +64,9 @@ fun ProfileSelectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Select Local Profile") }
+            AppTopBar(
+                screenTitle = "Select Local Profile",
+                showBack = false
             )
         }
     ) { padding ->

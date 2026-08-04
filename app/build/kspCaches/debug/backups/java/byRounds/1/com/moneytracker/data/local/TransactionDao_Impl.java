@@ -59,19 +59,19 @@ public final class TransactionDao_Impl implements TransactionDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `transactions` (`id`,`profileId`,`amount`,`type`,`categoryId`,`date`,`note`,`sortOrder`,`subCategory`,`detail`,`isRecurring`,`recurrenceFrequency`,`recurTillDate`,`recurCount`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `transactions` (`id`,`date`,`profileId`,`amount`,`type`,`categoryId`,`note`,`sortOrder`,`subCategory`,`detail`,`isRecurring`,`recurrenceFrequency`,`recurTillDate`,`recurCount`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final TransactionEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindLong(2, entity.getProfileId());
-        statement.bindDouble(3, entity.getAmount());
+        statement.bindLong(2, entity.getDate());
+        statement.bindLong(3, entity.getProfileId());
+        statement.bindDouble(4, entity.getAmount());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(4, _tmp);
-        statement.bindLong(5, entity.getCategoryId());
-        statement.bindLong(6, entity.getDate());
+        statement.bindString(5, _tmp);
+        statement.bindLong(6, entity.getCategoryId());
         statement.bindString(7, entity.getNote());
         statement.bindLong(8, entity.getSortOrder());
         statement.bindString(9, entity.getSubCategory());
@@ -113,19 +113,19 @@ public final class TransactionDao_Impl implements TransactionDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `transactions` SET `id` = ?,`profileId` = ?,`amount` = ?,`type` = ?,`categoryId` = ?,`date` = ?,`note` = ?,`sortOrder` = ?,`subCategory` = ?,`detail` = ?,`isRecurring` = ?,`recurrenceFrequency` = ?,`recurTillDate` = ?,`recurCount` = ? WHERE `id` = ?";
+        return "UPDATE OR ABORT `transactions` SET `id` = ?,`date` = ?,`profileId` = ?,`amount` = ?,`type` = ?,`categoryId` = ?,`note` = ?,`sortOrder` = ?,`subCategory` = ?,`detail` = ?,`isRecurring` = ?,`recurrenceFrequency` = ?,`recurTillDate` = ?,`recurCount` = ? WHERE `id` = ?";
       }
 
       @Override
       protected void bind(@NonNull final SupportSQLiteStatement statement,
           @NonNull final TransactionEntity entity) {
         statement.bindLong(1, entity.getId());
-        statement.bindLong(2, entity.getProfileId());
-        statement.bindDouble(3, entity.getAmount());
+        statement.bindLong(2, entity.getDate());
+        statement.bindLong(3, entity.getProfileId());
+        statement.bindDouble(4, entity.getAmount());
         final String _tmp = __transactionTypeConverter.fromType(entity.getType());
-        statement.bindString(4, _tmp);
-        statement.bindLong(5, entity.getCategoryId());
-        statement.bindLong(6, entity.getDate());
+        statement.bindString(5, _tmp);
+        statement.bindLong(6, entity.getCategoryId());
         statement.bindString(7, entity.getNote());
         statement.bindLong(8, entity.getSortOrder());
         statement.bindString(9, entity.getSubCategory());
@@ -413,11 +413,11 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
-          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
@@ -430,6 +430,8 @@ public final class TransactionDao_Impl implements TransactionDao {
           if (_cursor.moveToFirst()) {
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpDate;
+            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final long _tmpProfileId;
             _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
@@ -440,8 +442,6 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpType = __transactionTypeConverter.toType(_tmp);
             final long _tmpCategoryId;
             _tmpCategoryId = _cursor.getLong(_cursorIndexOfCategoryId);
-            final long _tmpDate;
-            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
             final int _tmpSortOrder;
@@ -474,7 +474,7 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _result = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _result = new TransactionEntity(_tmpId,_tmpDate,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
           } else {
             _result = null;
           }
@@ -644,11 +644,11 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
-          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
@@ -662,6 +662,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             final TransactionEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpDate;
+            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final long _tmpProfileId;
             _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
@@ -672,8 +674,6 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpType = __transactionTypeConverter.toType(_tmp);
             final long _tmpCategoryId;
             _tmpCategoryId = _cursor.getLong(_cursorIndexOfCategoryId);
-            final long _tmpDate;
-            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
             final int _tmpSortOrder;
@@ -706,7 +706,7 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _item = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _item = new TransactionEntity(_tmpId,_tmpDate,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
             _result.add(_item);
           }
           return _result;
@@ -733,11 +733,11 @@ public final class TransactionDao_Impl implements TransactionDao {
         final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
         try {
           final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
           final int _cursorIndexOfAmount = CursorUtil.getColumnIndexOrThrow(_cursor, "amount");
           final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
           final int _cursorIndexOfCategoryId = CursorUtil.getColumnIndexOrThrow(_cursor, "categoryId");
-          final int _cursorIndexOfDate = CursorUtil.getColumnIndexOrThrow(_cursor, "date");
           final int _cursorIndexOfNote = CursorUtil.getColumnIndexOrThrow(_cursor, "note");
           final int _cursorIndexOfSortOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "sortOrder");
           final int _cursorIndexOfSubCategory = CursorUtil.getColumnIndexOrThrow(_cursor, "subCategory");
@@ -751,6 +751,8 @@ public final class TransactionDao_Impl implements TransactionDao {
             final TransactionEntity _item;
             final long _tmpId;
             _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpDate;
+            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final long _tmpProfileId;
             _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
             final double _tmpAmount;
@@ -761,8 +763,6 @@ public final class TransactionDao_Impl implements TransactionDao {
             _tmpType = __transactionTypeConverter.toType(_tmp);
             final long _tmpCategoryId;
             _tmpCategoryId = _cursor.getLong(_cursorIndexOfCategoryId);
-            final long _tmpDate;
-            _tmpDate = _cursor.getLong(_cursorIndexOfDate);
             final String _tmpNote;
             _tmpNote = _cursor.getString(_cursorIndexOfNote);
             final int _tmpSortOrder;
@@ -795,7 +795,7 @@ public final class TransactionDao_Impl implements TransactionDao {
             } else {
               _tmpRecurCount = _cursor.getInt(_cursorIndexOfRecurCount);
             }
-            _item = new TransactionEntity(_tmpId,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpDate,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
+            _item = new TransactionEntity(_tmpId,_tmpDate,_tmpProfileId,_tmpAmount,_tmpType,_tmpCategoryId,_tmpNote,_tmpSortOrder,_tmpSubCategory,_tmpDetail,_tmpIsRecurring,_tmpRecurrenceFrequency,_tmpRecurTillDate,_tmpRecurCount);
             _result.add(_item);
           }
           return _result;

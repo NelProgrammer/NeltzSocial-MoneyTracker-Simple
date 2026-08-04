@@ -22,7 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -63,8 +63,9 @@ fun MonthComparisonScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Month-to-Month Comparison") }
+            AppTopBar(
+                screenTitle = "Month-to-Month Comparison",
+                showBack = false
             )
         }
     ) { padding ->

@@ -16,7 +16,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,7 +39,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun StatsScreen(
     viewModel: StatsViewModel,
-    contentPadding: PaddingValues
+    contentPadding: PaddingValues,
+    onNavigateBack: () -> Unit
 ) {
     val summary by viewModel.summary.collectAsState()
     val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
@@ -50,7 +51,12 @@ fun StatsScreen(
 
     Scaffold(
         modifier = Modifier,
-        topBar = { TopAppBar(title = { Text("Stats") }) }
+        topBar = {
+            AppTopBar(
+                screenTitle = "Stats",
+                showBack = false
+            )
+        }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
