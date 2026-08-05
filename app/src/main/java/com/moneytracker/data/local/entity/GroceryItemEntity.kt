@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class GroceryItemEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val profileId: Long = 1,
     val date: Long,
     val itemName: String,
     val size: Double = 1.0,
@@ -16,5 +17,6 @@ data class GroceryItemEntity(
     val unitPrice: Double = 0.0,
     val quantity: Int = 1,
     val totalPrice: Double = 0.0,
+    val isChecked: Boolean = false,
     val transactionId: Long? = null
 )

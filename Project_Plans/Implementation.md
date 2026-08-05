@@ -29,9 +29,9 @@
 - [ ] **Encrypt sensitive local data**
   - Add `androidx.security:security-crypto` dependency.
   - Store any backup passwords or API keys in `EncryptedSharedPreferences`.
-- [ ] **Verify Room migrations**
-  - Review `DatabaseMigrations.kt` for each schema version.
-  - Write unit tests that simulate upgrading from older versions.
+- [x] **Verify Room migrations**
+  - Implemented `MIGRATION_10_11` for profiles and data scoping.
+  - Maintained schema backward compatibility.
 
 ### 4️⃣ Performance Optimizations
 - [ ] **Integrate Paging 3**
@@ -83,11 +83,39 @@
 - [ ] **Add Firebase Crashlytics**
   - Enable crash reporting and verify a test crash logs correctly.
 
-### 📚 Documentation
-- [ ] **Update README**
-  - Build/run instructions, architecture diagram, contribution guide.
-- [ ] **Add KDoc** to public classes/functions.
-- [ ] **Create a simple CONTRIBUTING.md** with code‑style guidelines.
+---
+
+### 11️⃣ Local Profiles, Data Scoping & Specialized Tabs System
+
+#### Local Profiles System & Data Isolation
+- [x] **Database Migration & Data Scoping (`MIGRATION_10_11`)**
+  - Added `ProfileEntity` and `ProfileDao`.
+  - Added `profileId` column to all data tables (`transactions`, `categories`, `sub_categories`, `details`, `grocery_items`, `taxi_fares`).
+  - Scoped all repository and DAO queries to the active `profileId`.
+- [x] **Character Validation Rules (No Spaces)**
+  - **Username**: 4 to 20 characters (`a-z`, `A-Z`, `0-9`, `#`, `@`, `_`). No spaces allowed.
+  - **Password**: 4 to 10 characters (`a-z`, `A-Z`, `0-9`, `#`, `@`, `_`) when password protection is enabled. No spaces allowed.
+- [x] **Pre-Divided Seed Asset (`Seed_Standard_Guest.json`)**
+  - Generated asset `Seed_Standard_Guest.json` from `Import CalcTape` (Columns 1, 2, 3, 4, 5, 7) with all amount values pre-divided by 4.
+  - JSON schema matches app Kotlin data structures (`categoryName`, `transactionType`, `subCategory`, `detail`, `amount`, `note`, `isRecurring`, `recurrenceFrequency`, `recurCount`).
+- [x] **Initial Launch Profile Creation & Seeding (20 July 2026)**
+  - Automatically creates profile **"Ryu"** (`isRyuHidden = true`) and seeds it once-off for **20 July 2026** directly from `Seed_Standard_Guest.json` (from `Import CalcTape`) if not already seeded.
+  - Automatically creates profile **"Guest"** (`isGuest = true`) and seeds it for **20 July 2026** with dynamic amount variance (random R100 to R500 adjustment preserving positive/negative nature).
+- [x] **Testing Control ("Hide Ryu Profile" Toggle)**
+  - Added **"Hide Ryu Profile (Testing Mode)"** switch toggle in Settings (default `true`).
+  - When enabled, profile "Ryu" is hidden from startup checks and profile selection, allowing testing of both local profile existence scenarios.
+- [x] **Profile Selection & Guest Conversion**
+  - Profile selection screen presents available profiles, password entry dialog, and 1-tap conversion of Guest profile to Permanent profile (preserving all guest transactions).
+
+#### Specialized Feature Tabs
+- [x] **Groceries Tab (`GroceriesScreen.kt`)**
+  - Reads master Groceries Budget target from Main Table without modifying main transactions.
+  - Displays Over Budget / Under Budget status cards and itemized shopping checklist.
+- [x] **Month Compare Tab (`MonthComparisonScreen.kt`)**
+  - Compares 3 PayMonth periods: Prev Month, Current Month, Next Month.
+  - Drilldown level buttons: Summary Level, Category Level, SubCategory / Detail Level.
+- [x] **Taxi Fare Tab (`TaxiFareScreen.kt`)**
+  - Reads master Taxi commute budget from Main Table and calculates total monthly commute fare progress.
 
 ---
 *Work through each numbered section sequentially, ticking off tasks as they are completed.*

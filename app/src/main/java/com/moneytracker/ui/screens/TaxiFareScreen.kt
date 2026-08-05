@@ -1,47 +1,341 @@
 package com.moneytracker.ui.screens
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.res.painterResource
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.moneytracker.data.local.entity.TaxiFareEntity
+import com.moneytracker.ui.components.EmptyState
+import com.moneytracker.ui.theme.ExpenseColor
+import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.viewmodel.TaxiFareViewModel
+import com.moneytracker.util.CurrencyUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaxiFareScreen(contentPadding: PaddingValues) {
+fun TaxiFareScreen(
+    viewModel: TaxiFareViewModel,
+    contentPadding: PaddingValues
+) {
+    val routes by viewModel.routes.collectAsState()
+    val budgetSummary by viewModel.budgetSummary.collectAsState()
+    val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
+    var showAddDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Taxi Fare") },
-                navigationIcon = {
-                    IconButton(onClick = { /* TODO: handle back navigation */ }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
+            AppTopBar(
+                screenTitle = "Taxi Fare & Commute Calculator",
+                showBack = false
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Commute Route")
+            }
         }
-    ) { innerPadding ->
-        Box(
+    ) { padding ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Taxi Fare – Coming Soon",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                textAlign = TextAlign.Center,
-                fontSize = 20.sp
+            com.moneytracker.ui.components.PayMonthFilterHeader(
+                selectedPayMonthDate = selectedPayMonthDate,
+                onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
+            // 1. Commute Budget vs Total Estimated Fare Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsCar,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Taxi Commute Budget Target",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
+                        // Over / Under Budget Status Badge
+                        Surface(
+                            color = if (budgetSummary.isOverBudget) ExpenseColor else IncomeColor,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = if (budgetSummary.isOverBudget) {
+                                    "OVER BUDGET by ${CurrencyUtils.format(budgetSummary.overBudgetAmount)}"
+                                } else {
+                                    "UNDER BUDGET by ${CurrencyUtils.format(budgetSummary.remainingBudget)}"
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Main Table Taxi Budget",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = CurrencyUtils.format(budgetSummary.mainBudget),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "Total Estimated Commute Cost",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = CurrencyUtils.format(budgetSummary.totalEstimatedFare),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (budgetSummary.isOverBudget) ExpenseColor else IncomeColor
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2. Saved Commute Routes Section Header
+            Text(
+                text = "Saved Commute Routes (${routes.size})",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            // 3. Saved Routes List
+            if (routes.isEmpty()) {
+                EmptyState("No taxi routes saved yet. Tap + to add a commute route.")
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(routes, key = { it.id }) { route ->
+                        TaxiRouteCard(
+                            route = route,
+                            onDelete = { viewModel.deleteRoute(route) }
+                        )
+                    }
+                }
+            }
         }
     }
+
+    if (showAddDialog) {
+        AddTaxiRouteDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { routeName, fare, trips, workDays ->
+                viewModel.saveRoute(
+                    routeName = routeName,
+                    farePerTrip = fare,
+                    tripsPerDay = trips,
+                    workingDaysPerMonth = workDays
+                )
+                showAddDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun TaxiRouteCard(
+    route: TaxiFareEntity,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = route.routeName,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${CurrencyUtils.format(route.farePerTrip)} / trip  •  ${route.tripsPerDay} trips/day  •  ${route.workingDaysPerMonth} days/mo",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = CurrencyUtils.format(route.monthlyTotal),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete Route",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddTaxiRouteDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (routeName: String, farePerTrip: Double, tripsPerDay: Int, workingDaysPerMonth: Int) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var fareInput by remember { mutableStateOf("") }
+    var tripsInput by remember { mutableStateOf("2") }
+    var daysInput by remember { mutableStateOf("20") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Taxi Route") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Route Name (e.g. Work Commute)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = fareInput,
+                    onValueChange = { fareInput = it },
+                    label = { Text("Fare Per Trip (R)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = tripsInput,
+                        onValueChange = { tripsInput = it },
+                        label = { Text("Trips / Day") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = daysInput,
+                        onValueChange = { daysInput = it },
+                        label = { Text("Work Days / Mo") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val fare = fareInput.toDoubleOrNull() ?: 0.0
+                    val trips = tripsInput.toIntOrNull() ?: 2
+                    val days = daysInput.toIntOrNull() ?: 20
+                    if (name.isNotBlank() && fare > 0.0) {
+                        onConfirm(name, fare, trips, days)
+                    }
+                }
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

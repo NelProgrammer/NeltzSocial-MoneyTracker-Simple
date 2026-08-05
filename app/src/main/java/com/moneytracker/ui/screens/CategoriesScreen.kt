@@ -24,7 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -59,7 +59,13 @@ fun CategoriesScreen(
 
     Scaffold(
         modifier = Modifier,
-        topBar = { TopAppBar(title = { Text("Categories") }, navigationIcon = { TextButton(onClick = onNavigateBack) { Text("Back") } }) },
+        topBar = {
+            AppTopBar(
+                screenTitle = "Categories",
+                showBack = true,
+                onBack = onNavigateBack
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 editingCategory = null

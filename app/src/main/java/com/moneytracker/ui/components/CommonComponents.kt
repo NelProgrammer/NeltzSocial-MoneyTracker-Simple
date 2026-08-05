@@ -28,18 +28,22 @@ import com.moneytracker.util.CurrencyUtils
  * Balance Card for Dashboard displaying Category Totals and Net Balance.
  * Formula: Income − Investment − Expense.
  */
+import com.moneytracker.ui.theme.EducationColor
+
 @Composable
 fun BalanceCard(
     balance: Double,
     income: Double,
     investment: Double,
+    education: Double = 0.0,
     expense: Double,
     modifier: Modifier = Modifier
 ) {
     val absIncome = kotlin.math.abs(income)
     val absInvestment = kotlin.math.abs(investment)
+    val absEducation = kotlin.math.abs(education)
     val absExpense = kotlin.math.abs(expense)
-    val calculatedBalance = absIncome - absInvestment - absExpense
+    val calculatedBalance = absIncome - absInvestment - absEducation - absExpense
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -52,45 +56,66 @@ fun BalanceCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Net Balance Title & Amount
-            Column {
+            // Net Balance Title & Amount Row (Horizontal)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = "Net Balance",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
                     text = CurrencyUtils.format(calculatedBalance),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = if (calculatedBalance >= 0) IncomeColor else ExpenseColor
                 )
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
 
-            // Category Totals Grid (Income +, Investment -, Expense -)
-            Row(
+            // Category Totals Grid (Horizontal rows for Income, Investment, Education, Expense)
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryBalanceItem(
-                    label = "Income (+)",
-                    amount = absIncome,
-                    color = IncomeColor,
-                    modifier = Modifier.weight(1f)
-                )
-                CategoryBalanceItem(
-                    label = "Investment (−)",
-                    amount = absInvestment,
-                    color = InvestmentColor,
-                    modifier = Modifier.weight(1f)
-                )
-                CategoryBalanceItem(
-                    label = "Expense (−)",
-                    amount = absExpense,
-                    color = ExpenseColor,
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CategoryBalanceItem(
+                        label = "Income (+)",
+                        amount = absIncome,
+                        color = IncomeColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CategoryBalanceItem(
+                        label = "Investment (−)",
+                        amount = absInvestment,
+                        color = InvestmentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CategoryBalanceItem(
+                        label = "Education (−)",
+                        amount = absEducation,
+                        color = EducationColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CategoryBalanceItem(
+                        label = "Expense (−)",
+                        amount = absExpense,
+                        color = ExpenseColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -103,18 +128,21 @@ private fun CategoryBalanceItem(
     color: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
         modifier = modifier
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         Text(
             text = CurrencyUtils.format(amount),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = color,
             maxLines = 1,

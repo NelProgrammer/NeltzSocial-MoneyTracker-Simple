@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -18,20 +19,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.moneytracker.ui.components.*
+import com.moneytracker.ui.components.AppTopBar
+import com.moneytracker.ui.components.BalanceCard
+import com.moneytracker.ui.components.CategoryPieChartCard
+import com.moneytracker.ui.components.PayMonthFilterHeader
+import com.moneytracker.ui.theme.EducationColor
+import com.moneytracker.ui.theme.ExpenseColor
+import com.moneytracker.ui.theme.IncomeColor
+import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.ui.viewmodel.DashboardViewModel
-import com.moneytracker.util.DateUtils
-import com.moneytracker.util.SettingsManager
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,17 +46,17 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val summary by viewModel.summary.collectAsState()
-    val subCategorySummaries by viewModel.subCategorySummaries.collectAsState()
-
-    val payDateDay = SettingsManager.getPayDateDay()
-    val currentPayMonthDate = DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay)
-    val formattedMonth = currentPayMonthDate.format(DateTimeFormatter.ofPattern("yyyy-MMM"))
+    val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
+    val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
+    val educationBreakdown by viewModel.educationBreakdown.collectAsState()
+    val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
+    val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
-        modifier = Modifier,
         topBar = {
-            TopAppBar(
-                title = { Text("Money Tracker") },
+            AppTopBar(
+                screenTitle = "Dashboard",
+                showBack = false,
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -68,51 +70,95 @@ fun DashboardScreen(
             }
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Current Month: $formattedMonth",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Balance Section displaying category totals and Net Balance Sum/Difference calculation
-            BalanceCard(
-                balance = summary.balance,
-                income = summary.income,
-                investment = summary.investment,
-                expense = summary.expense
-            )
-
-            // Category Summary Section Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Category Summary",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+            // 1. PayMonth Filter Header (Prev, Current, Next, Dropdown)
+            item {
+                PayMonthFilterHeader(
+                    selectedPayMonthDate = selectedPayMonthDate,
+                    onPayMonthSelected = { viewModel.setPayMonth(it) }
                 )
-                TextButton(onClick = onViewAll) {
-                    Text("View all transactions")
+            }
+
+            // 2. Balance Card Overview
+            item {
+                BalanceCard(
+                    balance = summary.balance,
+                    income = summary.income,
+                    investment = summary.investment,
+                    education = summary.education,
+                    expense = summary.expense
+                )
+            }
+
+            // 3. Section Header for Visual Breakdown Charts with View Table Button
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Category Analytics & Visual Graphs",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = onViewAll) {
+                        Text("View Table")
+                    }
                 }
             }
 
-            // Category Summary Table with Running Total
-            if (subCategorySummaries.isEmpty()) {
-                EmptyState("No categories recorded. Tap + to add a transaction.")
-            } else {
-                CategorySummaryTable(
-                    summaries = subCategorySummaries,
-                    contentPadding = contentPadding
+            // 4. Income Pie Chart (Where Income Comes From)
+            item {
+                CategoryPieChartCard(
+                    title = "Income Sources (Where Money Comes From)",
+                    summaries = incomeBreakdown,
+                    totalAmount = summary.income,
+                    baseColor = IncomeColor,
+                    emptyMessage = "No income recorded for this pay period."
                 )
+            }
+
+            // 5. Investments Pie Chart (Where Money is Invested)
+            item {
+                CategoryPieChartCard(
+                    title = "Investment Distribution",
+                    summaries = investmentBreakdown,
+                    totalAmount = summary.investment,
+                    baseColor = InvestmentColor,
+                    emptyMessage = "No investments recorded for this pay period."
+                )
+            }
+
+            // 6. Expense Pie Chart (Where Money is Spent)
+            item {
+                CategoryPieChartCard(
+                    title = "Expense Breakdown (Where Money is Spent)",
+                    summaries = expenseBreakdown,
+                    totalAmount = summary.expense,
+                    baseColor = ExpenseColor,
+                    emptyMessage = "No expenses recorded for this pay period.",
+                    useTwoColumns = true
+                )
+            }
+
+            // 7. Education Pie Chart (If Education records exist)
+            if (educationBreakdown.isNotEmpty() || summary.education > 0) {
+                item {
+                    CategoryPieChartCard(
+                        title = "Education & Training",
+                        summaries = educationBreakdown,
+                        totalAmount = summary.education,
+                        baseColor = EducationColor,
+                        emptyMessage = "No education expenses recorded for this pay period."
+                    )
+                }
             }
         }
     }

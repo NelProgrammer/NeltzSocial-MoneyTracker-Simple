@@ -42,6 +42,13 @@ object DateUtils {
         }
     }
 
+    fun calculateNextPayDate(currentMillis: Long, payDateDay: Int = 20, monthsToAdd: Int = 1): Long {
+        val currentDate = toLocalDate(currentMillis)
+        val nextDate = currentDate.plusMonths(monthsToAdd.toLong())
+        val targetDay = payDateDay.coerceAtMost(nextDate.lengthOfMonth())
+        return toEpochMillis(nextDate.withDayOfMonth(targetDay))
+    }
+
     /**
      * Returns the epoch milliseconds for the start of the current calendar month (system local timezone).
      */

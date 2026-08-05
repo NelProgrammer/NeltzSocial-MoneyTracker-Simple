@@ -9,6 +9,7 @@ data class TransactionWithCategory(
     val note: String,
     val sortOrder: Int,
     val subCategory: String = "",
+    val detail: String = "",
     val categoryName: String,
     val categoryIconName: String
 ) {
@@ -20,6 +21,7 @@ data class TransactionWithCategory(
         date = date,
         note = note,
         sortOrder = sortOrder,
-        subCategory = subCategory
+        subCategory = subCategory,
+        detail = detail
     )
 }

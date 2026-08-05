@@ -8,13 +8,15 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class UserSettings(
     val payDateDay: Int = 20,
-    val cutoffDay: Int = 18
+    val cutoffDay: Int = 18,
+    val isRyuHidden: Boolean = true
 )
 
 object SettingsManager {
     private const val PREFS_NAME = "money_tracker_user_settings"
     private const val KEY_PAY_DATE_DAY = "pay_date_day"
     private const val KEY_CUTOFF_DAY = "cutoff_day"
+    private const val KEY_IS_RYU_HIDDEN = "is_ryu_hidden"
 
     private var prefs: SharedPreferences? = null
 
@@ -26,7 +28,12 @@ object SettingsManager {
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val payDate = prefs?.getInt(KEY_PAY_DATE_DAY, 20) ?: 20
             val cutoff = prefs?.getInt(KEY_CUTOFF_DAY, 18) ?: 18
-            _settings.value = UserSettings(payDateDay = payDate, cutoffDay = cutoff)
+            val isRyuHidden = prefs?.getBoolean(KEY_IS_RYU_HIDDEN, true) ?: true
+            _settings.value = UserSettings(
+                payDateDay = payDate,
+                cutoffDay = cutoff,
+                isRyuHidden = isRyuHidden
+            )
         }
     }
 
@@ -44,6 +51,13 @@ object SettingsManager {
         prefs?.edit()?.putInt(KEY_CUTOFF_DAY, validDay)?.apply()
     }
 
+    fun updateIsRyuHidden(hidden: Boolean) {
+        val current = _settings.value
+        _settings.value = current.copy(isRyuHidden = hidden)
+        prefs?.edit()?.putBoolean(KEY_IS_RYU_HIDDEN, hidden)?.apply()
+    }
+
     fun getPayDateDay(): Int = _settings.value.payDateDay
     fun getCutoffDay(): Int = _settings.value.cutoffDay
+    fun isRyuHidden(): Boolean = _settings.value.isRyuHidden
 }
