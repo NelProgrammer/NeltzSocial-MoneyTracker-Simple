@@ -91,7 +91,6 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.Dashboard,
         Screen.SummaryTable,
         Screen.Transactions,
-        Screen.Stats,
         Screen.Groceries,
         Screen.ShoppingList,
         Screen.TaxiFare,
