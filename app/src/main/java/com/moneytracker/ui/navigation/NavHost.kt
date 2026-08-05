@@ -48,13 +48,21 @@ import androidx.compose.material.icons.filled.*
 
 import com.moneytracker.ui.screens.SummaryTableScreen
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object ProfileSelection : Screen("profileSelection", "Profile", Icons.Default.Person)
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
     object SummaryTable : Screen("summaryTable", "Table", Icons.Default.TableChart)
-    object Transactions : Screen("transactions", "Transactions", Icons.Default.List)
+    object Transactions : Screen("transactions", "Transactions", Icons.AutoMirrored.Filled.List)
     object Stats : Screen("stats", "Stats", Icons.Default.PieChart)
-    object Groceries : Screen("groceries", "Groceries", Icons.Default.ShoppingCart)
+    object Groceries : Screen("groceries", "Grocery Shopping List", Icons.Default.ShoppingCart)
     object TaxiFare : Screen("taxi", "Taxi", Icons.Default.DirectionsCar)
     object MonthComparison : Screen("monthComparison", "Month Compare", Icons.Default.CalendarMonth)
     object Categories : Screen("categories", "Categories", Icons.Default.Category)
@@ -81,7 +89,9 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.Stats,
         Screen.Groceries,
         Screen.TaxiFare,
-        Screen.MonthComparison
+        Screen.MonthComparison,
+        Screen.Categories,
+        Screen.Settings
     )
 
     if (activeProfile == null) {
@@ -101,21 +111,35 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
 
                 if (currentRoute != Screen.ProfileSelection.route) {
                     NavigationBar {
-                        bottomNavItems.forEach { screen ->
-                            NavigationBarItem(
-                                selected = currentRoute == screen.route,
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            bottomNavItems.forEach { screen ->
+                                NavigationBarItem(
+                                    selected = currentRoute == screen.route,
+                                    onClick = {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                icon = { Icon(screen.icon, contentDescription = screen.label) },
-                                label = { Text(screen.label) }
-                            )
+                                    },
+                                    icon = { Icon(screen.icon, contentDescription = screen.label) },
+                                    label = {
+                                        Text(
+                                            text = screen.label,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    alwaysShowLabel = true
+                                )
+                            }
                         }
                     }
                 }
