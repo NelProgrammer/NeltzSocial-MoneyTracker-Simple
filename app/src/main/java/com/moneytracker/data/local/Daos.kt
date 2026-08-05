@@ -62,6 +62,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getById(id: Long): CategoryEntity?
 
+    @Query("SELECT * FROM categories WHERE profileId = :profileId")
+    suspend fun getAllCategories(profileId: Long): List<CategoryEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(category: CategoryEntity): Long
 
@@ -250,4 +253,85 @@ interface TaxiFareDao {
 
     @Delete
     suspend fun delete(fare: TaxiFareEntity)
+}
+
+@Dao
+interface GroceryBudgetDao {
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date = :monthTimestamp ORDER BY category ASC, subCategory ASC, itemDetail ASC")
+    fun observeForMonth(profileId: Long, monthTimestamp: Long): Flow<List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>>
+
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date = :monthTimestamp")
+    suspend fun getForMonth(profileId: Long, monthTimestamp: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
+
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND (isRecurring = 1 OR isRecurring = 2)")
+    suspend fun getRecurringAndPlannedItems(profileId: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
+
+    @Query("SELECT * FROM grocery_budget_items WHERE id = :id")
+    suspend fun getById(id: Long): com.moneytracker.data.local.entity.GroceryBudgetItemEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: com.moneytracker.data.local.entity.GroceryBudgetItemEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>)
+
+    @Update
+    suspend fun update(item: com.moneytracker.data.local.entity.GroceryBudgetItemEntity)
+
+    @Delete
+    suspend fun delete(item: com.moneytracker.data.local.entity.GroceryBudgetItemEntity)
+}
+
+@Dao
+interface UnitSizeDao {
+    @Query("SELECT * FROM unit_sizes WHERE profileId = :profileId ORDER BY name ASC")
+    fun observeAll(profileId: Long): Flow<List<com.moneytracker.data.local.entity.UnitSizeEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(unitSize: com.moneytracker.data.local.entity.UnitSizeEntity): Long
+
+    @Delete
+    suspend fun delete(unitSize: com.moneytracker.data.local.entity.UnitSizeEntity)
+}
+
+@Dao
+interface ShoppingListDao {
+    @Query("SELECT * FROM shopping_lists WHERE profileId = :profileId AND payMonthDate = :monthTimestamp ORDER BY shoppingDate DESC, id DESC")
+    fun observeForMonth(profileId: Long, monthTimestamp: Long): Flow<List<com.moneytracker.data.local.entity.ShoppingListEntity>>
+
+    @Query("SELECT * FROM shopping_lists WHERE id = :id")
+    suspend fun getById(id: Long): com.moneytracker.data.local.entity.ShoppingListEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(shoppingList: com.moneytracker.data.local.entity.ShoppingListEntity): Long
+
+    @Update
+    suspend fun update(shoppingList: com.moneytracker.data.local.entity.ShoppingListEntity)
+
+    @Delete
+    suspend fun delete(shoppingList: com.moneytracker.data.local.entity.ShoppingListEntity)
+}
+
+@Dao
+interface ShoppingListItemDao {
+    @Query("SELECT * FROM shopping_list_items WHERE shoppingListId = :listId ORDER BY id ASC")
+    fun observeForList(listId: Long): Flow<List<com.moneytracker.data.local.entity.ShoppingListItemEntity>>
+
+    @Query("SELECT * FROM shopping_list_items WHERE shoppingListId = :listId ORDER BY id ASC")
+    suspend fun getForList(listId: Long): List<com.moneytracker.data.local.entity.ShoppingListItemEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: com.moneytracker.data.local.entity.ShoppingListItemEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<com.moneytracker.data.local.entity.ShoppingListItemEntity>)
+
+    @Update
+    suspend fun update(item: com.moneytracker.data.local.entity.ShoppingListItemEntity)
+
+    @Delete
+    suspend fun delete(item: com.moneytracker.data.local.entity.ShoppingListItemEntity)
+
+    @Query("DELETE FROM shopping_list_items WHERE shoppingListId = :listId AND isChecked = 0")
+    suspend fun deleteUncheckedItems(listId: Long)
 }

@@ -12,6 +12,10 @@ import com.moneytracker.data.local.entity.GroceryItemEntity
 import com.moneytracker.data.local.entity.ProfileEntity
 import com.moneytracker.data.local.entity.RecurrenceFrequency
 import com.moneytracker.data.local.entity.SubCategoryEntity
+import com.moneytracker.data.local.entity.GroceryBudgetItemEntity
+import com.moneytracker.data.local.entity.UnitSizeEntity
+import com.moneytracker.data.local.entity.ShoppingListEntity
+import com.moneytracker.data.local.entity.ShoppingListItemEntity
 import com.moneytracker.data.local.entity.TaxiFareEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
@@ -42,9 +46,13 @@ class RecurrenceFrequencyConverter {
         TransactionEntity::class,
         GroceryItemEntity::class,
         TaxiFareEntity::class,
-        ProfileEntity::class
+        ProfileEntity::class,
+        GroceryBudgetItemEntity::class,
+        UnitSizeEntity::class,
+        ShoppingListEntity::class,
+        ShoppingListItemEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
@@ -56,6 +64,10 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun groceryDao(): GroceryDao
     abstract fun taxiFareDao(): TaxiFareDao
     abstract fun profileDao(): ProfileDao
+    abstract fun groceryBudgetDao(): GroceryBudgetDao
+    abstract fun unitSizeDao(): UnitSizeDao
+    abstract fun shoppingListDao(): ShoppingListDao
+    abstract fun shoppingListItemDao(): ShoppingListItemDao
 
     companion object {
         @Volatile
@@ -85,7 +97,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_9_10,
                     DatabaseMigrations.MIGRATION_10_11,
                     DatabaseMigrations.MIGRATION_11_12,
-                    DatabaseMigrations.MIGRATION_12_13
+                    DatabaseMigrations.MIGRATION_12_13,
+                    DatabaseMigrations.MIGRATION_13_14
                 )
                 .build()
         }

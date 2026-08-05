@@ -7,4 +7,6 @@ object CurrencyUtils {
         val formatted = String.format(Locale.US, "%,.2f", amount)
         return "R $formatted"
     }
+
+    fun formatZar(amount: Double): String = format(amount)
 }

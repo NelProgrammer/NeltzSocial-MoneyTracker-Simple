@@ -194,4 +194,72 @@ object DatabaseMigrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_profileId ON transactions(profileId)")
         }
     }
+
+    val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `grocery_budget_items` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL DEFAULT 1,
+                    `date` INTEGER NOT NULL,
+                    `category` TEXT NOT NULL DEFAULT 'Starch',
+                    `subCategory` TEXT NOT NULL DEFAULT 'Rice',
+                    `itemDetail` TEXT NOT NULL DEFAULT '',
+                    `unitSize` TEXT NOT NULL DEFAULT 'pack',
+                    `note` TEXT NOT NULL DEFAULT '',
+                    `quantityBudget` INTEGER NOT NULL DEFAULT 1,
+                    `unitPriceBudget` REAL NOT NULL DEFAULT 0.0,
+                    `costBudget` REAL NOT NULL DEFAULT 0.0,
+                    `isRecurring` INTEGER NOT NULL DEFAULT 0,
+                    `quantityActual` INTEGER NOT NULL DEFAULT 0,
+                    `unitPriceActual` REAL NOT NULL DEFAULT 0.0,
+                    `costActual` REAL NOT NULL DEFAULT 0.0
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `unit_sizes` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL DEFAULT 1,
+                    `name` TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `shopping_lists` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL DEFAULT 1,
+                    `payMonthDate` INTEGER NOT NULL,
+                    `shoppingDate` INTEGER NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `status` TEXT NOT NULL DEFAULT 'OPEN',
+                    `totalBudgetCost` REAL NOT NULL DEFAULT 0.0,
+                    `totalActualCost` REAL NOT NULL DEFAULT 0.0,
+                    `createdAt` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `shopping_list_items` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `shoppingListId` INTEGER NOT NULL,
+                    `budgetItemId` INTEGER,
+                    `category` TEXT NOT NULL,
+                    `subCategory` TEXT NOT NULL,
+                    `itemDetail` TEXT NOT NULL,
+                    `unitSize` TEXT NOT NULL,
+                    `quantityBudget` INTEGER NOT NULL,
+                    `unitPriceBudget` REAL NOT NULL,
+                    `quantityActual` INTEGER NOT NULL,
+                    `unitPriceActual` REAL NOT NULL,
+                    `isChecked` INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent()
+            )
+        }
+    }
 }
