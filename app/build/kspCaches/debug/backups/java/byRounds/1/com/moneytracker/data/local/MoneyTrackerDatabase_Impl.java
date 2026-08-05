@@ -41,10 +41,18 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
 
   private volatile ProfileDao _profileDao;
 
+  private volatile GroceryBudgetDao _groceryBudgetDao;
+
+  private volatile UnitSizeDao _unitSizeDao;
+
+  private volatile ShoppingListDao _shoppingListDao;
+
+  private volatile ShoppingListItemDao _shoppingListItemDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(13) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(14) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `categories` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `iconName` TEXT NOT NULL)");
@@ -58,8 +66,12 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
         db.execSQL("CREATE TABLE IF NOT EXISTS `grocery_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `date` INTEGER NOT NULL, `itemName` TEXT NOT NULL, `size` REAL NOT NULL, `sizeUnit` TEXT NOT NULL, `category` TEXT NOT NULL, `subCategory` TEXT NOT NULL, `unitPrice` REAL NOT NULL, `quantity` INTEGER NOT NULL, `totalPrice` REAL NOT NULL, `isChecked` INTEGER NOT NULL, `transactionId` INTEGER)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `taxi_fares` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `routeName` TEXT NOT NULL, `farePerTrip` REAL NOT NULL, `tripsPerDay` INTEGER NOT NULL, `workingDaysPerMonth` INTEGER NOT NULL, `monthlyTotal` REAL NOT NULL, `date` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `profiles` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `username` TEXT NOT NULL, `isGuest` INTEGER NOT NULL, `isPasswordProtected` INTEGER NOT NULL, `passwordHash` TEXT, `createdAt` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `grocery_budget_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `date` INTEGER NOT NULL, `category` TEXT NOT NULL, `subCategory` TEXT NOT NULL, `itemDetail` TEXT NOT NULL, `unitSize` TEXT NOT NULL, `note` TEXT NOT NULL, `quantityBudget` INTEGER NOT NULL, `unitPriceBudget` REAL NOT NULL, `costBudget` REAL NOT NULL, `isRecurring` INTEGER NOT NULL, `quantityActual` INTEGER NOT NULL, `unitPriceActual` REAL NOT NULL, `costActual` REAL NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `unit_sizes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `name` TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `shopping_lists` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `payMonthDate` INTEGER NOT NULL, `shoppingDate` INTEGER NOT NULL, `title` TEXT NOT NULL, `status` TEXT NOT NULL, `totalBudgetCost` REAL NOT NULL, `totalActualCost` REAL NOT NULL, `createdAt` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `shopping_list_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `shoppingListId` INTEGER NOT NULL, `budgetItemId` INTEGER, `category` TEXT NOT NULL, `subCategory` TEXT NOT NULL, `itemDetail` TEXT NOT NULL, `unitSize` TEXT NOT NULL, `quantityBudget` INTEGER NOT NULL, `unitPriceBudget` REAL NOT NULL, `quantityActual` INTEGER NOT NULL, `unitPriceActual` REAL NOT NULL, `isChecked` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8faa027c26f87e27a6b375a8a911a9c3')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '06243a6a41426cb55dd76564290503d5')");
       }
 
       @Override
@@ -71,6 +83,10 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
         db.execSQL("DROP TABLE IF EXISTS `grocery_items`");
         db.execSQL("DROP TABLE IF EXISTS `taxi_fares`");
         db.execSQL("DROP TABLE IF EXISTS `profiles`");
+        db.execSQL("DROP TABLE IF EXISTS `grocery_budget_items`");
+        db.execSQL("DROP TABLE IF EXISTS `unit_sizes`");
+        db.execSQL("DROP TABLE IF EXISTS `shopping_lists`");
+        db.execSQL("DROP TABLE IF EXISTS `shopping_list_items`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -249,9 +265,88 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
                   + " Expected:\n" + _infoProfiles + "\n"
                   + " Found:\n" + _existingProfiles);
         }
+        final HashMap<String, TableInfo.Column> _columnsGroceryBudgetItems = new HashMap<String, TableInfo.Column>(15);
+        _columnsGroceryBudgetItems.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("profileId", new TableInfo.Column("profileId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("date", new TableInfo.Column("date", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("category", new TableInfo.Column("category", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("subCategory", new TableInfo.Column("subCategory", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("itemDetail", new TableInfo.Column("itemDetail", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("unitSize", new TableInfo.Column("unitSize", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("note", new TableInfo.Column("note", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("quantityBudget", new TableInfo.Column("quantityBudget", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("unitPriceBudget", new TableInfo.Column("unitPriceBudget", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("costBudget", new TableInfo.Column("costBudget", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("isRecurring", new TableInfo.Column("isRecurring", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("quantityActual", new TableInfo.Column("quantityActual", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("unitPriceActual", new TableInfo.Column("unitPriceActual", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGroceryBudgetItems.put("costActual", new TableInfo.Column("costActual", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysGroceryBudgetItems = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesGroceryBudgetItems = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoGroceryBudgetItems = new TableInfo("grocery_budget_items", _columnsGroceryBudgetItems, _foreignKeysGroceryBudgetItems, _indicesGroceryBudgetItems);
+        final TableInfo _existingGroceryBudgetItems = TableInfo.read(db, "grocery_budget_items");
+        if (!_infoGroceryBudgetItems.equals(_existingGroceryBudgetItems)) {
+          return new RoomOpenHelper.ValidationResult(false, "grocery_budget_items(com.moneytracker.data.local.entity.GroceryBudgetItemEntity).\n"
+                  + " Expected:\n" + _infoGroceryBudgetItems + "\n"
+                  + " Found:\n" + _existingGroceryBudgetItems);
+        }
+        final HashMap<String, TableInfo.Column> _columnsUnitSizes = new HashMap<String, TableInfo.Column>(3);
+        _columnsUnitSizes.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUnitSizes.put("profileId", new TableInfo.Column("profileId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUnitSizes.put("name", new TableInfo.Column("name", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysUnitSizes = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesUnitSizes = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoUnitSizes = new TableInfo("unit_sizes", _columnsUnitSizes, _foreignKeysUnitSizes, _indicesUnitSizes);
+        final TableInfo _existingUnitSizes = TableInfo.read(db, "unit_sizes");
+        if (!_infoUnitSizes.equals(_existingUnitSizes)) {
+          return new RoomOpenHelper.ValidationResult(false, "unit_sizes(com.moneytracker.data.local.entity.UnitSizeEntity).\n"
+                  + " Expected:\n" + _infoUnitSizes + "\n"
+                  + " Found:\n" + _existingUnitSizes);
+        }
+        final HashMap<String, TableInfo.Column> _columnsShoppingLists = new HashMap<String, TableInfo.Column>(9);
+        _columnsShoppingLists.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("profileId", new TableInfo.Column("profileId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("payMonthDate", new TableInfo.Column("payMonthDate", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("shoppingDate", new TableInfo.Column("shoppingDate", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("title", new TableInfo.Column("title", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("status", new TableInfo.Column("status", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("totalBudgetCost", new TableInfo.Column("totalBudgetCost", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("totalActualCost", new TableInfo.Column("totalActualCost", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingLists.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysShoppingLists = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesShoppingLists = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoShoppingLists = new TableInfo("shopping_lists", _columnsShoppingLists, _foreignKeysShoppingLists, _indicesShoppingLists);
+        final TableInfo _existingShoppingLists = TableInfo.read(db, "shopping_lists");
+        if (!_infoShoppingLists.equals(_existingShoppingLists)) {
+          return new RoomOpenHelper.ValidationResult(false, "shopping_lists(com.moneytracker.data.local.entity.ShoppingListEntity).\n"
+                  + " Expected:\n" + _infoShoppingLists + "\n"
+                  + " Found:\n" + _existingShoppingLists);
+        }
+        final HashMap<String, TableInfo.Column> _columnsShoppingListItems = new HashMap<String, TableInfo.Column>(12);
+        _columnsShoppingListItems.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("shoppingListId", new TableInfo.Column("shoppingListId", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("budgetItemId", new TableInfo.Column("budgetItemId", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("category", new TableInfo.Column("category", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("subCategory", new TableInfo.Column("subCategory", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("itemDetail", new TableInfo.Column("itemDetail", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("unitSize", new TableInfo.Column("unitSize", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("quantityBudget", new TableInfo.Column("quantityBudget", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("unitPriceBudget", new TableInfo.Column("unitPriceBudget", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("quantityActual", new TableInfo.Column("quantityActual", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("unitPriceActual", new TableInfo.Column("unitPriceActual", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsShoppingListItems.put("isChecked", new TableInfo.Column("isChecked", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysShoppingListItems = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesShoppingListItems = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoShoppingListItems = new TableInfo("shopping_list_items", _columnsShoppingListItems, _foreignKeysShoppingListItems, _indicesShoppingListItems);
+        final TableInfo _existingShoppingListItems = TableInfo.read(db, "shopping_list_items");
+        if (!_infoShoppingListItems.equals(_existingShoppingListItems)) {
+          return new RoomOpenHelper.ValidationResult(false, "shopping_list_items(com.moneytracker.data.local.entity.ShoppingListItemEntity).\n"
+                  + " Expected:\n" + _infoShoppingListItems + "\n"
+                  + " Found:\n" + _existingShoppingListItems);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "8faa027c26f87e27a6b375a8a911a9c3", "d4811983b605da2d41bf3d253f5bdb52");
+    }, "06243a6a41426cb55dd76564290503d5", "a92f9a5c940701914284e36bf5f05616");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -262,7 +357,7 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "categories","sub_categories","details","transactions","grocery_items","taxi_fares","profiles");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "categories","sub_categories","details","transactions","grocery_items","taxi_fares","profiles","grocery_budget_items","unit_sizes","shopping_lists","shopping_list_items");
   }
 
   @Override
@@ -285,6 +380,10 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
       _db.execSQL("DELETE FROM `grocery_items`");
       _db.execSQL("DELETE FROM `taxi_fares`");
       _db.execSQL("DELETE FROM `profiles`");
+      _db.execSQL("DELETE FROM `grocery_budget_items`");
+      _db.execSQL("DELETE FROM `unit_sizes`");
+      _db.execSQL("DELETE FROM `shopping_lists`");
+      _db.execSQL("DELETE FROM `shopping_list_items`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -309,6 +408,10 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
     _typeConvertersMap.put(GroceryDao.class, GroceryDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(TaxiFareDao.class, TaxiFareDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ProfileDao.class, ProfileDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(GroceryBudgetDao.class, GroceryBudgetDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(UnitSizeDao.class, UnitSizeDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(ShoppingListDao.class, ShoppingListDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(ShoppingListItemDao.class, ShoppingListItemDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -421,6 +524,62 @@ public final class MoneyTrackerDatabase_Impl extends MoneyTrackerDatabase {
           _profileDao = new ProfileDao_Impl(this);
         }
         return _profileDao;
+      }
+    }
+  }
+
+  @Override
+  public GroceryBudgetDao groceryBudgetDao() {
+    if (_groceryBudgetDao != null) {
+      return _groceryBudgetDao;
+    } else {
+      synchronized(this) {
+        if(_groceryBudgetDao == null) {
+          _groceryBudgetDao = new GroceryBudgetDao_Impl(this);
+        }
+        return _groceryBudgetDao;
+      }
+    }
+  }
+
+  @Override
+  public UnitSizeDao unitSizeDao() {
+    if (_unitSizeDao != null) {
+      return _unitSizeDao;
+    } else {
+      synchronized(this) {
+        if(_unitSizeDao == null) {
+          _unitSizeDao = new UnitSizeDao_Impl(this);
+        }
+        return _unitSizeDao;
+      }
+    }
+  }
+
+  @Override
+  public ShoppingListDao shoppingListDao() {
+    if (_shoppingListDao != null) {
+      return _shoppingListDao;
+    } else {
+      synchronized(this) {
+        if(_shoppingListDao == null) {
+          _shoppingListDao = new ShoppingListDao_Impl(this);
+        }
+        return _shoppingListDao;
+      }
+    }
+  }
+
+  @Override
+  public ShoppingListItemDao shoppingListItemDao() {
+    if (_shoppingListItemDao != null) {
+      return _shoppingListItemDao;
+    } else {
+      synchronized(this) {
+        if(_shoppingListItemDao == null) {
+          _shoppingListItemDao = new ShoppingListItemDao_Impl(this);
+        }
+        return _shoppingListItemDao;
       }
     }
   }

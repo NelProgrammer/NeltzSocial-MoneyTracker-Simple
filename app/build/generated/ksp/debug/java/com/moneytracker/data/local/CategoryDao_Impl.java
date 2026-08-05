@@ -338,6 +338,52 @@ public final class CategoryDao_Impl implements CategoryDao {
   }
 
   @Override
+  public Object getAllCategories(final long profileId,
+      final Continuation<? super List<CategoryEntity>> $completion) {
+    final String _sql = "SELECT * FROM categories WHERE profileId = ?";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
+    int _argIndex = 1;
+    _statement.bindLong(_argIndex, profileId);
+    final CancellationSignal _cancellationSignal = DBUtil.createCancellationSignal();
+    return CoroutinesRoom.execute(__db, false, _cancellationSignal, new Callable<List<CategoryEntity>>() {
+      @Override
+      @NonNull
+      public List<CategoryEntity> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfProfileId = CursorUtil.getColumnIndexOrThrow(_cursor, "profileId");
+          final int _cursorIndexOfName = CursorUtil.getColumnIndexOrThrow(_cursor, "name");
+          final int _cursorIndexOfType = CursorUtil.getColumnIndexOrThrow(_cursor, "type");
+          final int _cursorIndexOfIconName = CursorUtil.getColumnIndexOrThrow(_cursor, "iconName");
+          final List<CategoryEntity> _result = new ArrayList<CategoryEntity>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final CategoryEntity _item;
+            final long _tmpId;
+            _tmpId = _cursor.getLong(_cursorIndexOfId);
+            final long _tmpProfileId;
+            _tmpProfileId = _cursor.getLong(_cursorIndexOfProfileId);
+            final String _tmpName;
+            _tmpName = _cursor.getString(_cursorIndexOfName);
+            final TransactionType _tmpType;
+            final String _tmp;
+            _tmp = _cursor.getString(_cursorIndexOfType);
+            _tmpType = __transactionTypeConverter.toType(_tmp);
+            final String _tmpIconName;
+            _tmpIconName = _cursor.getString(_cursorIndexOfIconName);
+            _item = new CategoryEntity(_tmpId,_tmpProfileId,_tmpName,_tmpType,_tmpIconName);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+          _statement.release();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
   public Object count(final long profileId, final Continuation<? super Integer> $completion) {
     final String _sql = "SELECT COUNT(*) FROM categories WHERE profileId = ?";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
