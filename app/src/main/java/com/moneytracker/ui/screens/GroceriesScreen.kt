@@ -104,7 +104,7 @@ fun GroceriesScreen(
 
     Scaffold(
         topBar = {
-            AppTopBar(screenTitle = "Monthly Grocery Budget")
+            AppTopBar(screenTitle = "Grocery Budget")
         },
         floatingActionButton = {
             FloatingActionButton(

@@ -63,7 +63,7 @@ fun ShoppingListScreen(
     Scaffold(
         topBar = {
             AppTopBar(
-                screenTitle = "Grocery Shopping Lists",
+                screenTitle = "Shopping Lists",
                 showBack = onBack != null,
                 onBack = onBack
             )
