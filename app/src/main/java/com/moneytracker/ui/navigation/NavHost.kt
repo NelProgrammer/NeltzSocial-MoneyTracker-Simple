@@ -94,9 +94,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.Groceries,
         Screen.ShoppingList,
         Screen.TaxiFare,
-        Screen.MonthComparison,
-        Screen.Categories,
-        Screen.Settings
+        Screen.MonthComparison
     )
 
     if (activeProfile == null) {
