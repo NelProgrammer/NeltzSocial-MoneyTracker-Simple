@@ -70,7 +70,7 @@ fun CategoryPieChartCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header Row
+            // Header Row (Strictly 1 Horizontal Row)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -80,13 +80,18 @@ fun CategoryPieChartCard(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = baseColor
+                    color = baseColor,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = CurrencyUtils.format(totalAmount),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = baseColor
+                    color = baseColor,
+                    maxLines = 1
                 )
             }
 
@@ -95,21 +100,20 @@ fun CategoryPieChartCard(
             if (summaries.isEmpty() || totalAmount <= 0.0) {
                 EmptyState(emptyMessage)
             } else {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Donut Chart Canvas
+                    // Centered Donut Chart Canvas
                     Box(
                         modifier = Modifier
-                            .size(130.dp)
-                            .padding(8.dp),
+                            .fillMaxWidth()
+                            .height(130.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Canvas(modifier = Modifier.size(110.dp)) {
                             var startAngle = -90f
-                            val strokeWidth = 24.dp.toPx()
+                            val strokeWidth = 22.dp.toPx()
 
                             summaries.forEachIndexed { index, summary ->
                                 val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
@@ -135,23 +139,26 @@ fun CategoryPieChartCard(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Categories",
+                                text = if (summaries.size == 1) "Sub-Category" else "Sub-Categories",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    // Legend & Progress Items
+                    // Full-Width Horizontal Legend & Progress Items
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         summaries.forEachIndexed { index, summary ->
                             val color = getSliceColor(index, baseColor)
                             val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
 
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -167,20 +174,22 @@ fun CategoryPieChartCard(
                                                 .clip(CircleShape)
                                                 .background(color)
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = summary.categoryName,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "${CurrencyUtils.format(summary.total)} (${String.format("%.1f", pct * 100)}%)",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = color
+                                        color = color,
+                                        maxLines = 1
                                     )
                                 }
                                 LinearProgressIndicator(
