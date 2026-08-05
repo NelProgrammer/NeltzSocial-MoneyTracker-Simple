@@ -217,7 +217,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     )
                     GroceriesScreen(
                         viewModel = viewModel,
-                        contentPadding = innerPadding
+                        repository = repository
                     )
                 }
                 composable(Screen.ShoppingList.route) {
