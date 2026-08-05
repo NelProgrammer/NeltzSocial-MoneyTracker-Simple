@@ -635,10 +635,29 @@ private fun AddEditBudgetItemDialog(
     onDismiss: () -> Unit,
     onSave: (cat: String, subCat: String, detail: String, unitSize: String, note: String, qtyB: Int, priceB: Double, isRec: Int) -> Unit
 ) {
+    val initialMeasureValue = remember(item) {
+        if (item == null || item.unitSize.isBlank()) ""
+        else {
+            val match = Regex("""^([0-9.,]+)\s*(.*)$""").find(item.unitSize.trim())
+            match?.groupValues?.get(1) ?: ""
+        }
+    }
+    val initialUnitMeasure = remember(item) {
+        if (item == null || item.unitSize.isBlank()) "g"
+        else {
+            val match = Regex("""^([0-9.,]+)\s*(.*)$""").find(item.unitSize.trim())
+            if (match != null) {
+                val rest = match.groupValues[2].trim()
+                if (rest.isNotBlank()) rest else "g"
+            } else item.unitSize.trim()
+        }
+    }
+
     var categoryInput by remember { mutableStateOf(item?.category ?: "Starch") }
     var subCategoryInput by remember { mutableStateOf(item?.subCategory ?: "Rice") }
     var itemDetailInput by remember { mutableStateOf(item?.itemDetail ?: "") }
-    var unitSizeInput by remember { mutableStateOf(item?.unitSize ?: "pack") }
+    var measureValueInput by remember { mutableStateOf(initialMeasureValue) }
+    var unitMeasureInput by remember { mutableStateOf(initialUnitMeasure) }
     var noteInput by remember { mutableStateOf(item?.note ?: "") }
     var qtyBudgetInput by remember { mutableStateOf(item?.quantityBudget?.toString() ?: "1") }
     var unitPriceBudgetInput by remember { mutableStateOf(if ((item?.unitPriceBudget ?: 0.0) > 0) item!!.unitPriceBudget.toString() else "") }
@@ -650,8 +669,7 @@ private fun AddEditBudgetItemDialog(
     // Editable Dropdown Expanded States
     var catExpanded by remember { mutableStateOf(false) }
     var subCatExpanded by remember { mutableStateOf(false) }
-    var detailExpanded by remember { mutableStateOf(false) }
-    var unitSizeExpanded by remember { mutableStateOf(false) }
+    var unitMeasureExpanded by remember { mutableStateOf(false) }
 
     val categoriesViewModel: CategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
     val categories by categoriesViewModel.categories.collectAsState()
@@ -745,25 +763,42 @@ private fun AddEditBudgetItemDialog(
                 OutlinedTextField(
                     value = itemDetailInput,
                     onValueChange = { itemDetailInput = it },
-                    label = { Text("Item Detail (e.g., 2.5kg White Star, Coca-Cola 2L)") },
+                    label = { Text("Item Detail (e.g., White Star, Coca-Cola)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Unit Size Editable Dropdown with CRUD Button
+                // Split Unit Size Section: (1) Measure Value Input Box + (2) SA Unit Measure Dropdown with CRUD Button
+                Text(
+                    text = "Unit Size & Measure",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Measure Value Input (e.g., 500 for 500g, 2.5 for 2.5kg, 12 for 12s)
+                    OutlinedTextField(
+                        value = measureValueInput,
+                        onValueChange = { measureValueInput = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Measure (500, 2.5)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1.1f)
+                    )
+
+                    // SA Unit Measure Dropdown (kg, g, Lit, mL, Bag, Pocket, 6s, 12s, 30s, etc.)
                     ExposedDropdownMenuBox(
-                        expanded = unitSizeExpanded,
-                        onExpandedChange = { unitSizeExpanded = it },
-                        modifier = Modifier.weight(1f)
+                        expanded = unitMeasureExpanded,
+                        onExpandedChange = { unitMeasureExpanded = it },
+                        modifier = Modifier.weight(1.3f)
                     ) {
                         OutlinedTextField(
-                            value = unitSizeInput,
-                            onValueChange = { unitSizeInput = it },
-                            label = { Text("Unit Size (e.g., 2.5kg, 2L, 500g, pack)") },
+                            value = unitMeasureInput,
+                            onValueChange = { unitMeasureInput = it },
+                            label = { Text("Unit (Kg, g, Lit, 12s)") },
                             trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -771,15 +806,15 @@ private fun AddEditBudgetItemDialog(
                             singleLine = true
                         )
                         DropdownMenu(
-                            expanded = unitSizeExpanded,
-                            onDismissRequest = { unitSizeExpanded = false }
+                            expanded = unitMeasureExpanded,
+                            onDismissRequest = { unitMeasureExpanded = false }
                         ) {
                             unitSizes.forEach { u ->
                                 DropdownMenuItem(
                                     text = { Text(u.name) },
                                     onClick = {
-                                        unitSizeInput = u.name
-                                        unitSizeExpanded = false
+                                        unitMeasureInput = u.name
+                                        unitMeasureExpanded = false
                                     }
                                 )
                             }
@@ -787,7 +822,7 @@ private fun AddEditBudgetItemDialog(
                     }
 
                     IconButton(onClick = { showUnitSizeCrudDialog = true }) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Manage Unit Sizes")
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Manage Unit Measures")
                     }
                 }
 
@@ -859,11 +894,16 @@ private fun AddEditBudgetItemDialog(
                 onClick = {
                     val qty = qtyBudgetInput.toIntOrNull() ?: 1
                     val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                    val computedUnitSize = if (measureValueInput.isBlank()) {
+                        unitMeasureInput.trim()
+                    } else {
+                        "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                    }
                     onSave(
                         categoryInput,
                         subCategoryInput,
                         itemDetailInput,
-                        unitSizeInput,
+                        computedUnitSize,
                         noteInput,
                         qty,
                         price,

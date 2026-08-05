@@ -112,7 +112,10 @@ class GroceriesViewModel(
         viewModelScope.launch {
             unitSizes.collect { sizes ->
                 if (sizes.isEmpty()) {
-                    val defaults = listOf("2.5kg", "2L", "1.5L", "1L", "500g", "pack", "bottle", "box", "kg", "bag", "tin", "tray", "each")
+                    val defaults = listOf(
+                        "kg", "g", "Lit", "mL", "Bag", "Pocket", "Bottle", "Box", "Pack", "Tin", "Tray",
+                        "6s", "12s", "18s", "24s", "30s", "48s", "60s"
+                    )
                     defaults.forEach { name ->
                         repository.saveUnitSize(UnitSizeEntity(name = name))
                     }
