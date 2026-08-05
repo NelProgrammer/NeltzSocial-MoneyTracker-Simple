@@ -45,6 +45,8 @@ import com.moneytracker.ui.viewmodel.MonthComparisonViewModel
 import com.moneytracker.ui.viewmodel.ViewModelFactory
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 
 import com.moneytracker.ui.screens.SummaryTableScreen
 
@@ -56,13 +58,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
+import com.moneytracker.ui.screens.ShoppingListScreen
+
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object ProfileSelection : Screen("profileSelection", "Profile", Icons.Default.Person)
     object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Home)
     object SummaryTable : Screen("summaryTable", "Table", Icons.Default.TableChart)
     object Transactions : Screen("transactions", "Transactions", Icons.AutoMirrored.Filled.List)
     object Stats : Screen("stats", "Stats", Icons.Default.PieChart)
-    object Groceries : Screen("groceries", "Grocery Shopping List", Icons.Default.ShoppingCart)
+    object Groceries : Screen("groceries", "Monthly Groceries", Icons.Default.ShoppingCart)
+    object ShoppingList : Screen("shoppingList", "Grocery Shopping List", Icons.AutoMirrored.Filled.ListAlt)
     object TaxiFare : Screen("taxi", "Taxi", Icons.Default.DirectionsCar)
     object MonthComparison : Screen("monthComparison", "Month Compare", Icons.Default.CalendarMonth)
     object Categories : Screen("categories", "Categories", Icons.Default.Category)
@@ -88,6 +93,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.Transactions,
         Screen.Stats,
         Screen.Groceries,
+        Screen.ShoppingList,
         Screen.TaxiFare,
         Screen.MonthComparison,
         Screen.Categories,
@@ -213,6 +219,15 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                         factory = ViewModelFactory(repository)
                     )
                     GroceriesScreen(
+                        viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.ShoppingList.route) {
+                    val viewModel: GroceriesViewModel = viewModel(
+                        factory = ViewModelFactory(repository)
+                    )
+                    ShoppingListScreen(
                         viewModel = viewModel,
                         contentPadding = innerPadding
                     )
