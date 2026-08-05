@@ -57,7 +57,8 @@ fun CategoryPieChartCard(
     summaries: List<CategorySummary>,
     totalAmount: Double,
     baseColor: Color,
-    emptyMessage: String
+    emptyMessage: String,
+    useTwoColumns: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -146,61 +147,141 @@ fun CategoryPieChartCard(
                         }
                     }
 
-                    // Full-Width Horizontal Legend & Progress Items
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        summaries.forEachIndexed { index, summary ->
-                            val color = getSliceColor(index, baseColor)
-                            val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
+                    // Legend & Progress Items (2-Column Grid or 1-Column List)
+                    if (useTwoColumns) {
+                        val indexedSummaries = summaries.mapIndexed { idx, item -> Pair(idx, item) }
+                        val rows = indexedSummaries.chunked(2)
 
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rows.forEach { rowItems ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    rowItems.forEach { (index, summary) ->
+                                        val color = getSliceColor(index, baseColor)
+                                        val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
+
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .clip(CircleShape)
+                                                            .background(color)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = summary.categoryName,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "${String.format("%.1f", pct * 100)}%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = color
+                                                )
+                                            }
+                                            Text(
+                                                text = CurrencyUtils.format(summary.total),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = color,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            LinearProgressIndicator(
+                                                progress = { pct.coerceIn(0f, 1f) },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = color,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                    }
+                                    if (rowItems.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            summaries.forEachIndexed { index, summary ->
+                                val color = getSliceColor(index, baseColor)
+                                val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
+
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .clip(CircleShape)
-                                                .background(color)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(color)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = summary.categoryName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = summary.categoryName,
+                                            text = "${CurrencyUtils.format(summary.total)} (${String.format("%.1f", pct * 100)}%)",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            fontWeight = FontWeight.Bold,
+                                            color = color,
+                                            maxLines = 1
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "${CurrencyUtils.format(summary.total)} (${String.format("%.1f", pct * 100)}%)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
+                                    LinearProgressIndicator(
+                                        progress = { pct.coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
                                         color = color,
-                                        maxLines = 1
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                     )
                                 }
-                                LinearProgressIndicator(
-                                    progress = { pct.coerceIn(0f, 1f) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(3.dp)),
-                                    color = color,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                )
                             }
                         }
                     }

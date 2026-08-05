@@ -143,7 +143,8 @@ fun DashboardScreen(
                     summaries = expenseBreakdown,
                     totalAmount = summary.expense,
                     baseColor = ExpenseColor,
-                    emptyMessage = "No expenses recorded for this pay period."
+                    emptyMessage = "No expenses recorded for this pay period.",
+                    useTwoColumns = true
                 )
             }
 
