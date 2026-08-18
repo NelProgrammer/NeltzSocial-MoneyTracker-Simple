@@ -287,27 +287,23 @@ fun GroceriesScreen(
                     }
                 }
             } else {
-                val grouped = remember(budgetItems) { budgetItems.groupBy { it.category } }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    grouped.forEach { (category, items) ->
-                        item(key = "category_$category") {
-                            GroceryCategoryTable(
-                                category = category,
-                                items = items,
-                                selectedIds = selectedIds,
-                                onToggleSelect = { viewModel.toggleBudgetItemSelection(it) },
-                                onEdit = {
-                                    editingItem = it
-                                    showAddEditDialog = true
-                                },
-                                onDelete = { viewModel.deleteGroceryBudgetItem(it) }
-                            )
-                        }
+                    item {
+                        UnifiedGroceryTable(
+                            items = budgetItems,
+                            selectedIds = selectedIds,
+                            onToggleSelect = { viewModel.toggleBudgetItemSelection(it) },
+                            onEdit = {
+                                editingItem = it
+                                showAddEditDialog = true
+                            },
+                            onDelete = { viewModel.deleteGroceryBudgetItem(it) }
+                        )
                     }
                 }
             }
@@ -525,16 +521,13 @@ private fun ShoppingListsDropdownSection(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GroceryCategoryTable(
-    category: String,
+private fun UnifiedGroceryTable(
     items: List<GroceryBudgetItemEntity>,
     selectedIds: Set<Long>,
     onToggleSelect: (Long) -> Unit,
     onEdit: (GroceryBudgetItemEntity) -> Unit,
     onDelete: (GroceryBudgetItemEntity) -> Unit
 ) {
-    val categoryBudgetTotal = remember(items) { items.sumOf { it.costBudget } }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -542,50 +535,12 @@ private fun GroceryCategoryTable(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Category Header Banner
+            // Table Column Headers: Select | Category | Item | Budget | Actual | Remain
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = category.uppercase(),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = "${items.size}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "Budget: ${CurrencyUtils.formatZar(categoryBudgetTotal)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Table Column Headers: Select | Item | Budget | Actual | Remain
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 6.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 1. Select Column
@@ -600,15 +555,23 @@ private fun GroceryCategoryTable(
                     )
                 }
 
-                // 2. Item Column
+                // 2. Category Column
+                Text(
+                    text = "Category",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.9f)
+                )
+
+                // 3. Item Column
                 Text(
                     text = "Item",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1.3f)
+                    modifier = Modifier.weight(1.2f)
                 )
 
-                // 3. Budget Column
+                // 4. Budget Column
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.End
@@ -629,7 +592,7 @@ private fun GroceryCategoryTable(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // 4. Actual Column
+                // 5. Actual Column
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.End
@@ -650,7 +613,7 @@ private fun GroceryCategoryTable(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // 5. Remain Column
+                // 6. Remain Column
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.End
@@ -677,7 +640,7 @@ private fun GroceryCategoryTable(
                 if (index > 0) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
                 }
-                GroceryItemTableRow(
+                UnifiedGroceryItemTableRow(
                     item = item,
                     isSelected = selectedIds.contains(item.id),
                     onToggleSelect = { onToggleSelect(item.id) },
@@ -691,7 +654,7 @@ private fun GroceryCategoryTable(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun GroceryItemTableRow(
+private fun UnifiedGroceryItemTableRow(
     item: GroceryBudgetItemEntity,
     isSelected: Boolean,
     onToggleSelect: () -> Unit,
@@ -728,16 +691,38 @@ private fun GroceryItemTableRow(
             )
         }
 
-        // 2. Item Column (Title, Subcategory/Unit, Recurrence badge, Note)
+        // 2. Category Column
         Column(
             modifier = Modifier
-                .weight(1.3f)
+                .weight(0.9f)
+                .padding(end = 4.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            ) {
+                Text(
+                    text = item.category,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        // 3. Item Column (Title, Subcategory/Unit, Recurrence badge, Note)
+        Column(
+            modifier = Modifier
+                .weight(1.2f)
                 .padding(end = 4.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             Text(
                 text = item.itemDetail.ifBlank { item.subCategory },
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.5.sp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -746,14 +731,14 @@ private fun GroceryItemTableRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${item.subCategory}${if (item.unitSize.isNotBlank()) " (${item.unitSize})" else ""}",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(3.dp))
 
                 // Recurrence tag
                 val (recLabel, recColor) = when (item.isRecurring) {
@@ -762,14 +747,14 @@ private fun GroceryItemTableRow(
                     else -> "1x" to MaterialTheme.colorScheme.outline
                 }
                 Surface(
-                    shape = RoundedCornerShape(4.dp),
+                    shape = RoundedCornerShape(3.dp),
                     color = recColor.copy(alpha = 0.15f)
                 ) {
                     Text(
                         text = recLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, fontWeight = FontWeight.Bold),
                         color = recColor,
-                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                        modifier = Modifier.padding(horizontal = 2.5.dp, vertical = 0.5.dp)
                     )
                 }
             }
@@ -777,7 +762,7 @@ private fun GroceryItemTableRow(
             if (item.note.isNotBlank()) {
                 Text(
                     text = item.note,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -785,7 +770,7 @@ private fun GroceryItemTableRow(
             }
         }
 
-        // 3. Budget Column (Qty × Unit Price -> Total Cost)
+        // 4. Budget Column (Qty × Unit Price -> Total Cost)
         Column(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.End
@@ -809,7 +794,7 @@ private fun GroceryItemTableRow(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // 4. Actual Column (Qty × Unit Price -> Total Cost)
+        // 5. Actual Column (Qty × Unit Price -> Total Cost)
         val isOver = item.costActual > item.costBudget && item.costBudget > 0
         val actualColor = if (isOver) ExpenseColor else IncomeColor
 
@@ -836,7 +821,7 @@ private fun GroceryItemTableRow(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        // 5. Remain Column (Qty × Unit Price -> Remaining Cost)
+        // 6. Remain Column (Qty × Unit Price -> Remaining Cost)
         val remainingQty = item.quantityBudget - item.quantityActual
         val remainingCost = item.costBudget - item.costActual
         val remainColor = when {
