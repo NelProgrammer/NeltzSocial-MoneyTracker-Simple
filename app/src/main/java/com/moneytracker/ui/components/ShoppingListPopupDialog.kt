@@ -62,7 +62,8 @@ fun ShoppingListPopupDialog(
     onDismiss: () -> Unit,
     onToggleItemChecked: (ShoppingListItemEntity) -> Unit,
     onUpdateActuals: (ShoppingListItemEntity, Int, Double) -> Unit,
-    onConfirmAndClose: (createExpenseTxn: Boolean) -> Unit
+    onConfirmAndClose: (createExpenseTxn: Boolean) -> Unit,
+    onReopen: () -> Unit = {}
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
     var createTxnOnClose by remember { mutableStateOf(true) }
@@ -120,59 +121,51 @@ fun ShoppingListPopupDialog(
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                // Cart Live Banner
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    )
+                // Summary Stats Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "In Cart Total",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = CurrencyUtils.formatZar(totalActualSpent),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = IncomeColor
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "Items Picked",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "$checkedItemsCount / ${items.size}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = "Estimated Budget",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatZar(shoppingList.totalBudgetCost),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Ticked Actual Total",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatZar(totalActualSpent),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (totalActualSpent > shoppingList.totalBudgetCost && shoppingList.totalBudgetCost > 0) ExpenseColor else IncomeColor
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
 
                 // Item List
                 if (items.isEmpty()) {
@@ -215,7 +208,7 @@ fun ShoppingListPopupDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Keep Open")
+                        Text("Close")
                     }
 
                     if (shoppingList.status != "CLOSED") {
@@ -231,6 +224,14 @@ fun ShoppingListPopupDialog(
                             )
                             Text("Confirm & Close")
                         }
+                    } else {
+                        Button(
+                            onClick = onReopen,
+                            modifier = Modifier.weight(1.2f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Text("Reopen List")
+                        }
                     }
                 }
             }
@@ -244,7 +245,6 @@ fun ShoppingListPopupDialog(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("This will update actual quantities and prices back into your Monthly Grocery Budget for ticked items ($checkedItemsCount items, total ${CurrencyUtils.formatZar(totalActualSpent)}).")
-                    Text("Unchecked items will be removed from this list.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -297,54 +297,43 @@ private fun ShoppingListItemRow(
             containerColor = if (item.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(10.dp)
         ) {
-            Checkbox(
-                checked = item.isChecked,
-                onCheckedChange = { onToggleChecked() }
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.itemDetail.ifBlank { "${item.category} - ${item.subCategory}" },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
-                )
-                Text(
-                    text = "${item.category} • ${item.subCategory} (${item.unitSize})",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Budget: ${item.quantityBudget} x ${CurrencyUtils.formatZar(item.unitPriceBudget)} = ${CurrencyUtils.formatZar(item.quantityBudget * item.unitPriceBudget)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Plain Numeric Input fields without currency sign
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Checkbox(
+                    checked = item.isChecked,
+                    onCheckedChange = { onToggleChecked() }
+                )
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.itemDetail.ifBlank { "${item.category} - ${item.subCategory}" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
+                    )
+                    Text(
+                        text = "${item.category} • ${item.subCategory} (${item.unitSize})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Qty & Price inputs
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = "Qty:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     OutlinedTextField(
                         value = qtyText,
                         onValueChange = { input ->
@@ -354,22 +343,13 @@ private fun ShoppingListItemRow(
                             val price = priceText.toDoubleOrNull() ?: item.unitPriceBudget
                             onUpdateActuals(qty, price)
                         },
-                        modifier = Modifier.width(55.dp),
+                        label = { Text("Qty", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.width(60.dp),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         textStyle = MaterialTheme.typography.bodySmall
                     )
-                }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Price:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     OutlinedTextField(
                         value = priceText,
                         onValueChange = { input ->
@@ -379,11 +359,42 @@ private fun ShoppingListItemRow(
                             val price = clean.toDoubleOrNull() ?: item.unitPriceBudget
                             onUpdateActuals(qty, price)
                         },
-                        modifier = Modifier.width(75.dp),
+                        label = { Text("Price", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.width(80.dp),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         textStyle = MaterialTheme.typography.bodySmall,
                         placeholder = { Text(item.unitPriceBudget.toString(), style = MaterialTheme.typography.bodySmall) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Dedicated full-width horizontal Budget info
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Budget Target:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)} = ${CurrencyUtils.formatZar(item.quantityBudget * item.unitPriceBudget)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

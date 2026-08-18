@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.ui.theme.EducationColor
@@ -371,15 +372,34 @@ internal fun TableRow(
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 
             // 5. Amount
-            Text(
-                text = "$prefix${CurrencyUtils.format(transaction.amount)}",
+            val isPlanFuture = transaction.recurrenceFrequency == com.moneytracker.data.local.entity.RecurrenceFrequency.PLAN_FUTURE
+            Column(
                 modifier = Modifier.width(95.dp),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                color = categoryColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "$prefix${CurrencyUtils.format(kotlin.math.abs(transaction.amount))}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (isPlanFuture) MaterialTheme.colorScheme.onSurfaceVariant else categoryColor,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isPlanFuture) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(3.dp)
+                    ) {
+                        Text(
+                            text = "Plan",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                        )
+                    }
+                }
+            }
 
             VerticalDivider(modifier = Modifier.height(20.dp), color = gridLineColor)
 

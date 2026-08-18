@@ -2,6 +2,7 @@ package com.moneytracker.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.moneytracker.data.local.entity.RecurrenceFrequency
 import com.moneytracker.data.local.entity.TransactionType
 import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.data.repository.MonthlySummary
@@ -108,9 +109,9 @@ class MonthComparisonViewModel(
         currentMonthData,
         nextMonthData
     ) { prev, curr, next ->
-        val prevGrouped = prev.transactions.groupBy { it.type }
-        val currGrouped = curr.transactions.groupBy { it.type }
-        val nextGrouped = next.transactions.groupBy { it.type }
+        val prevGrouped = prev.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.type }
+        val currGrouped = curr.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.type }
+        val nextGrouped = next.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.type }
 
         TransactionType.values().map { type ->
             CategoryComparisonRow(
@@ -132,9 +133,9 @@ class MonthComparisonViewModel(
         val allTxns = prev.transactions + curr.transactions + next.transactions
         val uniqueCategories = allTxns.map { Pair(it.categoryId, Pair(it.categoryName, it.type)) }.distinct()
 
-        val prevMap = prev.transactions.groupBy { it.categoryId }
-        val currMap = curr.transactions.groupBy { it.categoryId }
-        val nextMap = next.transactions.groupBy { it.categoryId }
+        val prevMap = prev.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.categoryId }
+        val currMap = curr.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.categoryId }
+        val nextMap = next.transactions.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }.groupBy { it.categoryId }
 
         uniqueCategories.map { (catId, pair) ->
             val (name, type) = pair

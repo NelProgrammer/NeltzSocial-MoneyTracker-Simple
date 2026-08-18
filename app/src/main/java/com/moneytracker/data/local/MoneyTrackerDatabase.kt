@@ -52,7 +52,7 @@ class RecurrenceFrequencyConverter {
         ShoppingListEntity::class,
         ShoppingListItemEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
@@ -98,7 +98,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_10_11,
                     DatabaseMigrations.MIGRATION_11_12,
                     DatabaseMigrations.MIGRATION_12_13,
-                    DatabaseMigrations.MIGRATION_13_14
+                    DatabaseMigrations.MIGRATION_13_14,
+                    DatabaseMigrations.MIGRATION_14_15
                 )
                 .build()
         }

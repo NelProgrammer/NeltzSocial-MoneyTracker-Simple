@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -45,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -92,6 +94,7 @@ fun AddEditScreen(
     var editingDetail by remember { mutableStateOf<DetailEntity?>(null) }
     val dbDetails by detailsViewModel.details.collectAsState()
     var showDetailDialog by remember { mutableStateOf(false) }
+    var showDeleteTxnDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -437,10 +440,20 @@ fun AddEditScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
+                val autoPrefix = if (state.type == TransactionType.INCOME) "+ " else "- "
+                val autoColor = if (state.type == TransactionType.INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+
                 OutlinedTextField(
                     value = state.amount,
                     onValueChange = viewModel::updateAmount,
                     label = { Text("Amount") },
+                    prefix = {
+                        Text(
+                            text = autoPrefix,
+                            color = autoColor,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
@@ -491,12 +504,14 @@ fun AddEditScreen(
                     onExpandedChange = { recurrenceExpanded = it },
                     modifier = Modifier.weight(1f)
                 ) {
+                    val currentRecurrenceLabel = if (state.isRecurring && state.recurrenceFrequency != null) {
+                        state.recurrenceFrequency!!.label
+                    } else {
+                        "One-time (No Recurrence)"
+                    }
+
                     OutlinedTextField(
-                        value = if (state.isRecurring && state.recurrenceFrequency != null) {
-                            state.recurrenceFrequency!!.name.lowercase().replaceFirstChar { it.uppercase() }
-                        } else {
-                            "One-time (No Recurrence)"
-                        },
+                        value = currentRecurrenceLabel,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Recurrence") },
@@ -523,7 +538,7 @@ fun AddEditScreen(
                         )
                         RecurrenceFrequency.values().forEach { freq ->
                             DropdownMenuItem(
-                                text = { Text(freq.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                text = { Text(freq.label) },
                                 onClick = {
                                     viewModel.updateIsRecurring(true)
                                     viewModel.updateRecurrenceFrequency(freq)
@@ -535,7 +550,7 @@ fun AddEditScreen(
                 }
             }
 
-            if (state.isRecurring) {
+            if (state.isRecurring && state.recurrenceFrequency == RecurrenceFrequency.MONTHLY) {
                 val tillDateVal = state.recurTillDate ?: state.date
                 val tillDatePicker = DatePickerDialog(
                     context,
@@ -576,6 +591,20 @@ fun AddEditScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+            } else if (state.isRecurring && state.recurrenceFrequency == RecurrenceFrequency.CONTINUOUS) {
+                Text(
+                    text = "Recurs every month indefinitely on PayDate",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            } else if (state.isRecurring && state.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE) {
+                Text(
+                    text = "Visible in roadmap every month (no effect on balances or summations)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
             }
 
             // 6. Note Field
@@ -595,47 +624,94 @@ fun AddEditScreen(
                 )
             }
 
-            // 7. Save Button
-            Button(
-                onClick = { viewModel.save(onNavigateBack) },
+            // 7. Action Buttons (Save & Delete)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.isSaving
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (state.isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
-                        strokeWidth = 2.dp
-                    )
+                if (title.contains("Edit", ignoreCase = true)) {
+                    Button(
+                        onClick = { showDeleteTxnDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isSaving
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Text("Delete")
+                    }
                 }
-                Text(if (state.isSaving) "Saving..." else "Save")
+
+                Button(
+                    onClick = { viewModel.save(onNavigateBack) },
+                    modifier = Modifier.weight(if (title.contains("Edit", ignoreCase = true)) 1.5f else 1f),
+                    enabled = !state.isSaving
+                ) {
+                    if (state.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(end = 8.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    Text(if (state.isSaving) "Saving..." else "Save")
+                }
             }
         }
 
-        // Add / Edit SubCategory Dialog
+        if (showDeleteTxnDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteTxnDialog = false },
+                title = { Text("Delete Transaction?") },
+                text = { Text("Are you sure you want to delete this transaction entry? This action cannot be undone.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteTxnDialog = false
+                            viewModel.delete(onNavigateBack)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteTxnDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Add / Edit Category Dialog
         if (showCategoryDialog) {
             var name by remember(editingCategory) { mutableStateOf(editingCategory?.name ?: "") }
             var type by remember(editingCategory) { mutableStateOf(editingCategory?.type ?: state.type) }
             AlertDialog(
                 onDismissRequest = { showCategoryDialog = false },
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                title = { Text(if (editingCategory == null) "Add SubCategory" else "Edit SubCategory") },
+                title = { Text(if (editingCategory == null) "Add Category" else "Edit Category") },
                 text = {
-                    Column {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("SubCategory Name") },
-                            modifier = Modifier.fillMaxWidth()
+                            label = { Text("Category Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
                         )
+                        Text("Category Type", style = MaterialTheme.typography.labelMedium)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             TransactionType.values().forEach { t ->
                                 FilterChip(
                                     selected = type == t,
                                     onClick = { type = t },
-                                    label = { Text(t.name) }
+                                    label = { Text(t.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) }
                                 )
                             }
                         }
@@ -643,16 +719,77 @@ fun AddEditScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        categoriesViewModel.startEdit(editingCategory)
-                        categoriesViewModel.updateName(name)
-                        categoriesViewModel.updateType(type)
-                        categoriesViewModel.saveCategory { showCategoryDialog = false }
+                        if (name.isNotBlank()) {
+                            categoriesViewModel.startEdit(editingCategory)
+                            categoriesViewModel.updateName(name.trim())
+                            categoriesViewModel.updateType(type)
+                            categoriesViewModel.saveCategory {
+                                viewModel.updateType(type)
+                                showCategoryDialog = false
+                            }
+                        }
                     }) {
                         Text("Save")
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showCategoryDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Add / Edit SubCategory Dialog
+        if (showSubCategoryDialog) {
+            var subCatName by remember(editingSubCategory) { mutableStateOf(editingSubCategory?.name ?: "") }
+            var subCatType by remember(editingSubCategory) { mutableStateOf(editingSubCategory?.type ?: state.type) }
+            AlertDialog(
+                onDismissRequest = { showSubCategoryDialog = false },
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                title = { Text(if (editingSubCategory == null) "Add SubCategory" else "Edit SubCategory") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = subCatName,
+                            onValueChange = { subCatName = it },
+                            label = { Text("SubCategory Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Text("Category Type", style = MaterialTheme.typography.labelMedium)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TransactionType.values().forEach { t ->
+                                FilterChip(
+                                    selected = subCatType == t,
+                                    onClick = { subCatType = t },
+                                    label = { Text(t.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (subCatName.isNotBlank()) {
+                            subCategoriesViewModel.startEdit(editingSubCategory)
+                            subCategoriesViewModel.updateName(subCatName.trim())
+                            subCategoriesViewModel.updateType(subCatType)
+                            subCategoriesViewModel.saveSubCategory {
+                                viewModel.updateSubCategory(subCatName.trim())
+                                viewModel.updateType(subCatType)
+                                showSubCategoryDialog = false
+                            }
+                        }
+                    }) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSubCategoryDialog = false }) {
                         Text("Cancel")
                     }
                 }

@@ -46,6 +46,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import com.moneytracker.util.AppThemeMode
+import com.moneytracker.util.AppThemePalette
 import com.moneytracker.ui.components.ProfileManagementDialog
 import com.moneytracker.ui.viewmodel.ProfileViewModel
 import com.moneytracker.ui.viewmodel.SettingsViewModel
@@ -138,6 +150,134 @@ fun SettingsScreen(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Switch Profile")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Appearance & Themes Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = "Theme Palette",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Appearance & Theme",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "Theme Mode",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Theme Mode Selector Chips
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AppThemeMode.values().forEach { mode ->
+                            FilterChip(
+                                modifier = Modifier.weight(1f),
+                                selected = settings.themeMode == mode,
+                                onClick = { viewModel.updateThemeMode(mode) },
+                                label = {
+                                    Text(
+                                        text = when (mode) {
+                                            AppThemeMode.SYSTEM -> "System"
+                                            AppThemeMode.LIGHT -> "Light"
+                                            AppThemeMode.DARK -> "Dark"
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (settings.themeMode == mode) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Text(
+                        text = "Color Palette",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // 4 Palette Options
+                    val palettes = listOf(
+                        Triple(AppThemePalette.EMERALD_GREEN, "Emerald Green", Color(0xFF2E7D32)),
+                        Triple(AppThemePalette.OCEAN_BLUE, "Ocean Blue", Color(0xFF1565C0)),
+                        Triple(AppThemePalette.ROYAL_VIOLET, "Royal Violet", Color(0xFF7B1FA2)),
+                        Triple(AppThemePalette.SUNSET_AMBER, "Sunset Amber", Color(0xFFD84315))
+                    )
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        palettes.chunked(2).forEach { rowPalettes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowPalettes.forEach { (palette, label, swatchColor) ->
+                                    val isSelected = settings.themePalette == palette
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { viewModel.updateThemePalette(palette) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isSelected) swatchColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = if (isSelected) swatchColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(swatchColor)
+                                            )
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) swatchColor else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

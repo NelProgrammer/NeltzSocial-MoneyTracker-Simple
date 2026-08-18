@@ -6,10 +6,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class AppThemePalette(val displayName: String) {
+    EMERALD_GREEN("Emerald Green"),
+    OCEAN_BLUE("Ocean Blue"),
+    ROYAL_VIOLET("Royal Violet"),
+    SUNSET_AMBER("Sunset Amber")
+}
+
+enum class AppThemeMode(val displayName: String) {
+    SYSTEM("System Default"),
+    LIGHT("Light Mode"),
+    DARK("Dark Mode")
+}
+
 data class UserSettings(
     val payDateDay: Int = 20,
     val cutoffDay: Int = 18,
-    val isRyuHidden: Boolean = true
+    val isRyuHidden: Boolean = true,
+    val themePalette: AppThemePalette = AppThemePalette.EMERALD_GREEN,
+    val themeMode: AppThemeMode = AppThemeMode.SYSTEM
 )
 
 object SettingsManager {
@@ -17,6 +32,8 @@ object SettingsManager {
     private const val KEY_PAY_DATE_DAY = "pay_date_day"
     private const val KEY_CUTOFF_DAY = "cutoff_day"
     private const val KEY_IS_RYU_HIDDEN = "is_ryu_hidden"
+    private const val KEY_THEME_PALETTE = "theme_palette"
+    private const val KEY_THEME_MODE = "theme_mode"
 
     private var prefs: SharedPreferences? = null
 
@@ -29,10 +46,25 @@ object SettingsManager {
             val payDate = prefs?.getInt(KEY_PAY_DATE_DAY, 20) ?: 20
             val cutoff = prefs?.getInt(KEY_CUTOFF_DAY, 18) ?: 18
             val isRyuHidden = prefs?.getBoolean(KEY_IS_RYU_HIDDEN, true) ?: true
+            val paletteName = prefs?.getString(KEY_THEME_PALETTE, AppThemePalette.EMERALD_GREEN.name)
+            val palette = try {
+                AppThemePalette.valueOf(paletteName ?: AppThemePalette.EMERALD_GREEN.name)
+            } catch (e: Exception) {
+                AppThemePalette.EMERALD_GREEN
+            }
+            val modeName = prefs?.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name)
+            val mode = try {
+                AppThemeMode.valueOf(modeName ?: AppThemeMode.SYSTEM.name)
+            } catch (e: Exception) {
+                AppThemeMode.SYSTEM
+            }
+
             _settings.value = UserSettings(
                 payDateDay = payDate,
                 cutoffDay = cutoff,
-                isRyuHidden = isRyuHidden
+                isRyuHidden = isRyuHidden,
+                themePalette = palette,
+                themeMode = mode
             )
         }
     }
@@ -57,7 +89,21 @@ object SettingsManager {
         prefs?.edit()?.putBoolean(KEY_IS_RYU_HIDDEN, hidden)?.apply()
     }
 
+    fun updateThemePalette(palette: AppThemePalette) {
+        val current = _settings.value
+        _settings.value = current.copy(themePalette = palette)
+        prefs?.edit()?.putString(KEY_THEME_PALETTE, palette.name)?.apply()
+    }
+
+    fun updateThemeMode(mode: AppThemeMode) {
+        val current = _settings.value
+        _settings.value = current.copy(themeMode = mode)
+        prefs?.edit()?.putString(KEY_THEME_MODE, mode.name)?.apply()
+    }
+
     fun getPayDateDay(): Int = _settings.value.payDateDay
     fun getCutoffDay(): Int = _settings.value.cutoffDay
     fun isRyuHidden(): Boolean = _settings.value.isRyuHidden
+    fun getThemePalette(): AppThemePalette = _settings.value.themePalette
+    fun getThemeMode(): AppThemeMode = _settings.value.themeMode
 }

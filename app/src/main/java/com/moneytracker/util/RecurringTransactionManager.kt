@@ -5,175 +5,204 @@ import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.repository.TransactionRepository
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Utility manager for monthly recurrence calculations and automatic recurring transaction generation.
- * - Recurrence cycle starts on PayDate (default: 20th of the month, editable in Settings).
- * - Scheduled calculation milestone: Calculation Cutoff Day (default: 18th of the month, editable in Settings).
- * - Generated recurring child instances fix candidate dates to the PayDate (e.g. 20th) of each target month.
- * - Stores last calculation date to eliminate duplicate effort.
- * - Generates instances for the current PayMonth and the next PayMonth (budgeting window).
+ * Utility manager for recurrence calculations and automatic recurring transaction generation.
+ * - Next Month entries calculated BEFORE cutoff are solely for budget view:
+ *   they are captured with null/blank recurrence fields (isRecurring = false, recurrenceFrequency = null).
+ * - When recurrence recalculations run, any stale or orphaned empty/tentative entries are dropped.
+ * - Once cutoff arrives, entries are materialized with active recurrence fields and parent is marked isRecurred = true.
  */
 object RecurringTransactionManager {
 
-    private val lastCheckDate = AtomicReference<LocalDate?>(null)
-
-    /**
-     * Returns the most recent calculation cutoff milestone date based on user settings.
-     */
-    fun getMostRecentCutoffMilestone(today: LocalDate = LocalDate.now()): LocalDate {
+    fun isBeforeCutoffForDate(targetPayMonthDate: LocalDate, today: LocalDate = LocalDate.now()): Boolean {
         val cutoffDay = SettingsManager.getCutoffDay()
-        val day = cutoffDay.coerceAtMost(today.lengthOfMonth())
-        return if (today.dayOfMonth >= day) {
-            today.withDayOfMonth(day)
+        val payDateDay = SettingsManager.getPayDateDay()
+
+        // Calculate the exact cutoff date for the target pay month cycle
+        val cutoffDate = if (cutoffDay <= payDateDay) {
+            targetPayMonthDate.withDayOfMonth(cutoffDay.coerceAtMost(targetPayMonthDate.lengthOfMonth()))
         } else {
-            val prev = today.minusMonths(1)
-            prev.withDayOfMonth(cutoffDay.coerceAtMost(prev.lengthOfMonth()))
+            val prevMonth = targetPayMonthDate.minusMonths(1)
+            prevMonth.withDayOfMonth(cutoffDay.coerceAtMost(prevMonth.lengthOfMonth()))
         }
+
+        return today.isBefore(cutoffDate)
     }
 
-    /**
-     * Runs full recurrence calculation sweep ONLY if last calculation date is older than the most recent cutoff milestone.
-     */
     suspend fun processRecurringTransactionsIfDue(repository: TransactionRepository) {
-        val today = LocalDate.now()
-        val milestone = getMostRecentCutoffMilestone(today)
-        val lastCheck = lastCheckDate.get()
-
-        if (lastCheck != null && !lastCheck.isBefore(milestone)) {
-            return // Already calculated on or after the most recent cutoff milestone!
-        }
-
         processRecurringTransactions(repository)
-        lastCheckDate.set(today)
     }
 
-    /**
-     * Calculates end date based on starting date and occurrence count (N) for monthly recurrence.
-     */
     fun calculateTillDate(startDate: LocalDate, freq: RecurrenceFrequency = RecurrenceFrequency.MONTHLY, count: Int): LocalDate {
         val steps = (count - 1).coerceAtLeast(0).toLong()
         return startDate.plusMonths(steps)
     }
 
-    /**
-     * Calculates occurrence count (N) between starting date and end date for monthly recurrence.
-     */
     fun calculateCount(startDate: LocalDate, freq: RecurrenceFrequency = RecurrenceFrequency.MONTHLY, tillDate: LocalDate): Long {
         if (tillDate.isBefore(startDate)) return 1L
         val diff = ChronoUnit.MONTHS.between(startDate, tillDate)
         return (diff + 1).coerceAtLeast(1L)
     }
 
-    /**
-     * Processes all active recurring transactions for the current PayMonth and next PayMonth.
-     */
     suspend fun processRecurringTransactions(repository: TransactionRepository) {
-        val allTransactions = repository.getAllEntities()
-        cleanupLegacyInvalidChildTransactions(repository, allTransactions)
-
+        repository.sanitizeLegacyData()
         val recurringParents = repository.getRecurringTransactions()
-        val freshTransactions = repository.getAllEntities()
+        val allTransactions = repository.getAllEntities().toMutableList()
+
+        val today = LocalDate.now()
+        val payDateDay = SettingsManager.getPayDateDay()
+        val currentPayMonthStart = DateUtils.currentPayMonthLocalDate(today, payDateDay)
+        val nextPayMonthStart = currentPayMonthStart.plusMonths(1)
+        val nextStartMillis = DateUtils.startOfPayMonth(nextPayMonthStart, payDateDay)
+        val nextEndMillis = DateUtils.startOfNextPayMonth(nextPayMonthStart, payDateDay)
+
+        // Drop orphaned tentative entries in next month that have null recurrence and no matching active recurring parent
+        val tentativeInNextMonth = allTransactions.filter { txn ->
+            txn.date in nextStartMillis until nextEndMillis &&
+            !txn.isRecurring &&
+            txn.recurrenceFrequency == null &&
+            !txn.isRecurred
+        }
+
+        for (tentative in tentativeInNextMonth) {
+            val hasMatchingParent = recurringParents.any { parent ->
+                parent.categoryId == tentative.categoryId &&
+                parent.subCategory.equals(tentative.subCategory, ignoreCase = true) &&
+                parent.detail.equals(tentative.detail, ignoreCase = true)
+            }
+            if (!hasMatchingParent) {
+                repository.deleteTransaction(tentative)
+                allTransactions.remove(tentative)
+            }
+        }
 
         for (parent in recurringParents) {
-            processSingleParent(repository, parent, freshTransactions)
+            processSingleParent(repository, parent, allTransactions)
         }
     }
 
-    /**
-     * Triggers recurrence calculation specifically for a single transaction being added or edited on AddEditScreen.
-     */
     suspend fun processSingleTransactionRecurrence(
         repository: TransactionRepository,
         parent: TransactionEntity
     ) {
-        if (!parent.isRecurring) return
-        val allTransactions = repository.getAllEntities()
+        val allTransactions = repository.getAllEntities().toMutableList()
         processSingleParent(repository, parent, allTransactions)
-    }
-
-    private suspend fun cleanupLegacyInvalidChildTransactions(
-        repository: TransactionRepository,
-        allTransactions: List<TransactionEntity>
-    ) {
-        val today = LocalDate.now()
-        val payDateDay = SettingsManager.getPayDateDay()
-
-        val currentPayMonthStart = DateUtils.currentPayMonthLocalDate(today, payDateDay)
-        val nextPayMonthEnd = currentPayMonthStart.plusMonths(2).minusDays(1)
-
-        val invalidChildren = allTransactions.filter { entity ->
-            if (entity.isRecurring) return@filter false
-            val date = DateUtils.toLocalDate(entity.date)
-            val isBeyondNextMonth = date.isAfter(nextPayMonthEnd)
-            val isNotPayDate = date.dayOfMonth != payDateDay
-            isBeyondNextMonth || isNotPayDate
-        }
-
-        for (child in invalidChildren) {
-            repository.deleteTransaction(child)
-        }
     }
 
     private suspend fun processSingleParent(
         repository: TransactionRepository,
         parent: TransactionEntity,
-        allTransactions: List<TransactionEntity>
+        allTransactions: MutableList<TransactionEntity>
     ) {
         val startDate = DateUtils.toLocalDate(parent.date)
-        val maxCount = parent.recurCount ?: Int.MAX_VALUE
         val maxTillDate = parent.recurTillDate?.let { DateUtils.toLocalDate(it) }
 
         val today = LocalDate.now()
         val payDateDay = SettingsManager.getPayDateDay()
 
-        // Horizon covers Current PayMonth and Next PayMonth (PayDate cycle)
         val currentPayMonthStart = DateUtils.currentPayMonthLocalDate(today, payDateDay)
         val nextPayMonthEnd = currentPayMonthStart.plusMonths(2).minusDays(1)
 
-        var step = 1
-        while (step < maxCount) {
-            val targetMonth = startDate.plusMonths(step.toLong())
-            // Fix candidate date for recurring instances to the PayDate (e.g. 20th) of target month
-            val candidateDay = payDateDay.coerceAtMost(targetMonth.lengthOfMonth())
-            val candidateDate = targetMonth.withDayOfMonth(candidateDay)
+        val targetMonth = startDate.plusMonths(1)
+        val candidateDay = payDateDay.coerceAtMost(targetMonth.lengthOfMonth())
+        val candidateDate = targetMonth.withDayOfMonth(candidateDay)
 
-            // Do not generate beyond next PayMonth horizon
-            if (candidateDate.isAfter(nextPayMonthEnd)) break
+        // Stop if candidateDate is beyond the 2-month horizon
+        if (candidateDate.isAfter(nextPayMonthEnd)) return
 
-            // Respect user-specified max till date
-            if (maxTillDate != null && candidateDate.isAfter(maxTillDate)) break
+        val candidateEpoch = DateUtils.toEpochMillis(candidateDate)
 
-            val candidateEpoch = DateUtils.toEpochMillis(candidateDate)
-
-            // Duplicate check for existing transactions on candidateDate
-            val exists = allTransactions.any { existing ->
+        // If parent recurrence was turned off
+        if (!parent.isRecurring) {
+            val existingChild = allTransactions.firstOrNull { existing ->
                 existing.categoryId == parent.categoryId &&
-                        existing.amount == parent.amount &&
-                        existing.subCategory == parent.subCategory &&
-                        DateUtils.toLocalDate(existing.date) == candidateDate
+                existing.subCategory.equals(parent.subCategory, ignoreCase = true) &&
+                existing.detail.equals(parent.detail, ignoreCase = true) &&
+                DateUtils.toLocalDate(existing.date) == candidateDate
             }
-
-            if (!exists) {
-                repository.saveTransaction(
-                    TransactionEntity(
-                        amount = parent.amount,
-                        type = parent.type,
-                        categoryId = parent.categoryId,
-                        date = candidateEpoch,
-                        note = parent.note,
-                        subCategory = parent.subCategory,
-                        detail = parent.detail,
-                        isRecurring = false,
-                        recurrenceFrequency = null,
-                        recurTillDate = null,
-                        recurCount = null
-                    )
-                )
+            if (existingChild != null) {
+                repository.deleteTransaction(existingChild)
+                allTransactions.remove(existingChild)
             }
+            return
+        }
 
-            step++
+        // Respect user-specified end date if applicable
+        if (maxTillDate != null && candidateDate.isAfter(maxTillDate)) {
+            repository.saveTransaction(parent.copy(isRecurred = true))
+            return
+        }
+
+        // Find existing child on candidateDate by category, subcategory & detail
+        val existingChild = allTransactions.firstOrNull { existing ->
+            existing.categoryId == parent.categoryId &&
+            existing.subCategory.equals(parent.subCategory, ignoreCase = true) &&
+            existing.detail.equals(parent.detail, ignoreCase = true) &&
+            DateUtils.toLocalDate(existing.date) == candidateDate
+        }
+
+        val isBeforeCutoff = isBeforeCutoffForDate(candidateDate, today)
+
+        val isContinuous = parent.recurrenceFrequency == RecurrenceFrequency.CONTINUOUS
+        val isPlanFuture = parent.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE
+        val remainingCount = parent.recurCount?.let { (it - 1).coerceAtLeast(0) }
+
+        val nextIsRecurring = when {
+            isBeforeCutoff -> false // Before cutoff: null/empty recurrence solely for budget view
+            isContinuous -> true
+            isPlanFuture -> true
+            remainingCount != null && remainingCount <= 1 -> false
+            maxTillDate != null && candidateDate.isEqual(maxTillDate) -> false
+            else -> parent.isRecurring
+        }
+
+        val nextRecurrenceFrequency = if (isBeforeCutoff) null else parent.recurrenceFrequency
+        val nextRecurTillDate = if (isBeforeCutoff) null else parent.recurTillDate
+        val nextRecurCount = if (isBeforeCutoff) null else remainingCount
+        val nextIsRecurred = if (isBeforeCutoff) false else !nextIsRecurring
+
+        if (existingChild != null) {
+            // Update the existing next month child with the latest amount, notes, and calculated recurrence fields
+            val updatedChild = existingChild.copy(
+                amount = kotlin.math.abs(parent.amount),
+                type = parent.type,
+                categoryId = parent.categoryId,
+                note = parent.note,
+                subCategory = parent.subCategory,
+                detail = parent.detail,
+                isRecurring = nextIsRecurring,
+                recurrenceFrequency = nextRecurrenceFrequency,
+                recurTillDate = nextRecurTillDate,
+                recurCount = nextRecurCount,
+                isRecurred = nextIsRecurred
+            )
+            repository.saveTransaction(updatedChild)
+            val index = allTransactions.indexOfFirst { it.id == existingChild.id }
+            if (index >= 0) allTransactions[index] = updatedChild
+        } else {
+            // Insert new next month budget view / recurrence child
+            val newChild = TransactionEntity(
+                amount = kotlin.math.abs(parent.amount),
+                type = parent.type,
+                categoryId = parent.categoryId,
+                date = candidateEpoch,
+                note = parent.note,
+                subCategory = parent.subCategory,
+                detail = parent.detail,
+                isRecurring = nextIsRecurring,
+                recurrenceFrequency = nextRecurrenceFrequency,
+                recurTillDate = nextRecurTillDate,
+                recurCount = nextRecurCount,
+                isRecurred = nextIsRecurred
+            )
+            val insertedId = repository.saveTransaction(newChild)
+            allTransactions.add(newChild.copy(id = insertedId))
+        }
+
+        // Only mark current parent as recurred if cutoff milestone has been reached
+        if (!isBeforeCutoff) {
+            repository.saveTransaction(parent.copy(isRecurred = true))
         }
     }
 }

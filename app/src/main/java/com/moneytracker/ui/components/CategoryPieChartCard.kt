@@ -1,7 +1,16 @@
 package com.moneytracker.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +28,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +42,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.moneytracker.data.local.entity.CategorySummary
 import com.moneytracker.util.CurrencyUtils
+
+enum class PieBreakdownMode {
+    SUBCATEGORY,
+    DETAIL
+}
 
 fun getSliceColor(index: Int, baseColor: Color): Color {
     val palette = when (baseColor) {
@@ -52,121 +73,271 @@ fun getSliceColor(index: Int, baseColor: Color): Color {
 }
 
 @Composable
-fun CategoryPieChartCard(
-    title: String,
+private fun DonutChart(
     summaries: List<CategorySummary>,
     totalAmount: Double,
     baseColor: Color,
     emptyMessage: String,
-    useTwoColumns: Boolean = false
+    hasDetails: Boolean,
+    viewMode: PieBreakdownMode,
+    onToggleViewMode: () -> Unit,
+    glowAlpha: Float,
+    isCompact: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
+    val sizeDp = if (isCompact) 85.dp else 110.dp
+    val heightDp = if (isCompact) 95.dp else 130.dp
+    val strokeWidthDp = if (isCompact) 14.dp else 22.dp
+
+    if (summaries.isEmpty() || totalAmount <= 0.0) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = if (isCompact) 4.dp else 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(heightDp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.size(sizeDp)) {
+                    val strokeWidth = strokeWidthDp.toPx()
+                    drawArc(
+                        color = baseColor.copy(alpha = 0.15f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                }
+            }
+            Text(
+                text = emptyMessage,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = if (isCompact) 9.sp else 10.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    } else {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(heightDp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(sizeDp)) {
+                val strokeWidth = strokeWidthDp.toPx()
+
+                // Pass 1: Draw glowing halo behind Debt Funding slices
+                var haloAngle = -90f
+                summaries.forEach { summary ->
+                    val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
+                    if (summary.isDebtFunding && sweepAngle > 0f) {
+                        drawArc(
+                            color = Color(0xFFFF6D00).copy(alpha = glowAlpha * 0.7f),
+                            startAngle = haloAngle - 1f,
+                            sweepAngle = sweepAngle + 2f,
+                            useCenter = false,
+                            style = Stroke(width = strokeWidth + 5.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                        drawArc(
+                            color = Color(0xFFFFD54F).copy(alpha = glowAlpha * 0.9f),
+                            startAngle = haloAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            style = Stroke(width = strokeWidth + 2.5.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
+                    haloAngle += sweepAngle
+                }
+
+                // Pass 2: Draw the slice arcs and inner/outer glowing borders
+                var startAngle = -90f
+                summaries.forEachIndexed { index, summary ->
+                    val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
+                    val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(index, baseColor)
+
+                    drawArc(
+                        color = color,
+                        startAngle = startAngle,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                    )
+
+                    if (summary.isDebtFunding && sweepAngle > 0f) {
+                        drawArc(
+                            color = Color(0xFFFFF8E1).copy(alpha = glowAlpha),
+                            startAngle = startAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Butt)
+                        )
+                    }
+                    startAngle += sweepAngle
+                }
+            }
+
+            // Centered Clickable inside Donut
+            if (hasDetails) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(if (isCompact) 48.dp else 70.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            onToggleViewMode()
+                        }
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = if (viewMode == PieBreakdownMode.DETAIL) "Sub-Cats" else "Details",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = if (isCompact) 7.5.sp else 9.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(
+                                horizontal = if (isCompact) 4.dp else 6.dp,
+                                vertical = if (isCompact) 2.dp else 3.dp
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryPieChartCard(
+    title: String,
+    summaries: List<CategorySummary>,
+    detailSummaries: List<CategorySummary> = emptyList(),
+    totalAmount: Double,
+    baseColor: Color,
+    emptyMessage: String,
+    useTwoColumns: Boolean = true,
+    isCompact: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    var viewMode by remember { mutableStateOf(PieBreakdownMode.SUBCATEGORY) }
+    val hasDetails = detailSummaries.isNotEmpty()
+    val activeSummaries = if (viewMode == PieBreakdownMode.DETAIL && hasDetails) detailSummaries else summaries
+
+    val infiniteTransition = rememberInfiniteTransition(label = "glowTransition")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(if (isCompact) 10.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 12.dp)
         ) {
-            // Header Row (Strictly 1 Horizontal Row)
-            Row(
+            // Header Title (Centered, bracketed text on second line)
+            val bracketIndex = title.indexOfAny(charArrayOf('(', '['))
+            val (mainTitle, subTitle) = if (bracketIndex > 0) {
+                Pair(title.substring(0, bracketIndex).trim(), title.substring(bracketIndex).trim())
+            } else {
+                Pair(title, null)
+            }
+
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = mainTitle,
+                    style = if (isCompact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = baseColor,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = CurrencyUtils.format(totalAmount),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = baseColor,
-                    maxLines = 1
-                )
+                if (subTitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subTitle,
+                        style = if (isCompact) MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp) else MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = baseColor.copy(alpha = 0.85f),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-            if (summaries.isEmpty() || totalAmount <= 0.0) {
-                EmptyState(emptyMessage)
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Centered Donut Chart Canvas
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp),
-                        contentAlignment = Alignment.Center
+            DonutChart(
+                summaries = activeSummaries,
+                totalAmount = totalAmount,
+                baseColor = baseColor,
+                emptyMessage = emptyMessage,
+                hasDetails = hasDetails,
+                viewMode = viewMode,
+                onToggleViewMode = {
+                    viewMode = if (viewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
+                },
+                glowAlpha = glowAlpha,
+                isCompact = isCompact
+            )
+
+            if (activeSummaries.isNotEmpty() && totalAmount > 0.0) {
+                // Legend & Progress Items
+                if (useTwoColumns) {
+                    val indexedSummaries = activeSummaries.mapIndexed { idx, item -> Pair(idx, item) }
+                    val rows = indexedSummaries.chunked(2)
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Canvas(modifier = Modifier.size(110.dp)) {
-                            var startAngle = -90f
-                            val strokeWidth = 22.dp.toPx()
+                        rows.forEach { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowItems.forEach { (index, summary) ->
+                                    val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(index, baseColor)
+                                    val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
 
-                            summaries.forEachIndexed { index, summary ->
-                                val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
-                                val color = getSliceColor(index, baseColor)
+                                    val debtBorder = if (summary.isDebtFunding) {
+                                        BorderStroke(1.5.dp, Color(0xFFFF6D00).copy(alpha = glowAlpha))
+                                    } else null
 
-                                drawArc(
-                                    color = color,
-                                    startAngle = startAngle,
-                                    sweepAngle = sweepAngle,
-                                    useCenter = false,
-                                    style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                                )
-                                startAngle += sweepAngle
-                            }
-                        }
-
-                        // Center Text inside Donut
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${summaries.size}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (summaries.size == 1) "Sub-Category" else "Sub-Categories",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    // Legend & Progress Items (2-Column Grid or 1-Column List)
-                    if (useTwoColumns) {
-                        val indexedSummaries = summaries.mapIndexed { idx, item -> Pair(idx, item) }
-                        val rows = indexedSummaries.chunked(2)
-
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            rows.forEach { rowItems ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    rowItems.forEach { (index, summary) ->
-                                        val color = getSliceColor(index, baseColor)
-                                        val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
-
+                                    Surface(
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = debtBorder,
+                                        color = if (summary.isDebtFunding) Color(0xFFFF6D00).copy(alpha = 0.08f) else Color.Transparent
+                                    ) {
                                         Column(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.padding(if (summary.isDebtFunding) 4.dp else 0.dp),
                                             verticalArrangement = Arrangement.spacedBy(2.dp)
                                         ) {
                                             Row(
@@ -220,23 +391,36 @@ fun CategoryPieChartCard(
                                             )
                                         }
                                     }
-                                    if (rowItems.size == 1) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
+                                }
+                                if (rowItems.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            summaries.forEachIndexed { index, summary ->
-                                val color = getSliceColor(index, baseColor)
-                                val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        activeSummaries.forEachIndexed { index, summary ->
+                            val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(index, baseColor)
+                            val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
 
+                            val debtBorder = if (summary.isDebtFunding) {
+                                BorderStroke(1.5.dp, Color(0xFFFF6D00).copy(alpha = glowAlpha))
+                            } else null
+
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                border = debtBorder,
+                                color = if (summary.isDebtFunding) Color(0xFFFF6D00).copy(alpha = 0.08f) else Color.Transparent
+                            ) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(if (summary.isDebtFunding) 6.dp else 0.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Row(
@@ -262,6 +446,20 @@ fun CategoryPieChartCard(
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
+                                            if (summary.isDebtFunding) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Surface(
+                                                    color = Color(0xFFFF6D00).copy(alpha = 0.2f),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Debt Funding",
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                                        color = Color(0xFFFF6D00),
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
@@ -282,6 +480,368 @@ fun CategoryPieChartCard(
                                         trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DualIncomePieChartCard(
+    title: String = "Income Sources and Utilization",
+    sourceSummaries: List<CategorySummary>,
+    sourceDetailSummaries: List<CategorySummary> = emptyList(),
+    sourceTotal: Double,
+    usageSummaries: List<CategorySummary>,
+    usageDetailSummaries: List<CategorySummary> = emptyList(),
+    usageTotal: Double,
+    baseColor: Color = com.moneytracker.ui.theme.IncomeColor,
+    emptySourceMessage: String = "No income recorded for this pay period.",
+    emptyUsageMessage: String = "No usage recorded for this pay period.",
+    modifier: Modifier = Modifier
+) {
+    var sourceViewMode by remember { mutableStateOf(PieBreakdownMode.SUBCATEGORY) }
+    var usageViewMode by remember { mutableStateOf(PieBreakdownMode.SUBCATEGORY) }
+
+    val hasSourceDetails = sourceDetailSummaries.isNotEmpty()
+    val hasUsageDetails = usageDetailSummaries.isNotEmpty()
+
+    val activeSourceSummaries = if (sourceViewMode == PieBreakdownMode.DETAIL && hasSourceDetails) sourceDetailSummaries else sourceSummaries
+    val activeUsageSummaries = if (usageViewMode == PieBreakdownMode.DETAIL && hasUsageDetails) usageDetailSummaries else usageSummaries
+
+    val infiniteTransition = rememberInfiniteTransition(label = "dualGlowTransition")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dualGlowAlpha"
+    )
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header Title (Centered, bracketed text on second line)
+            val bracketIndex = title.indexOfAny(charArrayOf('(', '['))
+            val (mainTitle, subTitle) = if (bracketIndex > 0) {
+                Pair(title.substring(0, bracketIndex).trim(), title.substring(bracketIndex).trim())
+            } else {
+                Pair(title, null)
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = mainTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = baseColor,
+                    textAlign = TextAlign.Center
+                )
+                if (subTitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = baseColor.copy(alpha = 0.85f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Side-by-Side Charts Row (Completely level with each other)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left Chart: Income Sources
+                DonutChart(
+                    summaries = activeSourceSummaries,
+                    totalAmount = sourceTotal,
+                    baseColor = baseColor,
+                    emptyMessage = emptySourceMessage,
+                    hasDetails = hasSourceDetails,
+                    viewMode = sourceViewMode,
+                    onToggleViewMode = {
+                        sourceViewMode = if (sourceViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
+                    },
+                    glowAlpha = glowAlpha,
+                    isCompact = true,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Right Chart: Funding & Utilization
+                DonutChart(
+                    summaries = activeUsageSummaries,
+                    totalAmount = usageTotal,
+                    baseColor = baseColor,
+                    emptyMessage = emptyUsageMessage,
+                    hasDetails = hasUsageDetails,
+                    viewMode = usageViewMode,
+                    onToggleViewMode = {
+                        usageViewMode = if (usageViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
+                    },
+                    glowAlpha = glowAlpha,
+                    isCompact = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // 1. Income Sources Bar / Legend on Top (2 Columns if multiple items, single card if 1)
+            if (activeSourceSummaries.isNotEmpty() && sourceTotal > 0) {
+                if (activeSourceSummaries.size == 1) {
+                    val summary = activeSourceSummaries.first()
+                    val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(0, baseColor)
+                    val pct = if (sourceTotal > 0) (summary.total / sourceTotal).toFloat() else 0f
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(6.dp),
+                        color = color.copy(alpha = 0.08f)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = summary.categoryName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${CurrencyUtils.format(summary.total)} (${String.format("%.1f", pct * 100)}%)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = color
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = { pct.coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = color,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                } else {
+                    val indexedSources = activeSourceSummaries.mapIndexed { idx, item -> Pair(idx, item) }
+                    val sourceRows = indexedSources.chunked(2)
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        sourceRows.forEach { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowItems.forEach { (index, summary) ->
+                                    val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(index, baseColor)
+                                    val pct = if (sourceTotal > 0) (summary.total / sourceTotal).toFloat() else 0f
+
+                                    Surface(
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = color.copy(alpha = 0.08f)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .clip(CircleShape)
+                                                            .background(color)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = summary.categoryName,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "${String.format("%.1f", pct * 100)}%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = color
+                                                )
+                                            }
+                                            Text(
+                                                text = CurrencyUtils.format(summary.total),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = color,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            LinearProgressIndicator(
+                                                progress = { pct.coerceIn(0f, 1f) },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = color,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                    }
+                                }
+                                if (rowItems.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Funding & Utilization Bars in 2 Columns Underneath (including Remaining Income & Debt Funding)
+            if (activeUsageSummaries.isNotEmpty() && usageTotal > 0) {
+                val indexedUsage = activeUsageSummaries.mapIndexed { idx, item -> Pair(idx, item) }
+                val usageRows = indexedUsage.chunked(2)
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    usageRows.forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            rowItems.forEach { (index, summary) ->
+                                val color = summary.customColorHex?.let { Color(it) } ?: getSliceColor(index, baseColor)
+                                val pct = if (usageTotal > 0) (summary.total / usageTotal).toFloat() else 0f
+
+                                val debtBorder = if (summary.isDebtFunding) {
+                                    BorderStroke(1.5.dp, Color(0xFFFF6D00).copy(alpha = glowAlpha))
+                                } else null
+
+                                Surface(
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = debtBorder,
+                                    color = if (summary.isDebtFunding) Color(0xFFFF6D00).copy(alpha = 0.08f) else Color.Transparent
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(if (summary.isDebtFunding) 4.dp else 0.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(CircleShape)
+                                                        .background(color)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = summary.categoryName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.Medium,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "${String.format("%.1f", pct * 100)}%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = color
+                                            )
+                                        }
+                                        Text(
+                                            text = CurrencyUtils.format(summary.total),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = color,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        LinearProgressIndicator(
+                                            progress = { pct.coerceIn(0f, 1f) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(4.dp)
+                                                .clip(RoundedCornerShape(2.dp)),
+                                            color = color,
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+                            }
+                            if (rowItems.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }

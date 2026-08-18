@@ -257,10 +257,11 @@ private fun SummaryTableRow(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         }
+                        val isPlan = tx.recurrenceFrequency == com.moneytracker.data.local.entity.RecurrenceFrequency.PLAN_FUTURE
                         Text(
-                            text = "$prefix${CurrencyUtils.format(tx.amount)}",
+                            text = if (isPlan) "${prefix}${CurrencyUtils.format(kotlin.math.abs(tx.amount))} (Plan)" else "${prefix}${CurrencyUtils.format(kotlin.math.abs(tx.amount))}",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = categoryColor
+                            color = if (isPlan) MaterialTheme.colorScheme.onSurfaceVariant else categoryColor
                         )
                     }
                 }

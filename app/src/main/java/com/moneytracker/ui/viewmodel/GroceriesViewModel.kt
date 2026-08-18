@@ -42,14 +42,26 @@ class GroceriesViewModel(
         triggerAutoPopulate()
     }
 
-    val monthTimestamp: StateFlow<Long> = _selectedPayMonthDate
-        .map { DateUtils.toEpochMillis(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DateUtils.toEpochMillis(_selectedPayMonthDate.value))
+    val payMonthRange: StateFlow<Pair<Long, Long>> = _selectedPayMonthDate
+        .map { date ->
+            val start = DateUtils.startOfPayMonth(date, payDateDay)
+            val end = DateUtils.startOfNextPayMonth(date, payDateDay)
+            Pair(start, end)
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            Pair(DateUtils.startOfPayMonth(LocalDate.now(), payDateDay), DateUtils.startOfNextPayMonth(LocalDate.now(), payDateDay))
+        )
+
+    val monthTimestamp: StateFlow<Long> = payMonthRange
+        .map { it.first }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DateUtils.startOfPayMonth(LocalDate.now(), payDateDay))
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val budgetItems: StateFlow<List<GroceryBudgetItemEntity>> = monthTimestamp
-        .flatMapLatest { ts ->
-            repository.observeGroceryBudgetForMonth(ts)
+    val budgetItems: StateFlow<List<GroceryBudgetItemEntity>> = payMonthRange
+        .flatMapLatest { (start, end) ->
+            repository.observeGroceryBudgetForMonth(start, end)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -58,9 +70,9 @@ class GroceriesViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val shoppingLists: StateFlow<List<ShoppingListEntity>> = monthTimestamp
-        .flatMapLatest { ts ->
-            repository.observeShoppingListsForMonth(ts)
+    val shoppingLists: StateFlow<List<ShoppingListEntity>> = payMonthRange
+        .flatMapLatest { (start, end) ->
+            repository.observeShoppingListsForMonth(start, end)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -103,8 +115,8 @@ class GroceriesViewModel(
 
     private fun triggerAutoPopulate() {
         viewModelScope.launch {
-            val ts = monthTimestamp.value
-            repository.autoPopulateRecurringAndPlannedGroceryItems(ts)
+            val (start, end) = payMonthRange.value
+            repository.autoPopulateRecurringAndPlannedGroceryItems(start, end, start)
         }
     }
 
@@ -124,6 +136,19 @@ class GroceriesViewModel(
         }
     }
 
+    // Find any duplicate item in the current month with matching (Category, SubCategory, Detail)
+    fun findDuplicateItem(category: String, subCategory: String, itemDetail: String, excludeId: Long = 0L): GroceryBudgetItemEntity? {
+        val catClean = category.trim()
+        val subClean = subCategory.trim()
+        val detClean = itemDetail.trim()
+        return budgetItems.value.firstOrNull { existing ->
+            existing.id != excludeId &&
+            existing.category.equals(catClean, ignoreCase = true) &&
+            existing.subCategory.equals(subClean, ignoreCase = true) &&
+            existing.itemDetail.equals(detClean, ignoreCase = true)
+        }
+    }
+
     // Budget Item Mutations
     fun saveGroceryBudgetItem(
         id: Long = 0,
@@ -134,14 +159,22 @@ class GroceriesViewModel(
         note: String = "",
         quantityBudget: Int,
         unitPriceBudget: Double,
-        isRecurring: Int // 0 = Once-off, 1 = Monthly Recurring, 2 = Planned
+        isRecurring: Int, // 0 = Once-off, 1 = Monthly Recurring, 2 = Planned
+        startDate: Long? = null,
+        isUpdatingExisting: Boolean = false
     ) {
         viewModelScope.launch {
-            val ts = monthTimestamp.value
+            val startTs = startDate ?: payMonthRange.value.first
+            val existing = if (id != 0L) repository.getGroceryBudgetItemById(id) else null
             val costB = quantityBudget * unitPriceBudget
+            val qA = existing?.quantityActual ?: 0
+            val pA = existing?.unitPriceActual ?: 0.0
+            val cA = existing?.costActual ?: (qA * pA)
+
             val item = GroceryBudgetItemEntity(
                 id = id,
-                date = ts,
+                profileId = repository.activeProfileId,
+                date = startTs,
                 category = category.ifBlank { "Groceries" },
                 subCategory = subCategory.ifBlank { "General" },
                 itemDetail = itemDetail.ifBlank { subCategory },
@@ -151,11 +184,20 @@ class GroceriesViewModel(
                 unitPriceBudget = unitPriceBudget,
                 costBudget = costB,
                 isRecurring = isRecurring,
-                quantityActual = 0,
-                unitPriceActual = 0.0,
-                costActual = 0.0
+                quantityActual = qA,
+                unitPriceActual = pA,
+                costActual = cA
             )
-            repository.saveGroceryBudgetItem(item)
+
+            if (isUpdatingExisting || id != 0L) {
+                repository.updateGroceryBudgetItemWithRecurrenceChange(
+                    existingItemId = id,
+                    item = item,
+                    currentMonthStart = startTs
+                )
+            } else {
+                repository.saveGroceryBudgetItem(item)
+            }
         }
     }
 
@@ -205,17 +247,16 @@ class GroceriesViewModel(
         if (itemsToInclude.isEmpty()) return
 
         viewModelScope.launch {
+            val (startTs, _) = payMonthRange.value
             val listTitle = title.ifBlank { "Shopping List (${itemsToInclude.size} items)" }
             val listId = repository.generateShoppingListFromBudget(
-                payMonthTimestamp = monthTimestamp.value,
+                payMonthTimestamp = startTs,
                 shoppingDateTimestamp = shoppingDateTimestamp,
                 title = listTitle,
                 selectedBudgetItems = itemsToInclude
             )
             clearBudgetItemSelection()
-            // Open newly created shopping list
-            val sLists = repository.getGroceryBudgetForMonth(monthTimestamp.value)
-            val newList = ShoppingListEntity(id = listId, payMonthDate = monthTimestamp.value, shoppingDate = shoppingDateTimestamp, title = listTitle)
+            val newList = ShoppingListEntity(id = listId, payMonthDate = startTs, shoppingDate = shoppingDateTimestamp, title = listTitle)
             _activeShoppingList.value = newList
         }
     }
@@ -249,6 +290,14 @@ class GroceriesViewModel(
                 createExpenseTransaction = createExpenseTxn
             )
             _activeShoppingList.value = null
+        }
+    }
+
+    fun reopenShoppingList(list: ShoppingListEntity) {
+        viewModelScope.launch {
+            repository.reopenShoppingList(list.id)
+            val updated = repository.getShoppingListById(list.id)
+            _activeShoppingList.value = updated
         }
     }
 

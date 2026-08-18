@@ -262,4 +262,10 @@ object DatabaseMigrations {
             )
         }
     }
+
+    val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE transactions ADD COLUMN isRecurred INTEGER NOT NULL DEFAULT 0")
+        }
+    }
 }
