@@ -47,9 +47,15 @@ fun DashboardScreen(
 ) {
     val summary by viewModel.summary.collectAsState()
     val incomeBreakdown by viewModel.incomeBreakdown.collectAsState()
+    val incomeDetailBreakdown by viewModel.incomeDetailBreakdown.collectAsState()
+    val incomeUsageBreakdown by viewModel.incomeUsageBreakdown.collectAsState()
+    val incomeUsageDetailBreakdown by viewModel.incomeUsageDetailBreakdown.collectAsState()
     val investmentBreakdown by viewModel.investmentBreakdown.collectAsState()
+    val investmentDetailBreakdown by viewModel.investmentDetailBreakdown.collectAsState()
     val educationBreakdown by viewModel.educationBreakdown.collectAsState()
+    val educationDetailBreakdown by viewModel.educationDetailBreakdown.collectAsState()
     val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
+    val expenseDetailBreakdown by viewModel.expenseDetailBreakdown.collectAsState()
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
@@ -114,25 +120,29 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. Income Pie Chart (Where Income Comes From)
+            // 4. Income Sources Pie Chart (Where Income Comes From)
             item {
                 CategoryPieChartCard(
                     title = "Income Sources (Where Money Comes From)",
                     summaries = incomeBreakdown,
+                    detailSummaries = incomeDetailBreakdown,
                     totalAmount = summary.income,
                     baseColor = IncomeColor,
                     emptyMessage = "No income recorded for this pay period."
                 )
             }
 
-            // 5. Investments Pie Chart (Where Money is Invested)
+            // 5. 2nd Pie: Income Funding & Utilization (How Income is Used & Remaining Balance)
             item {
+                val totalOutflows = summary.expense + summary.investment + summary.education
+                val usageTotal = if (summary.income > 0) maxOf(summary.income, totalOutflows) else totalOutflows
                 CategoryPieChartCard(
-                    title = "Investment Distribution",
-                    summaries = investmentBreakdown,
-                    totalAmount = summary.investment,
-                    baseColor = InvestmentColor,
-                    emptyMessage = "No investments recorded for this pay period."
+                    title = "Income Funding & Utilization",
+                    summaries = incomeUsageBreakdown,
+                    detailSummaries = incomeUsageDetailBreakdown,
+                    totalAmount = usageTotal,
+                    baseColor = IncomeColor,
+                    emptyMessage = "No income or outflows recorded for this pay period."
                 )
             }
 
@@ -141,6 +151,7 @@ fun DashboardScreen(
                 CategoryPieChartCard(
                     title = "Expense Breakdown (Where Money is Spent)",
                     summaries = expenseBreakdown,
+                    detailSummaries = expenseDetailBreakdown,
                     totalAmount = summary.expense,
                     baseColor = ExpenseColor,
                     emptyMessage = "No expenses recorded for this pay period.",
@@ -148,17 +159,28 @@ fun DashboardScreen(
                 )
             }
 
-            // 7. Education Pie Chart (If Education records exist)
-            if (educationBreakdown.isNotEmpty() || summary.education > 0) {
-                item {
-                    CategoryPieChartCard(
-                        title = "Education & Training",
-                        summaries = educationBreakdown,
-                        totalAmount = summary.education,
-                        baseColor = EducationColor,
-                        emptyMessage = "No education expenses recorded for this pay period."
-                    )
-                }
+            // 7. Investments Pie Chart (Where Money is Invested)
+            item {
+                CategoryPieChartCard(
+                    title = "Investment Distribution",
+                    summaries = investmentBreakdown,
+                    detailSummaries = investmentDetailBreakdown,
+                    totalAmount = summary.investment,
+                    baseColor = InvestmentColor,
+                    emptyMessage = "No investments recorded for this pay period."
+                )
+            }
+
+            // 8. Education Pie Chart
+            item {
+                CategoryPieChartCard(
+                    title = "Education & Training",
+                    summaries = educationBreakdown,
+                    detailSummaries = educationDetailBreakdown,
+                    totalAmount = summary.education,
+                    baseColor = EducationColor,
+                    emptyMessage = "No education expenses recorded for this pay period."
+                )
             }
         }
     }

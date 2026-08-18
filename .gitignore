@@ -34,3 +34,5 @@ build/
 .cxx/
 .navigation/
 output.json
+.wifi_device
+

@@ -20,6 +20,7 @@ import com.moneytracker.data.local.entity.TransactionWithCategory
 import com.moneytracker.util.ProfileManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOf
 
 import com.moneytracker.data.local.GroceryBudgetDao
@@ -167,9 +168,13 @@ class TransactionRepository(
         transactionDao.getAllEntities(activeProfileId)
 
     suspend fun saveTransaction(transaction: TransactionEntity): Long {
-        val pid = if (transaction.profileId == 0L) activeProfileId else transaction.profileId
+        val pid = if (transaction.id == 0L || transaction.profileId <= 0L) activeProfileId else transaction.profileId
         val sortOrder = if (transaction.id == 0L) transactionDao.nextSortOrder(pid) else transaction.sortOrder
-        val entity = transaction.copy(profileId = pid, sortOrder = sortOrder)
+        val entity = transaction.copy(
+            profileId = pid,
+            sortOrder = sortOrder,
+            amount = kotlin.math.abs(transaction.amount)
+        )
         return if (entity.id == 0L) {
             transactionDao.insert(entity)
         } else {
@@ -196,7 +201,7 @@ class TransactionRepository(
     }
 
     suspend fun saveCategory(category: CategoryEntity): Long {
-        val pid = if (category.profileId == 0L) activeProfileId else category.profileId
+        val pid = if (category.id == 0L || category.profileId <= 0L) activeProfileId else category.profileId
         val entity = category.copy(profileId = pid)
         return if (entity.id == 0L) {
             categoryDao.insert(entity)
@@ -211,7 +216,7 @@ class TransactionRepository(
     }
 
     suspend fun saveSubCategory(subCategory: SubCategoryEntity): Long {
-        val pid = if (subCategory.profileId == 0L) activeProfileId else subCategory.profileId
+        val pid = if (subCategory.id == 0L || subCategory.profileId <= 0L) activeProfileId else subCategory.profileId
         val entity = subCategory.copy(profileId = pid)
         return if (entity.id == 0L) {
             subCategoryDao.insert(entity)
@@ -226,7 +231,7 @@ class TransactionRepository(
     }
 
     suspend fun saveDetail(detail: DetailEntity): Long {
-        val pid = if (detail.profileId == 0L) activeProfileId else detail.profileId
+        val pid = if (detail.id == 0L || detail.profileId <= 0L) activeProfileId else detail.profileId
         val entity = detail.copy(profileId = pid)
         return if (entity.id == 0L) {
             detailDao.insert(entity)
@@ -238,6 +243,24 @@ class TransactionRepository(
 
     suspend fun deleteDetail(detail: DetailEntity) {
         detailDao.delete(detail)
+    }
+
+    suspend fun sanitizeLegacyData() {
+        try {
+            val all = transactionDao.getAllEntities(activeProfileId)
+            for (t in all) {
+                if (t.amount < 0) {
+                    transactionDao.update(t.copy(amount = kotlin.math.abs(t.amount)))
+                }
+            }
+            val currentSubs = subCategoryDao.observeAll(activeProfileId).firstOrNull() ?: emptyList()
+            if (currentSubs.isEmpty() && activeProfileId != 1L) {
+                val profile1Subs = subCategoryDao.observeAll(1L).firstOrNull() ?: emptyList()
+                for (s in profile1Subs) {
+                    subCategoryDao.insert(s.copy(id = 0L, profileId = activeProfileId))
+                }
+            }
+        } catch (e: Exception) {}
     }
 
     // Grocery Operations
@@ -264,13 +287,14 @@ class TransactionRepository(
         taxiFareDao?.observeAll(activeProfileId) ?: flowOf(emptyList())
 
     suspend fun saveTaxiFare(fare: TaxiFareEntity): Long {
+        val dao = taxiFareDao ?: return 0L
         val pid = if (fare.profileId == 0L) activeProfileId else fare.profileId
         val entity = fare.copy(profileId = pid)
         return if (entity.id == 0L) {
-            taxiFareDao?.insert(fare) ?: 0L
+            dao.insert(entity)
         } else {
-            taxiFareDao?.update(fare)
-            fare.id
+            dao.update(entity)
+            entity.id
         }
     }
 
@@ -279,27 +303,38 @@ class TransactionRepository(
     }
 
     // Grocery Budget Operations
-    fun observeGroceryBudgetForMonth(monthTimestamp: Long): Flow<List<GroceryBudgetItemEntity>> =
-        groceryBudgetDao?.observeForMonth(activeProfileId, monthTimestamp) ?: flowOf(emptyList())
+    fun observeGroceryBudgetForMonth(startDate: Long, endDate: Long): Flow<List<GroceryBudgetItemEntity>> =
+        groceryBudgetDao?.observeForMonth(activeProfileId, startDate, endDate) ?: flowOf(emptyList())
 
-    suspend fun getGroceryBudgetForMonth(monthTimestamp: Long): List<GroceryBudgetItemEntity> =
-        groceryBudgetDao?.getForMonth(activeProfileId, monthTimestamp) ?: emptyList()
+    suspend fun getGroceryBudgetForMonth(startDate: Long, endDate: Long): List<GroceryBudgetItemEntity> =
+        groceryBudgetDao?.getForMonth(activeProfileId, startDate, endDate) ?: emptyList()
 
-    suspend fun autoPopulateRecurringAndPlannedGroceryItems(monthTimestamp: Long) {
+    suspend fun getGroceryBudgetItemById(id: Long): GroceryBudgetItemEntity? =
+        groceryBudgetDao?.getById(id)
+
+    suspend fun autoPopulateRecurringAndPlannedGroceryItems(startDate: Long, endDate: Long, targetDate: Long) {
         val dao = groceryBudgetDao ?: return
-        val currentMonthItems = dao.getForMonth(activeProfileId, monthTimestamp)
-        val recurringAndPlanned = dao.getRecurringAndPlannedItems(activeProfileId)
+        val currentMonthItems = dao.getForMonth(activeProfileId, startDate, endDate)
+        val allRecurringAndPlanned = dao.getRecurringAndPlannedItems(activeProfileId)
 
-        val toCopy = recurringAndPlanned.filter { template ->
+        // Deduplicate templates before startDate: pick the most recent one for each (category, subCategory, itemDetail)
+        val templates = allRecurringAndPlanned
+            .filter { it.date < startDate }
+            .groupBy { "${it.category.trim().lowercase()}|||${it.subCategory.trim().lowercase()}|||${it.itemDetail.trim().lowercase()}" }
+            .mapValues { (_, list) -> list.maxByOrNull { it.date }!! }
+            .values
+
+        val toCopy = templates.filter { template ->
             currentMonthItems.none { existing ->
-                existing.category == template.category &&
-                existing.subCategory == template.subCategory &&
-                existing.itemDetail == template.itemDetail
+                existing.category.equals(template.category, ignoreCase = true) &&
+                existing.subCategory.equals(template.subCategory, ignoreCase = true) &&
+                existing.itemDetail.equals(template.itemDetail, ignoreCase = true)
             }
         }.map { template ->
             template.copy(
                 id = 0,
-                date = monthTimestamp,
+                profileId = activeProfileId,
+                date = targetDate,
                 quantityActual = 0,
                 unitPriceActual = 0.0,
                 costActual = 0.0
@@ -314,15 +349,63 @@ class TransactionRepository(
     suspend fun saveGroceryBudgetItem(item: GroceryBudgetItemEntity): Long {
         val dao = groceryBudgetDao ?: return 0L
         val pid = if (item.profileId == 0L) activeProfileId else item.profileId
+        val existing = if (item.id != 0L) dao.getById(item.id) else null
+        val qA = if (item.quantityActual > 0) item.quantityActual else (existing?.quantityActual ?: 0)
+        val pA = if (item.unitPriceActual > 0.0) item.unitPriceActual else (existing?.unitPriceActual ?: 0.0)
+        val cA = if (item.costActual > 0.0) item.costActual else (qA * pA)
         val costB = item.quantityBudget * item.unitPriceBudget
-        val costA = item.quantityActual * item.unitPriceActual
-        val entity = item.copy(profileId = pid, costBudget = costB, costActual = costA)
+        val entity = item.copy(profileId = pid, costBudget = costB, quantityActual = qA, unitPriceActual = pA, costActual = cA)
         return if (entity.id == 0L) {
             dao.insert(entity)
         } else {
             dao.update(entity)
             entity.id
         }
+    }
+
+    suspend fun updateGroceryBudgetItemWithRecurrenceChange(
+        existingItemId: Long,
+        item: GroceryBudgetItemEntity,
+        currentMonthStart: Long
+    ): Long {
+        val dao = groceryBudgetDao ?: return 0L
+        val pid = if (item.profileId == 0L) activeProfileId else item.profileId
+        val existing = if (existingItemId != 0L) dao.getById(existingItemId) else null
+        val qA = if (item.quantityActual > 0) item.quantityActual else (existing?.quantityActual ?: 0)
+        val pA = if (item.unitPriceActual > 0.0) item.unitPriceActual else (existing?.unitPriceActual ?: 0.0)
+        val cA = if (item.costActual > 0.0) item.costActual else (qA * pA)
+        val costB = item.quantityBudget * item.unitPriceBudget
+        val entity = item.copy(
+            id = existingItemId,
+            profileId = pid,
+            costBudget = costB,
+            quantityActual = qA,
+            unitPriceActual = pA,
+            costActual = cA
+        )
+
+        val id = if (existingItemId == 0L) {
+            dao.insert(entity)
+        } else {
+            dao.update(entity)
+            existingItemId
+        }
+
+        // Amend older active recurring templates of the same item before current month to isRecurring = 0
+        val allItems = dao.getAllForProfile(pid)
+        val olderDuplicates = allItems.filter {
+            it.id != id &&
+            it.date < currentMonthStart &&
+            it.isRecurring != 0 &&
+            it.category.equals(item.category, ignoreCase = true) &&
+            it.subCategory.equals(item.subCategory, ignoreCase = true) &&
+            it.itemDetail.equals(item.itemDetail, ignoreCase = true)
+        }
+        olderDuplicates.forEach { older ->
+            dao.update(older.copy(isRecurring = 0))
+        }
+
+        return id
     }
 
     suspend fun deleteGroceryBudgetItem(item: GroceryBudgetItemEntity) {
@@ -344,8 +427,8 @@ class TransactionRepository(
     }
 
     // Shopping List Operations
-    fun observeShoppingListsForMonth(monthTimestamp: Long): Flow<List<ShoppingListEntity>> =
-        shoppingListDao?.observeForMonth(activeProfileId, monthTimestamp) ?: flowOf(emptyList())
+    fun observeShoppingListsForMonth(startDate: Long, endDate: Long): Flow<List<ShoppingListEntity>> =
+        shoppingListDao?.observeForMonth(activeProfileId, startDate, endDate) ?: flowOf(emptyList())
 
     fun observeShoppingListItems(listId: Long): Flow<List<ShoppingListItemEntity>> =
         shoppingListItemDao?.observeForList(listId) ?: flowOf(emptyList())
@@ -460,6 +543,53 @@ class TransactionRepository(
             }
         }
     }
+
+    suspend fun reopenShoppingList(shoppingListId: Long) {
+        val sListDao = shoppingListDao ?: return
+        val sItemDao = shoppingListItemDao ?: return
+        val bDao = groceryBudgetDao ?: return
+
+        val shoppingList = sListDao.getById(shoppingListId) ?: return
+        if (shoppingList.status != "CLOSED") return
+
+        val items = sItemDao.getForList(shoppingListId)
+        val checkedItems = items.filter { it.isChecked }
+
+        // Subtract checked item actuals from the associated grocery budget items
+        checkedItems.forEach { sItem ->
+            if (sItem.budgetItemId != null) {
+                val budgetItem = bDao.getById(sItem.budgetItemId)
+                if (budgetItem != null) {
+                    val updatedQtyActual = (budgetItem.quantityActual - sItem.quantityActual).coerceAtLeast(0)
+                    val updatedCostActual = updatedQtyActual * budgetItem.unitPriceActual
+                    bDao.update(
+                        budgetItem.copy(
+                            quantityActual = updatedQtyActual,
+                            costActual = updatedCostActual
+                        )
+                    )
+                }
+            }
+        }
+
+        // Delete the expense transaction that was logged on close (if any)
+        val noteText = "Logged from Shopping List: ${shoppingList.title}"
+        val allTxns = transactionDao.getAllEntities(activeProfileId)
+        val matchingTxn = allTxns.find { it.note.equals(noteText, ignoreCase = true) && it.date == shoppingList.shoppingDate }
+        if (matchingTxn != null) {
+            transactionDao.delete(matchingTxn)
+        }
+
+        sListDao.update(
+            shoppingList.copy(
+                status = "OPEN",
+                totalActualCost = 0.0
+            )
+        )
+    }
+
+    suspend fun getShoppingListById(shoppingListId: Long): ShoppingListEntity? =
+        shoppingListDao?.getById(shoppingListId)
 
     suspend fun deleteShoppingList(shoppingList: ShoppingListEntity) {
         shoppingListDao?.delete(shoppingList)

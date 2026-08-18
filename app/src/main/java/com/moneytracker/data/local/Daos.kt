@@ -137,6 +137,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
+               t.isRecurring, t.recurrenceFrequency, t.recurTillDate, t.recurCount, t.isRecurred,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id
@@ -149,6 +150,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
+               t.isRecurring, t.recurrenceFrequency, t.recurTillDate, t.recurCount, t.isRecurred,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
         INNER JOIN categories c ON t.categoryId = c.id
@@ -166,6 +168,7 @@ interface TransactionDao {
         SELECT COALESCE(SUM(ABS(amount)), 0)
         FROM transactions
         WHERE profileId = :profileId AND type = :type AND date >= :startDate AND date < :endDate
+          AND (recurrenceFrequency IS NULL OR recurrenceFrequency != 'PLAN_FUTURE')
         """
     )
     fun observeTotalByTypeAndDateRange(
@@ -177,13 +180,15 @@ interface TransactionDao {
 
     @Query(
         """
-        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total
+        SELECT c.id AS categoryId, c.name AS categoryName, COALESCE(SUM(ABS(t.amount)), 0) AS total,
+               0 AS isDebtFunding, NULL AS customColorHex
         FROM categories c
         LEFT JOIN transactions t ON t.categoryId = c.id
             AND t.profileId = :profileId
             AND t.type = :type
             AND t.date >= :startDate
             AND t.date < :endDate
+            AND (t.recurrenceFrequency IS NULL OR t.recurrenceFrequency != 'PLAN_FUTURE')
         WHERE c.profileId = :profileId AND c.type = :type
         GROUP BY c.id, c.name
         HAVING total > 0
@@ -212,7 +217,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
-    @Query("SELECT * FROM transactions WHERE profileId = :profileId AND isRecurring = 1")
+    @Query("SELECT * FROM transactions WHERE profileId = :profileId AND isRecurring = 1 AND isRecurred = 0")
     suspend fun getRecurringTransactions(profileId: Long): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE profileId = :profileId")
@@ -257,14 +262,17 @@ interface TaxiFareDao {
 
 @Dao
 interface GroceryBudgetDao {
-    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date = :monthTimestamp ORDER BY category ASC, subCategory ASC, itemDetail ASC")
-    fun observeForMonth(profileId: Long, monthTimestamp: Long): Flow<List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>>
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date >= :startDate AND date < :endDate ORDER BY category ASC, subCategory ASC, itemDetail ASC")
+    fun observeForMonth(profileId: Long, startDate: Long, endDate: Long): Flow<List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>>
 
-    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date = :monthTimestamp")
-    suspend fun getForMonth(profileId: Long, monthTimestamp: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND date >= :startDate AND date < :endDate")
+    suspend fun getForMonth(profileId: Long, startDate: Long, endDate: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
 
     @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId AND (isRecurring = 1 OR isRecurring = 2)")
     suspend fun getRecurringAndPlannedItems(profileId: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
+
+    @Query("SELECT * FROM grocery_budget_items WHERE profileId = :profileId")
+    suspend fun getAllForProfile(profileId: Long): List<com.moneytracker.data.local.entity.GroceryBudgetItemEntity>
 
     @Query("SELECT * FROM grocery_budget_items WHERE id = :id")
     suspend fun getById(id: Long): com.moneytracker.data.local.entity.GroceryBudgetItemEntity?
@@ -296,8 +304,8 @@ interface UnitSizeDao {
 
 @Dao
 interface ShoppingListDao {
-    @Query("SELECT * FROM shopping_lists WHERE profileId = :profileId AND payMonthDate = :monthTimestamp ORDER BY shoppingDate DESC, id DESC")
-    fun observeForMonth(profileId: Long, monthTimestamp: Long): Flow<List<com.moneytracker.data.local.entity.ShoppingListEntity>>
+    @Query("SELECT * FROM shopping_lists WHERE profileId = :profileId AND payMonthDate >= :startDate AND payMonthDate < :endDate ORDER BY shoppingDate DESC, id DESC")
+    fun observeForMonth(profileId: Long, startDate: Long, endDate: Long): Flow<List<com.moneytracker.data.local.entity.ShoppingListEntity>>
 
     @Query("SELECT * FROM shopping_lists WHERE id = :id")
     suspend fun getById(id: Long): com.moneytracker.data.local.entity.ShoppingListEntity?

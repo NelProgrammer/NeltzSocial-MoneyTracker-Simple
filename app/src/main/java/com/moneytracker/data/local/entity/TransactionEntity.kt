@@ -21,7 +21,7 @@ data class TransactionEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val date: Long,
-    val profileId: Long = 1,
+    val profileId: Long = 0,
     val amount: Double,
     val type: TransactionType,
     val categoryId: Long,
@@ -32,5 +32,6 @@ data class TransactionEntity(
     val isRecurring: Boolean = false,
     val recurrenceFrequency: RecurrenceFrequency? = null,
     val recurTillDate: Long? = null,
-    val recurCount: Int? = null
+    val recurCount: Int? = null,
+    val isRecurred: Boolean = false
 )

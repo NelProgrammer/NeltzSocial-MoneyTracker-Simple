@@ -10,6 +10,11 @@ data class TransactionWithCategory(
     val sortOrder: Int,
     val subCategory: String = "",
     val detail: String = "",
+    val isRecurring: Boolean = false,
+    val recurrenceFrequency: RecurrenceFrequency? = null,
+    val recurTillDate: Long? = null,
+    val recurCount: Int? = null,
+    val isRecurred: Boolean = false,
     val categoryName: String,
     val categoryIconName: String
 ) {
@@ -22,6 +27,11 @@ data class TransactionWithCategory(
         note = note,
         sortOrder = sortOrder,
         subCategory = subCategory,
-        detail = detail
+        detail = detail,
+        isRecurring = isRecurring,
+        recurrenceFrequency = recurrenceFrequency,
+        recurTillDate = recurTillDate,
+        recurCount = recurCount,
+        isRecurred = isRecurred
     )
 }

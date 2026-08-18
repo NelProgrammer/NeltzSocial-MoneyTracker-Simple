@@ -50,9 +50,9 @@ fun PayMonthFilterHeader(
 
     var dropdownExpanded by remember { mutableStateOf(false) }
 
-    // Generate list of 13 candidate PayMonths (-6 months to +6 months around currentPayMonthDate)
+    // Generate list of candidate PayMonths (-6 months to +12 months around currentPayMonthDate)
     val availablePayMonths = remember(currentPayMonthDate) {
-        (-6..6).map { offset ->
+        (-6..12).map { offset ->
             currentPayMonthDate.plusMonths(offset.toLong())
         }
     }

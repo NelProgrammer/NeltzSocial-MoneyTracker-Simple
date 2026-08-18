@@ -1,5 +1,6 @@
 package com.moneytracker.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,12 +16,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,7 +37,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.moneytracker.ui.components.AppTopBar
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,11 +52,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.TaxiFareEntity
+import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.EmptyState
+import com.moneytracker.ui.components.PayMonthFilterHeader
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
 import com.moneytracker.ui.viewmodel.TaxiFareViewModel
 import com.moneytracker.util.CurrencyUtils
+import com.moneytracker.util.DateUtils
+import com.moneytracker.util.SettingsManager
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +73,7 @@ fun TaxiFareScreen(
     val budgetSummary by viewModel.budgetSummary.collectAsState()
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingRoute by remember { mutableStateOf<TaxiFareEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -70,7 +83,10 @@ fun TaxiFareScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = { 
+                editingRoute = null
+                showAddDialog = true 
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Commute Route")
             }
         }
@@ -82,7 +98,7 @@ fun TaxiFareScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            com.moneytracker.ui.components.PayMonthFilterHeader(
+            PayMonthFilterHeader(
                 selectedPayMonthDate = selectedPayMonthDate,
                 onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
@@ -191,6 +207,10 @@ fun TaxiFareScreen(
                     items(routes, key = { it.id }) { route ->
                         TaxiRouteCard(
                             route = route,
+                            onClick = {
+                                editingRoute = route
+                                showAddDialog = true
+                            },
                             onDelete = { viewModel.deleteRoute(route) }
                         )
                     }
@@ -200,16 +220,31 @@ fun TaxiFareScreen(
     }
 
     if (showAddDialog) {
-        AddTaxiRouteDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { routeName, fare, trips, workDays ->
+        AddEditTaxiRouteDialog(
+            route = editingRoute,
+            selectedPayMonthDate = selectedPayMonthDate,
+            onDismiss = { 
+                showAddDialog = false
+                editingRoute = null
+            },
+            onDelete = if (editingRoute != null) {
+                {
+                    viewModel.deleteRoute(editingRoute!!)
+                    showAddDialog = false
+                    editingRoute = null
+                }
+            } else null,
+            onConfirm = { id, routeName, fare, trips, workDays, startTs ->
                 viewModel.saveRoute(
+                    id = id,
                     routeName = routeName,
                     farePerTrip = fare,
                     tripsPerDay = trips,
-                    workingDaysPerMonth = workDays
+                    workingDaysPerMonth = workDays,
+                    startDate = startTs
                 )
                 showAddDialog = false
+                editingRoute = null
             }
         )
     }
@@ -218,10 +253,13 @@ fun TaxiFareScreen(
 @Composable
 private fun TaxiRouteCard(
     route: TaxiFareEntity,
+    onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -253,6 +291,13 @@ private fun TaxiRouteCard(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 4.dp)
                 )
+                IconButton(onClick = onClick) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Route",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -265,21 +310,90 @@ private fun TaxiRouteCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddTaxiRouteDialog(
+private fun AddEditTaxiRouteDialog(
+    route: TaxiFareEntity?,
+    selectedPayMonthDate: LocalDate,
     onDismiss: () -> Unit,
-    onConfirm: (routeName: String, farePerTrip: Double, tripsPerDay: Int, workingDaysPerMonth: Int) -> Unit
+    onDelete: (() -> Unit)? = null,
+    onConfirm: (id: Long, routeName: String, farePerTrip: Double, tripsPerDay: Int, workingDaysPerMonth: Int, startTs: Long) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var fareInput by remember { mutableStateOf("") }
-    var tripsInput by remember { mutableStateOf("2") }
-    var daysInput by remember { mutableStateOf("20") }
+    val payDateDay = remember { SettingsManager.getPayDateDay() }
+    val currentPayMonth = selectedPayMonthDate
+    val candidateMonths = remember(currentPayMonth) {
+        (-3..12).map { currentPayMonth.plusMonths(it.toLong()) }
+    }
+    var startMonthInput by remember {
+        mutableStateOf(
+            route?.let { DateUtils.toLocalDate(it.date) } ?: currentPayMonth
+        )
+    }
+    var startMonthExpanded by remember { mutableStateOf(false) }
+
+    var name by remember { mutableStateOf(route?.routeName ?: "") }
+    var fareInput by remember { mutableStateOf(if ((route?.farePerTrip ?: 0.0) > 0) route!!.farePerTrip.toString() else "") }
+    var tripsInput by remember { mutableStateOf(route?.tripsPerDay?.toString() ?: "2") }
+    var daysInput by remember { mutableStateOf(route?.workingDaysPerMonth?.toString() ?: "20") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Taxi Route") },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (route == null) "Add Taxi Route" else "Edit Taxi Route",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (route != null && onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Route",
+                            tint = ExpenseColor
+                        )
+                    }
+                }
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Start Month Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = startMonthExpanded,
+                    onExpandedChange = { startMonthExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = DateUtils.formatPayMonth(startMonthInput, payDateDay),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Start Month") },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        singleLine = true
+                    )
+                    DropdownMenu(
+                        expanded = startMonthExpanded,
+                        onDismissRequest = { startMonthExpanded = false }
+                    ) {
+                        candidateMonths.forEach { m ->
+                            DropdownMenuItem(
+                                text = { Text(DateUtils.formatPayMonth(m, payDateDay)) },
+                                onClick = {
+                                    startMonthInput = m
+                                    startMonthExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -319,22 +433,40 @@ private fun AddTaxiRouteDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     val fare = fareInput.toDoubleOrNull() ?: 0.0
                     val trips = tripsInput.toIntOrNull() ?: 2
                     val days = daysInput.toIntOrNull() ?: 20
+                    val startTs = DateUtils.startOfPayMonth(startMonthInput, payDateDay)
                     if (name.isNotBlank() && fare > 0.0) {
-                        onConfirm(name, fare, trips, days)
+                        onConfirm(route?.id ?: 0L, name, fare, trips, days, startTs)
                     }
-                }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("Add")
+                Text(if (route == null) "Add" else "Save")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (route != null && onDelete != null) {
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(contentColor = ExpenseColor)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 2.dp)
+                        )
+                        Text("Delete")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
             }
         }
     )

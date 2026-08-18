@@ -1,5 +1,7 @@
 package com.moneytracker.ui.screens
 
+import java.time.LocalDate
+import com.moneytracker.util.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.moneytracker.data.local.entity.GroceryBudgetItemEntity
 import com.moneytracker.data.local.entity.ShoppingListEntity
@@ -362,7 +365,8 @@ fun GroceriesScreen(
             onDismiss = { viewModel.openShoppingList(null) },
             onToggleItemChecked = { viewModel.toggleShoppingListItemChecked(it) },
             onUpdateActuals = { item, qty, price -> viewModel.updateShoppingListItemActuals(item, qty, price) },
-            onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) }
+            onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) },
+            onReopen = { viewModel.reopenShoppingList(activeShoppingList!!) }
         )
     }
 
@@ -410,8 +414,9 @@ fun GroceriesScreen(
             item = editingItem,
             repository = repository,
             viewModel = viewModel,
+            selectedPayMonthDate = selectedPayMonthDate,
             onDismiss = { showAddEditDialog = false },
-            onSave = { cat, subCat, detail, unitSize, note, qtyB, priceB, isRec ->
+            onSave = { cat, subCat, detail, unitSize, note, qtyB, priceB, isRec, startTs ->
                 viewModel.saveGroceryBudgetItem(
                     id = editingItem?.id ?: 0L,
                     category = cat,
@@ -421,7 +426,8 @@ fun GroceriesScreen(
                     note = note,
                     quantityBudget = qtyB,
                     unitPriceBudget = priceB,
-                    isRecurring = isRec
+                    isRecurring = isRec,
+                    startDate = startTs
                 )
                 showAddEditDialog = false
             }
@@ -540,87 +546,183 @@ private fun BudgetItemRow(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            Checkbox(
-                checked = isSelected,
-                onCheckedChange = { onToggleSelect() }
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.itemDetail.ifBlank { item.subCategory },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+            // Top Row: Checkbox, Title, Recurrence Badge, and Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                        modifier = Modifier.padding(end = 4.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
 
-                    // Recurrence Badge
-                    val (recLabel, recColor) = when (item.isRecurring) {
-                        1 -> "Monthly" to MaterialTheme.colorScheme.primary
-                        2 -> "Planned" to MaterialTheme.colorScheme.tertiary
-                        else -> "Once-off" to MaterialTheme.colorScheme.outline
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = recColor.copy(alpha = 0.15f)
-                    ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.itemDetail.ifBlank { item.subCategory },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            // Recurrence Badge
+                            val (recLabel, recColor) = when (item.isRecurring) {
+                                1 -> "Monthly" to MaterialTheme.colorScheme.primary
+                                2 -> "Planned" to MaterialTheme.colorScheme.tertiary
+                                else -> "Once-off" to MaterialTheme.colorScheme.outline
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = recColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = recLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = recColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
                         Text(
-                            text = recLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = recColor,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = "${item.category} • ${item.subCategory} (${item.unitSize}) • Date: $dateStr",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onEdit) {
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = ExpenseColor)
+                    }
+                }
+            }
+
+            if (item.note.isNotBlank()) {
                 Text(
-                    text = "${item.category} • ${item.subCategory} (${item.unitSize}) • Date: $dateStr",
+                    text = "Note: ${item.note}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 36.dp, bottom = 4.dp)
                 )
+            }
 
-                if (item.note.isNotBlank()) {
-                    Text(
-                        text = "Note: ${item.note}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            Spacer(modifier = Modifier.height(6.dp))
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Budget vs Actual Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+            // Dedicated Horizontal Full-Width Budget vs Actual vs Remaining Stats Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 1. Budget Pill Box
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "Budget: ${item.quantityBudget} x ${CurrencyUtils.formatZar(item.unitPriceBudget)} = ${CurrencyUtils.formatZar(item.costBudget)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Actual: ${item.quantityActual} x ${CurrencyUtils.formatZar(item.unitPriceActual)} = ${CurrencyUtils.formatZar(item.costActual)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (item.costActual > item.costBudget && item.costBudget > 0) ExpenseColor else IncomeColor,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+                        Text(
+                            text = "Budget",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatZar(item.costBudget),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
-            }
 
-            IconButton(onClick = onEdit) {
-                Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = onDelete) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = ExpenseColor)
+                // 2. Actual Pill Box
+                val isOver = item.costActual > item.costBudget && item.costBudget > 0
+                val actualColor = if (isOver) ExpenseColor else IncomeColor
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = actualColor.copy(alpha = 0.1f),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+                        Text(
+                            text = "Actual",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = actualColor
+                        )
+                        Text(
+                            text = "${item.quantityActual} × ${CurrencyUtils.formatZar(item.unitPriceActual)}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatZar(item.costActual),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = actualColor
+                        )
+                    }
+                }
+
+                // 3. Remaining Pill Box
+                val remainingQty = item.quantityBudget - item.quantityActual
+                val remainingCost = item.costBudget - item.costActual
+                val (remainingColor, remainingBg) = when {
+                    remainingQty < 0 || remainingCost < 0 -> ExpenseColor to ExpenseColor.copy(alpha = 0.1f)
+                    remainingQty == 0 -> MaterialTheme.colorScheme.outline to MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    else -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = remainingBg,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+                        Text(
+                            text = "Remaining",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = remainingColor
+                        )
+                        Text(
+                            text = "$remainingQty × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = CurrencyUtils.formatZar(remainingCost),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = remainingColor
+                        )
+                    }
+                }
             }
         }
     }
@@ -632,9 +734,22 @@ private fun AddEditBudgetItemDialog(
     item: GroceryBudgetItemEntity?,
     repository: TransactionRepository,
     viewModel: GroceriesViewModel,
+    selectedPayMonthDate: LocalDate,
     onDismiss: () -> Unit,
-    onSave: (cat: String, subCat: String, detail: String, unitSize: String, note: String, qtyB: Int, priceB: Double, isRec: Int) -> Unit
+    onSave: (cat: String, subCat: String, detail: String, unitSize: String, note: String, qtyB: Int, priceB: Double, isRec: Int, startTs: Long) -> Unit
 ) {
+    val payDateDay = remember { com.moneytracker.util.SettingsManager.getPayDateDay() }
+    val currentPayMonth = selectedPayMonthDate
+    val candidateMonths = remember(currentPayMonth) {
+        (-3..12).map { currentPayMonth.plusMonths(it.toLong()) }
+    }
+    var startMonthInput by remember {
+        mutableStateOf(
+            item?.let { com.moneytracker.util.DateUtils.toLocalDate(it.date) } ?: currentPayMonth
+        )
+    }
+    var startMonthExpanded by remember { mutableStateOf(false) }
+
     val initialMeasureValue = remember(item) {
         if (item == null || item.unitSize.isBlank()) ""
         else {
@@ -686,10 +801,38 @@ private fun AddEditBudgetItemDialog(
         val defaultSubs = listOf("Maize Meal", "Rice", "Bread", "Fizzy Drink", "Milk", "Beef", "Chicken", "Pork", "Sausage", "Cheese", "Butter")
         (defaultSubs + dbSubCategories.map { it.name }).distinct()
     }
+    var showDuplicateDialog by remember { mutableStateOf<GroceryBudgetItemEntity?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (item == null) "Add Grocery Budget Item" else "Edit Grocery Budget Item") },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (item == null) "Add Grocery Budget Item" else "Edit Grocery Budget Item",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (item != null) {
+                    IconButton(
+                        onClick = {
+                            viewModel.deleteGroceryBudgetItem(item)
+                            onDismiss()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Item",
+                            tint = ExpenseColor
+                        )
+                    }
+                }
+            }
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -697,6 +840,38 @@ private fun AddEditBudgetItemDialog(
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Start Month Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = startMonthExpanded,
+                    onExpandedChange = { startMonthExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = com.moneytracker.util.DateUtils.formatPayMonth(startMonthInput, payDateDay),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Start Month") },
+                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        singleLine = true
+                    )
+                    DropdownMenu(
+                        expanded = startMonthExpanded,
+                        onDismissRequest = { startMonthExpanded = false }
+                    ) {
+                        candidateMonths.forEach { m ->
+                            DropdownMenuItem(
+                                text = { Text(com.moneytracker.util.DateUtils.formatPayMonth(m, payDateDay)) },
+                                onClick = {
+                                    startMonthInput = m
+                                    startMonthExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 // Category Editable Dropdown
                 ExposedDropdownMenuBox(
                     expanded = catExpanded,
@@ -759,37 +934,30 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // Item Detail Editable Dropdown
+                // Item Detail (Free text)
                 OutlinedTextField(
                     value = itemDetailInput,
                     onValueChange = { itemDetailInput = it },
-                    label = { Text("Item Detail (e.g., White Star, Coca-Cola)") },
+                    label = { Text("Detail / Item Name (e.g., White Rice 2kg)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Split Unit Size Section: (1) Measure Value Input Box + (2) SA Unit Measure Dropdown with CRUD Button
-                Text(
-                    text = "Unit Size & Measure",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Split Unit Size: Numeric Measure Value + Unit Measure Dropdown
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Measure Value Input (e.g., 500 for 500g, 2.5 for 2.5kg, 12 for 12s)
                     OutlinedTextField(
                         value = measureValueInput,
-                        onValueChange = { measureValueInput = it.filter { c -> c.isDigit() || c == '.' } },
-                        label = { Text("Measure (500, 2.5)") },
-                        singleLine = true,
+                        onValueChange = { measureValueInput = it },
+                        label = { Text("Measure (e.g. 500)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1.1f)
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
                     )
 
-                    // SA Unit Measure Dropdown (kg, g, Lit, mL, Bag, Pocket, 6s, 12s, 30s, etc.)
                     ExposedDropdownMenuBox(
                         expanded = unitMeasureExpanded,
                         onExpandedChange = { unitMeasureExpanded = it },
@@ -798,7 +966,7 @@ private fun AddEditBudgetItemDialog(
                         OutlinedTextField(
                             value = unitMeasureInput,
                             onValueChange = { unitMeasureInput = it },
-                            label = { Text("Unit (Kg, g, Lit, 12s)") },
+                            label = { Text("Unit") },
                             trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -809,55 +977,55 @@ private fun AddEditBudgetItemDialog(
                             expanded = unitMeasureExpanded,
                             onDismissRequest = { unitMeasureExpanded = false }
                         ) {
-                            unitSizes.forEach { u ->
+                            unitSizes.forEach { sizeEntity ->
                                 DropdownMenuItem(
-                                    text = { Text(u.name) },
+                                    text = { Text(sizeEntity.name) },
                                     onClick = {
-                                        unitMeasureInput = u.name
+                                        unitMeasureInput = sizeEntity.name
                                         unitMeasureExpanded = false
                                     }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("+ Manage Units...", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    unitMeasureExpanded = false
+                                    showUnitSizeCrudDialog = true
+                                }
+                            )
                         }
-                    }
-
-                    IconButton(onClick = { showUnitSizeCrudDialog = true }) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Manage Unit Measures")
                     }
                 }
 
-                // Note Field
+                // Note Field (Optional)
                 OutlinedTextField(
                     value = noteInput,
                     onValueChange = { noteInput = it },
-                    label = { Text("Note (optional)") },
+                    label = { Text("Note (Optional, e.g., brand, store)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Budget Quantity & Unit Price Plain Numeric Inputs
+                // Budget Quantity & Unit Price
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = qtyBudgetInput,
-                        onValueChange = { qtyBudgetInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("Budget Qty") },
-                        singleLine = true,
+                        onValueChange = { qtyBudgetInput = it },
+                        label = { Text("Qty (Budget)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
-
-                    // Plain numeric input field without 'R' inside field
                     OutlinedTextField(
                         value = unitPriceBudgetInput,
-                        onValueChange = { unitPriceBudgetInput = it.filter { c -> c.isDigit() || c == '.' } },
-                        label = { Text("Budget Unit Price") },
-                        prefix = { Text("R ") },
-                        singleLine = true,
+                        onValueChange = { unitPriceBudgetInput = it },
+                        label = { Text("Price (R)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1.3f)
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
@@ -892,23 +1060,36 @@ private fun AddEditBudgetItemDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val qty = qtyBudgetInput.toIntOrNull() ?: 1
-                    val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
-                    val computedUnitSize = if (measureValueInput.isBlank()) {
-                        unitMeasureInput.trim()
-                    } else {
-                        "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
-                    }
-                    onSave(
-                        categoryInput,
-                        subCategoryInput,
-                        itemDetailInput,
-                        computedUnitSize,
-                        noteInput,
-                        qty,
-                        price,
-                        isRecurringInput
+                    val duplicate = viewModel.findDuplicateItem(
+                        category = categoryInput,
+                        subCategory = subCategoryInput,
+                        itemDetail = itemDetailInput,
+                        excludeId = item?.id ?: 0L
                     )
+
+                    if (duplicate != null) {
+                        showDuplicateDialog = duplicate
+                    } else {
+                        val qty = qtyBudgetInput.toIntOrNull() ?: 1
+                        val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                        val computedUnitSize = if (measureValueInput.isBlank()) {
+                            unitMeasureInput.trim()
+                        } else {
+                            "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                        }
+                        val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                        onSave(
+                            categoryInput,
+                            subCategoryInput,
+                            itemDetailInput,
+                            computedUnitSize,
+                            noteInput,
+                            qty,
+                            price,
+                            isRecurringInput,
+                            startTs
+                        )
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
@@ -916,11 +1097,145 @@ private fun AddEditBudgetItemDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (item != null) {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteGroceryBudgetItem(item)
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = ExpenseColor)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 2.dp)
+                        )
+                        Text("Delete")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
             }
         }
     )
+
+    // Duplicate Capture Confirmation Dialog
+    if (showDuplicateDialog != null) {
+        val duplicate = showDuplicateDialog!!
+        var duplicateNoteError by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = {
+                showDuplicateDialog = null
+                duplicateNoteError = false
+            },
+            title = { Text("Duplicate Item Detected") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "An item for '${categoryInput.ifBlank { "Groceries" }} > ${subCategoryInput.ifBlank { "General" }} > ${itemDetailInput.ifBlank { subCategoryInput }}' already exists in this month's budget.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Are you updating the existing item's amount or recurrence, or creating a new separate entry?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (duplicateNoteError) {
+                        Text(
+                            text = "⚠️ To create a new entry with the same item name, please enter a Note to differentiate it (e.g., brand, flavor, or store).",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExpenseColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                // "Yes, Update Existing"
+                Button(
+                    onClick = {
+                        val qty = qtyBudgetInput.toIntOrNull() ?: 1
+                        val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                        val computedUnitSize = if (measureValueInput.isBlank()) {
+                            unitMeasureInput.trim()
+                        } else {
+                            "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                        }
+                        val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                        viewModel.saveGroceryBudgetItem(
+                            id = duplicate.id,
+                            category = categoryInput,
+                            subCategory = subCategoryInput,
+                            itemDetail = itemDetailInput,
+                            unitSize = computedUnitSize,
+                            note = noteInput,
+                            quantityBudget = qty,
+                            unitPriceBudget = price,
+                            isRecurring = isRecurringInput,
+                            startDate = startTs,
+                            isUpdatingExisting = true
+                        )
+                        showDuplicateDialog = null
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Yes, Update Existing")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // "No, Create New Entry"
+                    TextButton(
+                        onClick = {
+                            if (noteInput.isBlank()) {
+                                duplicateNoteError = true
+                            } else {
+                                val qty = qtyBudgetInput.toIntOrNull() ?: 1
+                                val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                                val computedUnitSize = if (measureValueInput.isBlank()) {
+                                  unitMeasureInput.trim()
+                                } else {
+                                  "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                                }
+                                val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                                viewModel.saveGroceryBudgetItem(
+                                    id = 0L,
+                                    category = categoryInput,
+                                    subCategory = subCategoryInput,
+                                    itemDetail = itemDetailInput,
+                                    unitSize = computedUnitSize,
+                                    note = noteInput,
+                                    quantityBudget = qty,
+                                    unitPriceBudget = price,
+                                    isRecurring = isRecurringInput,
+                                    startDate = startTs,
+                                    isUpdatingExisting = false
+                                )
+                                showDuplicateDialog = null
+                                onDismiss()
+                            }
+                        }
+                    ) {
+                        Text("No, Create New Entry")
+                    }
+
+                    TextButton(
+                        onClick = {
+                            showDuplicateDialog = null
+                            duplicateNoteError = false
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        )
+    }
 
     // Unit Size CRUD Management Sub-Dialog
     if (showUnitSizeCrudDialog) {

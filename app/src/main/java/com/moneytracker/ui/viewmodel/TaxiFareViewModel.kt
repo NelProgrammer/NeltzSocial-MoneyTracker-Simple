@@ -74,18 +74,21 @@ class TaxiFareViewModel(
         routeName: String,
         farePerTrip: Double,
         tripsPerDay: Int,
-        workingDaysPerMonth: Int
+        workingDaysPerMonth: Int,
+        startDate: Long? = null
     ) {
         viewModelScope.launch {
+            val startTs = startDate ?: DateUtils.toEpochMillis(_selectedPayMonthDate.value)
             val monthlyTotal = farePerTrip * tripsPerDay * workingDaysPerMonth
             val fareEntity = TaxiFareEntity(
                 id = id,
-                routeName = routeName,
+                profileId = repository.activeProfileId,
+                routeName = routeName.trim(),
                 farePerTrip = farePerTrip,
                 tripsPerDay = tripsPerDay,
                 workingDaysPerMonth = workingDaysPerMonth,
                 monthlyTotal = monthlyTotal,
-                date = System.currentTimeMillis()
+                date = startTs
             )
             repository.saveTaxiFare(fareEntity)
         }

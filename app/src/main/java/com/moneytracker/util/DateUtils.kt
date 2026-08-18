@@ -88,4 +88,12 @@ object DateUtils {
 
     fun formatDate(epochMillis: Long): String =
         displayFormatter.format(toLocalDate(epochMillis))
+
+    private val payMonthFormatter = DateTimeFormatter.ofPattern("MMM yyyy")
+
+    fun formatPayMonth(date: LocalDate, payDateDay: Int = SettingsManager.getPayDateDay()): String =
+        "${date.format(payMonthFormatter)} (${payDateDay}th)"
+
+    fun formatMonth(date: LocalDate): String =
+        date.format(payMonthFormatter)
 }

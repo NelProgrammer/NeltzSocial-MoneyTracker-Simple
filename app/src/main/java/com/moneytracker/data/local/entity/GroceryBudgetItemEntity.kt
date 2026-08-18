@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 data class GroceryBudgetItemEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val profileId: Long = 1,
+    val profileId: Long = 0,
     val date: Long, // Epoch timestamp millis for human readability
     val category: String = "Starch",
     val subCategory: String = "Rice",

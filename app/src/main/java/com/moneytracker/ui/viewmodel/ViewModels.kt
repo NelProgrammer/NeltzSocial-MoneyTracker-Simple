@@ -99,22 +99,25 @@ class DashboardViewModel(
 
     fun setPayMonth(date: LocalDate) {
         _selectedPayMonthDate.value = date
+        viewModelScope.launch {
+            com.moneytracker.util.RecurringTransactionManager.processRecurringTransactions(repository)
+        }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val payMonthTransactions = _selectedPayMonthDate.flatMapLatest { date ->
-        val startMillis = DateUtils.toEpochMillis(date)
-        val nextMonthDate = date.plusMonths(1)
-        val endMillis = DateUtils.toEpochMillis(nextMonthDate) - 1
+        val startMillis = DateUtils.startOfPayMonth(date, payDateDay)
+        val endMillis = DateUtils.startOfNextPayMonth(date, payDateDay)
         repository.observeTransactionsForMonth(startMillis, endMillis)
     }
 
     val summary: StateFlow<MonthlySummary> = payMonthTransactions
         .map { list ->
-            val incomeTotal = list.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
-            val investTotal = list.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
-            val eduTotal = list.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
-            val expenseTotal = list.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
+            val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+            val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+            val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
+            val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
+            val expenseTotal = active.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
             MonthlySummary(
                 income = incomeTotal,
                 investment = investTotal,
@@ -127,15 +130,17 @@ class DashboardViewModel(
 
     val subCategorySummaries: StateFlow<List<SubCategorySummary>> = payMonthTransactions
         .map { list ->
-            val incomeTotal = list.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
-            val investTotal = list.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
-            val eduTotal = list.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
-            val expenseTotal = list.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
+            val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+            val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+            val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
+            val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
+            val expenseTotal = active.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
 
             list.groupBy { it.categoryId }
                 .map { (catId, txns) ->
                     val first = txns.first()
-                    val total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    val activeForCat = txns.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+                    val total = activeForCat.sumOf { kotlin.math.abs(it.amount) }
                     val typeTotal = when (first.type) {
                         TransactionType.INCOME -> incomeTotal
                         TransactionType.INVESTMENT -> investTotal
@@ -168,7 +173,7 @@ class DashboardViewModel(
 
     val incomeBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
         .map { list ->
-            list.filter { it.type == TransactionType.INCOME }
+            list.filter { it.type == TransactionType.INCOME && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
                 .groupBy { it.subCategory.ifBlank { it.categoryName } }
                 .map { (subCatName, txns) ->
                     CategorySummary(
@@ -181,14 +186,113 @@ class DashboardViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val incomeDetailBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.INCOME && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+                .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                .map { (detailName, txns) ->
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = detailName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // 2nd Pie: Income Funding / Utilization (How Income is Used & Remaining Balance)
+    val incomeUsageBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+            val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+            val expenseTotal = active.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
+            val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
+            val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
+            val totalOutflows = expenseTotal + investTotal + eduTotal
+            val hasDeficit = totalOutflows > incomeTotal
+
+            val items = mutableListOf<CategorySummary>()
+            if (expenseTotal > 0) {
+                items.add(CategorySummary(101L, "Expenses", expenseTotal, isDebtFunding = hasDeficit, customColorHex = 0xFFD32F2F))
+            }
+            if (investTotal > 0) {
+                items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
+            }
+            if (eduTotal > 0) {
+                items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
+            }
+
+            if (incomeTotal > totalOutflows) {
+                val remaining = incomeTotal - totalOutflows
+                items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
+            }
+            items
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val incomeUsageDetailBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+            val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+            val totalOutflows = active.filter { it.type != TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+
+            val outflowDetails = active.filter { it.type != TransactionType.INCOME }
+                .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                .map { (detailName, txns) ->
+                    val type = txns.first().type
+                    val hex = when (type) {
+                        TransactionType.INVESTMENT -> 0xFF1976D2
+                        TransactionType.EDUCATION -> 0xFF7B1FA2
+                        else -> 0xFFD32F2F
+                    }
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = detailName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) },
+                        customColorHex = hex
+                    )
+                }
+                .sortedByDescending { it.total }
+
+            var runningOutflow = 0.0
+            val items = outflowDetails.map { detail ->
+                runningOutflow += detail.total
+                val needsDebt = runningOutflow > incomeTotal
+                detail.copy(isDebtFunding = needsDebt)
+            }.toMutableList()
+
+            if (incomeTotal > totalOutflows) {
+                val remaining = incomeTotal - totalOutflows
+                items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
+            }
+            items
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val investmentBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
         .map { list ->
-            list.filter { it.type == TransactionType.INVESTMENT }
+            list.filter { it.type == TransactionType.INVESTMENT && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
                 .groupBy { it.subCategory.ifBlank { it.categoryName } }
                 .map { (subCatName, txns) ->
                     CategorySummary(
                         categoryId = txns.first().categoryId,
                         categoryName = subCatName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val investmentDetailBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.INVESTMENT && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+                .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                .map { (detailName, txns) ->
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = detailName,
                         total = txns.sumOf { kotlin.math.abs(it.amount) }
                     )
                 }
@@ -198,7 +302,7 @@ class DashboardViewModel(
 
     val educationBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
         .map { list ->
-            list.filter { it.type == TransactionType.EDUCATION }
+            list.filter { it.type == TransactionType.EDUCATION && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
                 .groupBy { it.subCategory.ifBlank { it.categoryName } }
                 .map { (subCatName, txns) ->
                     CategorySummary(
@@ -211,14 +315,44 @@ class DashboardViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val educationDetailBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.EDUCATION && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+                .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                .map { (detailName, txns) ->
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = detailName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val expenseBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
         .map { list ->
-            list.filter { it.type == TransactionType.EXPENSE }
+            list.filter { it.type == TransactionType.EXPENSE && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
                 .groupBy { it.subCategory.ifBlank { it.categoryName } }
                 .map { (subCatName, txns) ->
                     CategorySummary(
                         categoryId = txns.first().categoryId,
                         categoryName = subCatName,
+                        total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    )
+                }
+                .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val expenseDetailBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
+        .map { list ->
+            list.filter { it.type == TransactionType.EXPENSE && it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
+                .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                .map { (detailName, txns) ->
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = detailName,
                         total = txns.sumOf { kotlin.math.abs(it.amount) }
                     )
                 }
@@ -300,6 +434,9 @@ class TransactionsViewModel(
 
     fun setPayMonth(date: LocalDate) {
         _selectedPayMonthDate.value = date
+        viewModelScope.launch {
+            com.moneytracker.util.RecurringTransactionManager.processRecurringTransactions(repository)
+        }
     }
 
     private val _filterType = MutableStateFlow<TransactionType?>(null)
@@ -357,8 +494,8 @@ class TransactionsViewModel(
         _secondarySorts,
         _selectedPayMonthDate
     ) { list, type, secondarySorts, monthDate ->
-        val startMillis = DateUtils.toEpochMillis(monthDate)
-        val endMillis = DateUtils.toEpochMillis(monthDate.plusMonths(1)) - 1
+        val startMillis = DateUtils.startOfPayMonth(monthDate, payDateDay)
+        val endMillis = DateUtils.startOfNextPayMonth(monthDate, payDateDay) - 1
         val monthFiltered = list.filter { it.date in startMillis..endMillis }
         val filtered = if (type == null) monthFiltered else monthFiltered.filter { it.type == type }
         filtered.sortedWith(buildTransactionComparator(secondarySorts))
@@ -418,8 +555,10 @@ class AddEditViewModel(
                 val transaction = repository.getTransaction(transactionId)
                 if (transaction != null) {
                     existingSortOrder = transaction.sortOrder
+                    val absAmt = kotlin.math.abs(transaction.amount)
+                    val formattedAmt = if (absAmt == absAmt.toLong().toDouble()) absAmt.toLong().toString() else absAmt.toString()
                     _uiState.value = _uiState.value.copy(
-                        amount = transaction.amount.toString(),
+                        amount = formattedAmt,
                         type = transaction.type,
                         categoryId = transaction.categoryId,
                         date = DateUtils.toLocalDate(transaction.date),
@@ -461,8 +600,9 @@ class AddEditViewModel(
     }
 
     fun updateAmount(value: String) {
-        if (value.isEmpty() || value.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
-            _uiState.value = _uiState.value.copy(amount = value, errorMessage = null)
+        val cleanValue = value.replace("+", "").replace("-", "").trim()
+        if (cleanValue.isEmpty() || cleanValue.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
+            _uiState.value = _uiState.value.copy(amount = cleanValue, errorMessage = null)
         }
     }
 
@@ -562,11 +702,15 @@ class AddEditViewModel(
             }
         }
 
+        val absAmount = kotlin.math.abs(amount)
+        val isContinuous = state.recurrenceFrequency == RecurrenceFrequency.CONTINUOUS
+        val isPlanFuture = state.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE
+
         viewModelScope.launch {
             _uiState.value = state.copy(isSaving = true, errorMessage = null)
             val entityToSave = TransactionEntity(
                 id = transactionId ?: 0L,
-                amount = amount,
+                amount = absAmount,
                 type = state.type,
                 categoryId = categoryId,
                 date = DateUtils.toEpochMillis(state.date),
@@ -576,8 +720,9 @@ class AddEditViewModel(
                 detail = state.detail.trim(),
                 isRecurring = state.isRecurring,
                 recurrenceFrequency = if (state.isRecurring) state.recurrenceFrequency else null,
-                recurTillDate = if (state.isRecurring && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
-                recurCount = if (state.isRecurring) state.recurCount.toIntOrNull() else null
+                recurTillDate = if (state.isRecurring && !isContinuous && !isPlanFuture && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
+                recurCount = if (state.isRecurring && !isContinuous && !isPlanFuture) state.recurCount.toIntOrNull() else null,
+                isRecurred = false
             )
             val savedId = repository.saveTransaction(entityToSave)
             val savedEntity = entityToSave.copy(id = if (entityToSave.id == 0L) savedId else entityToSave.id)
@@ -592,6 +737,19 @@ class AddEditViewModel(
             val sorted = all.sortedWith(buildTransactionComparator(emptyList()))
             repository.reorderTransactions(sorted.map { it.id })
 
+            _uiState.value = _uiState.value.copy(isSaving = false)
+            onSuccess()
+        }
+    }
+
+    fun delete(onSuccess: () -> Unit) {
+        if (transactionId == null || transactionId == 0L) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSaving = true)
+            val transaction = repository.getTransaction(transactionId)
+            if (transaction != null) {
+                repository.deleteTransaction(transaction)
+            }
             _uiState.value = _uiState.value.copy(isSaving = false)
             onSuccess()
         }
@@ -664,6 +822,14 @@ class SettingsViewModel : ViewModel() {
 
     fun updateIsRyuHidden(hidden: Boolean) {
         com.moneytracker.util.SettingsManager.updateIsRyuHidden(hidden)
+    }
+
+    fun updateThemePalette(palette: com.moneytracker.util.AppThemePalette) {
+        com.moneytracker.util.SettingsManager.updateThemePalette(palette)
+    }
+
+    fun updateThemeMode(mode: com.moneytracker.util.AppThemeMode) {
+        com.moneytracker.util.SettingsManager.updateThemeMode(mode)
     }
 }
 
