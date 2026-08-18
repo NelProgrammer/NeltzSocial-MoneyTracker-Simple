@@ -2,8 +2,10 @@ package com.moneytracker.ui.screens
 
 import java.time.LocalDate
 import com.moneytracker.util.DateUtils
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +15,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -287,29 +292,20 @@ fun GroceriesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     grouped.forEach { (category, items) ->
-                        item {
-                            Text(
-                                text = category.uppercase(),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-
-                        items(items, key = { it.id }) { item ->
-                            BudgetItemRow(
-                                item = item,
-                                isSelected = selectedIds.contains(item.id),
-                                onToggleSelect = { viewModel.toggleBudgetItemSelection(item.id) },
+                        item(key = "category_$category") {
+                            GroceryCategoryTable(
+                                category = category,
+                                items = items,
+                                selectedIds = selectedIds,
+                                onToggleSelect = { viewModel.toggleBudgetItemSelection(it) },
                                 onEdit = {
-                                    editingItem = item
+                                    editingItem = it
                                     showAddEditDialog = true
                                 },
-                                onDelete = { viewModel.deleteGroceryBudgetItem(item) }
+                                onDelete = { viewModel.deleteGroceryBudgetItem(it) }
                             )
                         }
                     }
@@ -527,204 +523,432 @@ private fun ShoppingListsDropdownSection(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BudgetItemRow(
+private fun GroceryCategoryTable(
+    category: String,
+    items: List<GroceryBudgetItemEntity>,
+    selectedIds: Set<Long>,
+    onToggleSelect: (Long) -> Unit,
+    onEdit: (GroceryBudgetItemEntity) -> Unit,
+    onDelete: (GroceryBudgetItemEntity) -> Unit
+) {
+    val categoryBudgetTotal = remember(items) { items.sumOf { it.costBudget } }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Category Header Banner
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = category.uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = "${items.size}",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Budget: ${CurrencyUtils.formatZar(categoryBudgetTotal)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Table Column Headers: Select | Item | Budget | Actual | Remain
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 1. Select Column
+                Box(
+                    modifier = Modifier.width(36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✓",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 2. Item Column
+                Text(
+                    text = "Item",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1.3f)
+                )
+
+                // 3. Budget Column
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "Budget",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.End
+                    )
+                    Text(
+                        text = "Qty×Unit | Cost",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.End
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // 4. Actual Column
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "Actual",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.End
+                    )
+                    Text(
+                        text = "Qty×Unit | Cost",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.End
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // 5. Remain Column
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "Remain",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.secondary,
+                        textAlign = TextAlign.End
+                    )
+                    Text(
+                        text = "Qty×Unit | Cost",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.End
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // Table Rows
+            items.forEachIndexed { index, item ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
+                }
+                GroceryItemTableRow(
+                    item = item,
+                    isSelected = selectedIds.contains(item.id),
+                    onToggleSelect = { onToggleSelect(item.id) },
+                    onEdit = { onEdit(item) },
+                    onDelete = { onDelete(item) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroceryItemTableRow(
     item: GroceryBudgetItemEntity,
     isSelected: Boolean,
     onToggleSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
-    val dateStr = remember(item.date) { dateFormat.format(Date(item.date)) }
+    var showActionDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                else Color.Transparent
+            )
+            .combinedClickable(
+                onClick = onToggleSelect,
+                onDoubleClick = onEdit,
+                onLongClick = { showActionDialog = true }
+            )
+            .padding(horizontal = 6.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // 1. Dedicated Select Column
+        Box(
+            modifier = Modifier.width(36.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggleSelect() },
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        // 2. Item Column (Title, Subcategory/Unit, Recurrence badge, Note)
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+                .weight(1.3f)
+                .padding(end = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
-            // Top Row: Checkbox, Title, Recurrence Badge, and Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+            Text(
+                text = item.itemDetail.ifBlank { item.subCategory },
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.5.sp),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${item.subCategory}${if (item.unitSize.isNotBlank()) " (${item.unitSize})" else ""}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
-                ) {
-                    Checkbox(
-                        checked = isSelected,
-                        onCheckedChange = { onToggleSelect() },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
+                )
 
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = item.itemDetail.ifBlank { item.subCategory },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
-                            // Recurrence Badge
-                            val (recLabel, recColor) = when (item.isRecurring) {
-                                1 -> "Monthly" to MaterialTheme.colorScheme.primary
-                                2 -> "Planned" to MaterialTheme.colorScheme.tertiary
-                                else -> "Once-off" to MaterialTheme.colorScheme.outline
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = recColor.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = recLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = recColor,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "${item.category} • ${item.subCategory} (${item.unitSize}) • Date: $dateStr",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                // Recurrence tag
+                val (recLabel, recColor) = when (item.isRecurring) {
+                    1 -> "M" to MaterialTheme.colorScheme.primary
+                    2 -> "P" to MaterialTheme.colorScheme.tertiary
+                    else -> "1x" to MaterialTheme.colorScheme.outline
                 }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onEdit) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = ExpenseColor)
-                    }
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = recColor.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = recLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                        color = recColor,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                    )
                 }
             }
 
             if (item.note.isNotBlank()) {
                 Text(
-                    text = "Note: ${item.note}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 36.dp, bottom = 4.dp)
+                    text = item.note,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.height(6.dp))
+        // 3. Budget Column (Qty × Unit Price -> Total Cost)
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = "${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+            Text(
+                text = CurrencyUtils.formatZar(item.costBudget),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
 
-            // Dedicated Horizontal Full-Width Budget vs Actual vs Remaining Stats Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. Budget Pill Box
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    modifier = Modifier.weight(1f)
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // 4. Actual Column (Qty × Unit Price -> Total Cost)
+        val isOver = item.costActual > item.costBudget && item.costBudget > 0
+        val actualColor = if (isOver) ExpenseColor else IncomeColor
+
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = "${item.quantityActual} × ${CurrencyUtils.formatZar(item.unitPriceActual)}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+            Text(
+                text = CurrencyUtils.formatZar(item.costActual),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                fontWeight = FontWeight.Bold,
+                color = actualColor,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // 5. Remain Column (Qty × Unit Price -> Remaining Cost)
+        val remainingQty = item.quantityBudget - item.quantityActual
+        val remainingCost = item.costBudget - item.costActual
+        val remainColor = when {
+            remainingQty < 0 || remainingCost < 0 -> ExpenseColor
+            remainingQty == 0 -> MaterialTheme.colorScheme.outline
+            else -> MaterialTheme.colorScheme.secondary
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = "$remainingQty × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+            Text(
+                text = CurrencyUtils.formatZar(remainingCost),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                fontWeight = FontWeight.Bold,
+                color = remainColor,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        }
+    }
+
+    // Long Press Action Dialog
+    if (showActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showActionDialog = false },
+            title = {
+                Text(
+                    text = item.itemDetail.ifBlank { item.subCategory },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Category: ${item.category} • ${item.subCategory} (${item.unitSize})",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Budget: ${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)} = ${CurrencyUtils.formatZar(item.costBudget)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "Actual: ${item.quantityActual} × ${CurrencyUtils.formatZar(item.unitPriceActual)} = ${CurrencyUtils.formatZar(item.costActual)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showActionDialog = false
+                        onEdit()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-                        Text(
-                            text = "Budget",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = CurrencyUtils.formatZar(item.costBudget),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                    Text("Edit Item")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showActionDialog = false }) {
+                        Text("Cancel")
                     }
-                }
-
-                // 2. Actual Pill Box
-                val isOver = item.costActual > item.costBudget && item.costBudget > 0
-                val actualColor = if (isOver) ExpenseColor else IncomeColor
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = actualColor.copy(alpha = 0.1f),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-                        Text(
-                            text = "Actual",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = actualColor
-                        )
-                        Text(
-                            text = "${item.quantityActual} × ${CurrencyUtils.formatZar(item.unitPriceActual)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = CurrencyUtils.formatZar(item.costActual),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = actualColor
-                        )
-                    }
-                }
-
-                // 3. Remaining Pill Box
-                val remainingQty = item.quantityBudget - item.quantityActual
-                val remainingCost = item.costBudget - item.costActual
-                val (remainingColor, remainingBg) = when {
-                    remainingQty < 0 || remainingCost < 0 -> ExpenseColor to ExpenseColor.copy(alpha = 0.1f)
-                    remainingQty == 0 -> MaterialTheme.colorScheme.outline to MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    else -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = remainingBg,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-                        Text(
-                            text = "Remaining",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = remainingColor
-                        )
-                        Text(
-                            text = "$remainingQty × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = CurrencyUtils.formatZar(remainingCost),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = remainingColor
-                        )
+                    Button(
+                        onClick = {
+                            showActionDialog = false
+                            showDeleteConfirmDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ExpenseColor)
+                    ) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Delete")
                     }
                 }
             }
-        }
+        )
+    }
+
+    // Delete Confirmation Dialog
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("Delete Item?") },
+            text = { Text("Are you sure you want to delete '${item.itemDetail.ifBlank { item.subCategory }}'?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ExpenseColor)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

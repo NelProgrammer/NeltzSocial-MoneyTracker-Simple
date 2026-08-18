@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.CategoryPieChartCard
+import com.moneytracker.ui.components.DualIncomePieChartCard
 import com.moneytracker.ui.components.PayMonthFilterHeader
 import com.moneytracker.ui.theme.EducationColor
 import com.moneytracker.ui.theme.ExpenseColor
@@ -120,29 +121,19 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. Income Sources Pie Chart (Where Income Comes From)
-            item {
-                CategoryPieChartCard(
-                    title = "Income Sources (Where Money Comes From)",
-                    summaries = incomeBreakdown,
-                    detailSummaries = incomeDetailBreakdown,
-                    totalAmount = summary.income,
-                    baseColor = IncomeColor,
-                    emptyMessage = "No income recorded for this pay period."
-                )
-            }
-
-            // 5. 2nd Pie: Income Funding & Utilization (How Income is Used & Remaining Balance)
+            // 4. Combined Income Overview (Income Sources and Utilization)
             item {
                 val totalOutflows = summary.expense + summary.investment + summary.education
                 val usageTotal = if (summary.income > 0) maxOf(summary.income, totalOutflows) else totalOutflows
-                CategoryPieChartCard(
-                    title = "Income Funding & Utilization",
-                    summaries = incomeUsageBreakdown,
-                    detailSummaries = incomeUsageDetailBreakdown,
-                    totalAmount = usageTotal,
-                    baseColor = IncomeColor,
-                    emptyMessage = "No income or outflows recorded for this pay period."
+                DualIncomePieChartCard(
+                    title = "Income Sources and Utilization",
+                    sourceSummaries = incomeBreakdown,
+                    sourceDetailSummaries = incomeDetailBreakdown,
+                    sourceTotal = summary.income,
+                    usageSummaries = incomeUsageBreakdown,
+                    usageDetailSummaries = incomeUsageDetailBreakdown,
+                    usageTotal = usageTotal,
+                    baseColor = IncomeColor
                 )
             }
 

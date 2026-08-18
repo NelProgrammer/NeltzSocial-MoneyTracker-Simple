@@ -203,7 +203,8 @@ fun ShoppingListScreen(
             onDismiss = { viewModel.openShoppingList(null) },
             onToggleItemChecked = { viewModel.toggleShoppingListItemChecked(it) },
             onUpdateActuals = { item, qty, price -> viewModel.updateShoppingListItemActuals(item, qty, price) },
-            onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) }
+            onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) },
+            onReopen = { viewModel.reopenShoppingList(activeShoppingList!!) }
         )
     }
 }

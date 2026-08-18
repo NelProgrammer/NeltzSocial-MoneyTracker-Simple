@@ -245,7 +245,6 @@ fun ShoppingListPopupDialog(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("This will update actual quantities and prices back into your Monthly Grocery Budget for ticked items ($checkedItemsCount items, total ${CurrencyUtils.formatZar(totalActualSpent)}).")
-                    Text("Unchecked items will be removed from this list.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

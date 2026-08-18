@@ -513,8 +513,6 @@ class TransactionRepository(
             }
         }
 
-        sItemDao.deleteUncheckedItems(shoppingListId)
-
         sListDao.update(
             shoppingList.copy(
                 status = "CLOSED",
