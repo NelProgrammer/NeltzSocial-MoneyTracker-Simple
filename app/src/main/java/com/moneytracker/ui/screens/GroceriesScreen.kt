@@ -79,10 +79,7 @@ import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.ShoppingListPopupDialog
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
-import com.moneytracker.ui.viewmodel.CategoriesViewModel
 import com.moneytracker.ui.viewmodel.GroceriesViewModel
-import com.moneytracker.ui.viewmodel.SubCategoriesViewModel
-import com.moneytracker.ui.viewmodel.ViewModelFactory
 import com.moneytracker.util.CurrencyUtils
 import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
@@ -713,56 +710,62 @@ private fun UnifiedGroceryItemTableRow(
             }
         }
 
-        // 3. Item Column (Title, Subcategory/Unit, Recurrence badge, Note)
+        // 3. Item Column (Subcategory, Name & Unit Size, Recurrence badge, Note)
         Column(
             modifier = Modifier
                 .weight(1.2f)
                 .padding(end = 4.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
+            // 1. Subcategory
             Text(
-                text = item.itemDetail.ifBlank { item.subCategory },
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                text = item.subCategory,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 2. Name & Unit Size
+            val nameAndUnit = if (item.itemDetail.isNotBlank()) {
+                if (item.unitSize.isNotBlank()) "${item.itemDetail} (${item.unitSize})" else item.itemDetail
+            } else {
+                if (item.unitSize.isNotBlank()) "(${item.unitSize})" else ""
+            }
+            if (nameAndUnit.isNotBlank()) {
                 Text(
-                    text = "${item.subCategory}${if (item.unitSize.isNotBlank()) " (${item.unitSize})" else ""}",
+                    text = nameAndUnit,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(modifier = Modifier.width(3.dp))
-
-                // Recurrence tag
-                val (recLabel, recColor) = when (item.isRecurring) {
-                    1 -> "M" to MaterialTheme.colorScheme.primary
-                    2 -> "P" to MaterialTheme.colorScheme.tertiary
-                    else -> "1x" to MaterialTheme.colorScheme.outline
-                }
-                Surface(
-                    shape = RoundedCornerShape(3.dp),
-                    color = recColor.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = recLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, fontWeight = FontWeight.Bold),
-                        color = recColor,
-                        modifier = Modifier.padding(horizontal = 2.5.dp, vertical = 0.5.dp)
-                    )
-                }
             }
 
+            // 3. Recurrence tag (M/P/1x)
+            val (recLabel, recColor) = when (item.isRecurring) {
+                1 -> "M" to MaterialTheme.colorScheme.primary
+                2 -> "P" to MaterialTheme.colorScheme.tertiary
+                else -> "1x" to MaterialTheme.colorScheme.outline
+            }
+            Surface(
+                shape = RoundedCornerShape(3.dp),
+                color = recColor.copy(alpha = 0.15f)
+            ) {
+                Text(
+                    text = recLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.5.sp, fontWeight = FontWeight.Bold),
+                    color = recColor,
+                    modifier = Modifier.padding(horizontal = 2.5.dp, vertical = 0.5.dp)
+                )
+            }
+
+            // 4. Note (Optional)
             if (item.note.isNotBlank()) {
                 Text(
                     text = item.note,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.5.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -937,6 +940,24 @@ private fun UnifiedGroceryItemTableRow(
     }
 }
 
+private val GROCERY_DEFAULT_CATEGORIES_MAP: Map<String, List<String>> = mapOf(
+    "Starch" to listOf("Rice", "Maize Meal", "Pasta", "Flour", "Cereal", "Oats", "Potatoes", "Samp", "Bread"),
+    "Dairy" to listOf("Fresh Milk", "Long Life Milk", "Cheese", "Butter", "Yoghurt", "Cream", "Eggs", "Margarine"),
+    "Meat & Poultry" to listOf("Chicken", "Beef", "Pork", "Lamb", "Mince", "Sausages", "Fish", "Bacon", "Cold Meats"),
+    "Produce" to listOf("Tomatoes", "Onions", "Potatoes", "Carrots", "Bananas", "Apples", "Oranges", "Spinach", "Cabbage", "Lettuce", "Avocado", "Garlic & Ginger"),
+    "Bakery" to listOf("Bread", "Rolls", "Buns", "Pies", "Cakes", "Biscuits", "Rusk"),
+    "Beverages" to listOf("Coffee", "Tea", "Juice", "Soft Drinks", "Water", "Squash", "Energy Drinks", "Milkshake"),
+    "Pantry & Condiments" to listOf("Cooking Oil", "Sugar", "Salt & Spices", "Sauces", "Soup Powder", "Vinegar", "Mayonnaise", "Jam", "Peanut Butter", "Honey"),
+    "Canned Goods" to listOf("Baked Beans", "Tinned Fish", "Chopped Tomatoes", "Sweetcorn", "Tinned Peas", "Tinned Fruit", "Soup"),
+    "Snacks & Sweets" to listOf("Chips", "Chocolates", "Sweets", "Nuts", "Dried Fruit", "Popcorn", "Crackers"),
+    "Frozen" to listOf("Frozen Veg", "Frozen Chips", "Ice Cream", "Frozen Pastry", "Frozen Fish", "Frozen Meals"),
+    "Household & Cleaning" to listOf("Washing Powder", "Dishwashing Liquid", "Bleach", "Fabric Softener", "Trash Bags", "Surface Cleaner", "Sponges"),
+    "Personal Care" to listOf("Soap", "Shampoo", "Toothpaste", "Deodorant", "Toilet Paper", "Lotion", "Shaving"),
+    "Baby" to listOf("Nappies", "Baby Wipes", "Baby Food", "Formula", "Baby Lotion"),
+    "Pet Care" to listOf("Dog Food", "Cat Food", "Pet Treats", "Cat Litter"),
+    "Other" to listOf("General", "Miscellaneous")
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddEditBudgetItemDialog(
@@ -984,8 +1005,8 @@ private fun AddEditBudgetItemDialog(
     var unitMeasureInput by remember { mutableStateOf(initialUnitMeasure) }
     var noteInput by remember { mutableStateOf(item?.note ?: "") }
     var qtyBudgetInput by remember { mutableStateOf(item?.quantityBudget?.toString() ?: "1") }
-    var unitPriceBudgetInput by remember { mutableStateOf(if ((item?.unitPriceBudget ?: 0.0) > 0) item!!.unitPriceBudget.toString() else "") }
-    var isRecurringInput by remember { mutableStateOf(item?.isRecurring ?: 0) } // 0 = Once-off, 1 = Monthly Recurring, 2 = Planned
+    var unitPriceBudgetInput by remember { mutableStateOf(if (item != null) (if (item.unitPriceBudget > 0) item.unitPriceBudget.toString() else "0") else "0") }
+    var isRecurringInput by remember { mutableStateOf(item?.isRecurring ?: 1) } // Default 1 = Monthly Recurring
 
     val unitSizes by viewModel.unitSizes.collectAsState()
     var showUnitSizeCrudDialog by remember { mutableStateOf(false) }
@@ -995,20 +1016,20 @@ private fun AddEditBudgetItemDialog(
     var subCatExpanded by remember { mutableStateOf(false) }
     var unitMeasureExpanded by remember { mutableStateOf(false) }
 
-    val categoriesViewModel: CategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
-    val categories by categoriesViewModel.categories.collectAsState()
-
-    val defaultCategories = remember { listOf("Starch", "Beverages", "Meat", "Cold Meats", "Dairy", "Cleaning", "Toiletries", "Snacks") }
-    val availableCategoryNames = remember(categories) {
-        val names = categories.map { it.name }.toSet()
-        (defaultCategories + names).distinct()
+    val allBudgetItems by viewModel.budgetItems.collectAsState()
+    val availableCategoryNames = remember(allBudgetItems) {
+        val existingCats = allBudgetItems.map { it.category }.filter { it.isNotBlank() }
+        (GROCERY_DEFAULT_CATEGORIES_MAP.keys + existingCats).distinct()
     }
 
-    val subCategoriesViewModel: SubCategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
-    val dbSubCategories by subCategoriesViewModel.subCategories.collectAsState()
-    val availableSubCatNames = remember(dbSubCategories) {
-        val defaultSubs = listOf("Maize Meal", "Rice", "Bread", "Fizzy Drink", "Milk", "Beef", "Chicken", "Pork", "Sausage", "Cheese", "Butter")
-        (defaultSubs + dbSubCategories.map { it.name }).distinct()
+    val availableSubCatNames = remember(categoryInput, allBudgetItems) {
+        val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[categoryInput] ?: emptyList()
+        val existingSubs = allBudgetItems
+            .filter { it.category.equals(categoryInput, ignoreCase = true) }
+            .map { it.subCategory }
+            .filter { it.isNotBlank() }
+        val fallbackSubs = GROCERY_DEFAULT_CATEGORIES_MAP.values.flatten()
+        (catSubs + existingSubs + fallbackSubs).distinct()
     }
     var showDuplicateDialog by remember { mutableStateOf<GroceryBudgetItemEntity?>(null) }
 
@@ -1081,7 +1102,7 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // Category Editable Dropdown
+                // Category Editable Dropdown (Grocery Specific)
                 ExposedDropdownMenuBox(
                     expanded = catExpanded,
                     onExpandedChange = { catExpanded = it }
@@ -1089,7 +1110,7 @@ private fun AddEditBudgetItemDialog(
                     OutlinedTextField(
                         value = categoryInput,
                         onValueChange = { categoryInput = it },
-                        label = { Text("Category (e.g., Starch, Beverages, Meat)") },
+                        label = { Text("Category (e.g., Starch, Dairy, Produce)") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1105,6 +1126,10 @@ private fun AddEditBudgetItemDialog(
                                 text = { Text(catName) },
                                 onClick = {
                                     categoryInput = catName
+                                    val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[catName]
+                                    if (catSubs != null && catSubs.isNotEmpty() && !catSubs.contains(subCategoryInput)) {
+                                        subCategoryInput = catSubs.first()
+                                    }
                                     catExpanded = false
                                 }
                             )
@@ -1112,7 +1137,7 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // SubCategory Editable Dropdown
+                // SubCategory Editable Dropdown (Grocery Specific)
                 ExposedDropdownMenuBox(
                     expanded = subCatExpanded,
                     onExpandedChange = { subCatExpanded = it }
@@ -1120,7 +1145,7 @@ private fun AddEditBudgetItemDialog(
                     OutlinedTextField(
                         value = subCategoryInput,
                         onValueChange = { subCategoryInput = it },
-                        label = { Text("Sub-Category (e.g., Maize Meal, Rice, Fizzy Drink)") },
+                        label = { Text("Sub-Category (e.g., Rice, Milk, Chicken)") },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
