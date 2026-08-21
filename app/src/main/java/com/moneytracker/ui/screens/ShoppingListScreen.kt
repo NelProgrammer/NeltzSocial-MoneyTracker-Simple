@@ -197,14 +197,29 @@ fun ShoppingListScreen(
 
     // Active Shopping List Popup Dialog
     if (activeShoppingList != null) {
+        val list = activeShoppingList!!
         ShoppingListPopupDialog(
-            shoppingList = activeShoppingList!!,
+            shoppingList = list,
             items = activeShoppingListItems,
             onDismiss = { viewModel.openShoppingList(null) },
             onToggleItemChecked = { viewModel.toggleShoppingListItemChecked(it) },
             onUpdateActuals = { item, qty, price -> viewModel.updateShoppingListItemActuals(item, qty, price) },
+            onAddItem = { cat, subCat, detail, unitSize, qtyB, priceB, qtyA, priceA ->
+                viewModel.addShoppingListItem(
+                    shoppingListId = list.id,
+                    category = cat,
+                    subCategory = subCat,
+                    itemDetail = detail,
+                    unitSize = unitSize,
+                    quantityBudget = qtyB,
+                    unitPriceBudget = priceB,
+                    quantityActual = qtyA,
+                    unitPriceActual = priceA
+                )
+            },
+            onDeleteItem = { viewModel.deleteShoppingListItem(it) },
             onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) },
-            onReopen = { viewModel.reopenShoppingList(activeShoppingList!!) }
+            onReopen = { viewModel.reopenShoppingList(list) }
         )
     }
 }

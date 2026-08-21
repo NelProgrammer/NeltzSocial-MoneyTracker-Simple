@@ -111,12 +111,16 @@ class GroceriesViewModel(
     init {
         seedDefaultUnitSizesIfNeeded()
         triggerAutoPopulate()
+        viewModelScope.launch {
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItemsIfDue(repository)
+        }
     }
 
     private fun triggerAutoPopulate() {
         viewModelScope.launch {
             val (start, end) = payMonthRange.value
             repository.autoPopulateRecurringAndPlannedGroceryItems(start, end, start)
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItems(repository)
         }
     }
 
@@ -279,6 +283,41 @@ class GroceriesViewModel(
                     unitPriceActual = priceActual
                 )
             )
+        }
+    }
+
+    fun addShoppingListItem(
+        shoppingListId: Long,
+        category: String,
+        subCategory: String,
+        itemDetail: String,
+        unitSize: String,
+        quantityBudget: Int = 1,
+        unitPriceBudget: Double = 0.0,
+        quantityActual: Int = 1,
+        unitPriceActual: Double = 0.0
+    ) {
+        viewModelScope.launch {
+            repository.saveShoppingListItem(
+                ShoppingListItemEntity(
+                    shoppingListId = shoppingListId,
+                    category = category,
+                    subCategory = subCategory,
+                    itemDetail = itemDetail,
+                    unitSize = unitSize,
+                    quantityBudget = quantityBudget,
+                    unitPriceBudget = unitPriceBudget,
+                    quantityActual = quantityActual,
+                    unitPriceActual = unitPriceActual,
+                    isChecked = false
+                )
+            )
+        }
+    }
+
+    fun deleteShoppingListItem(item: ShoppingListItemEntity) {
+        viewModelScope.launch {
+            repository.deleteShoppingListItem(item)
         }
     }
 

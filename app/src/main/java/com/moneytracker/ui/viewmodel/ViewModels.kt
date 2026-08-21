@@ -90,6 +90,7 @@ class DashboardViewModel(
     init {
         viewModelScope.launch {
             com.moneytracker.util.RecurringTransactionManager.processRecurringTransactionsIfDue(repository)
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItemsIfDue(repository)
         }
     }
 
@@ -101,6 +102,7 @@ class DashboardViewModel(
         _selectedPayMonthDate.value = date
         viewModelScope.launch {
             com.moneytracker.util.RecurringTransactionManager.processRecurringTransactions(repository)
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItems(repository)
         }
     }
 
@@ -531,13 +533,14 @@ data class AddEditUiState(
     val subCategory: String = "",
     val detail: String = "",
     val isRecurring: Boolean = false,
-    val recurrenceFrequency: RecurrenceFrequency = RecurrenceFrequency.MONTHLY,
+    val recurrenceFrequency: RecurrenceFrequency = RecurrenceFrequency.ONCE_OFF,
     val recurTillDate: LocalDate? = null,
     val recurCount: String = "",
     val categories: List<CategoryEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val updatedAt: Long = 0L
 )
 
 // Add/Edit ViewModel
@@ -557,6 +560,8 @@ class AddEditViewModel(
                     existingSortOrder = transaction.sortOrder
                     val absAmt = kotlin.math.abs(transaction.amount)
                     val formattedAmt = if (absAmt == absAmt.toLong().toDouble()) absAmt.toLong().toString() else absAmt.toString()
+                    val initialFreq = transaction.recurrenceFrequency ?: (if (transaction.isRecurring) RecurrenceFrequency.MONTHLY else RecurrenceFrequency.ONCE_OFF)
+                    val normalizedFreq = if (initialFreq == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else initialFreq
                     _uiState.value = _uiState.value.copy(
                         amount = formattedAmt,
                         type = transaction.type,
@@ -566,9 +571,10 @@ class AddEditViewModel(
                         subCategory = transaction.subCategory,
                         detail = transaction.detail,
                         isRecurring = transaction.isRecurring,
-                        recurrenceFrequency = transaction.recurrenceFrequency ?: RecurrenceFrequency.MONTHLY,
+                        recurrenceFrequency = normalizedFreq,
                         recurTillDate = transaction.recurTillDate?.let { DateUtils.toLocalDate(it) },
                         recurCount = transaction.recurCount?.toString() ?: "",
+                        updatedAt = transaction.updatedAt,
                         isLoading = false
                     )
                     observeCategories(transaction.type)
@@ -580,7 +586,7 @@ class AddEditViewModel(
                 }
             } else {
                 _uiState.value = _uiState.value.copy(isLoading = false)
-                observeCategories(TransactionType.EXPENSE)
+                observeCategories(_uiState.value.type)
             }
         }
     }
@@ -588,26 +594,19 @@ class AddEditViewModel(
     private fun observeCategories(type: TransactionType) {
         viewModelScope.launch {
             repository.observeCategories(type).collect { categories ->
-                val current = _uiState.value
-                val selectedCategory = when {
-                    current.categoryId != null && categories.any { it.id == current.categoryId } -> current.categoryId
-                    categories.isNotEmpty() -> categories.first().id
-                    else -> null
-                }
-                _uiState.value = current.copy(categories = categories, categoryId = selectedCategory)
+                _uiState.value = _uiState.value.copy(
+                    categories = categories,
+                    categoryId = _uiState.value.categoryId ?: categories.firstOrNull()?.id
+                )
             }
         }
     }
 
-    fun updateAmount(value: String) {
-        val cleanValue = value.replace("+", "").replace("-", "").trim()
-        if (cleanValue.isEmpty() || cleanValue.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
-            _uiState.value = _uiState.value.copy(amount = cleanValue, errorMessage = null)
-        }
+    fun updateAmount(amount: String) {
+        _uiState.value = _uiState.value.copy(amount = amount)
     }
 
     fun updateType(type: TransactionType) {
-        if (_uiState.value.type == type) return
         _uiState.value = _uiState.value.copy(type = type, categoryId = null)
         observeCategories(type)
     }
@@ -617,8 +616,7 @@ class AddEditViewModel(
     }
 
     fun updateDate(date: LocalDate) {
-        val state = _uiState.value
-        _uiState.value = state.copy(date = date)
+        _uiState.value = _uiState.value.copy(date = date)
         recalculateRecurrence(date = date)
     }
 
@@ -635,13 +633,21 @@ class AddEditViewModel(
     }
 
     fun updateIsRecurring(isRecurring: Boolean) {
-        _uiState.value = _uiState.value.copy(isRecurring = isRecurring)
+        val currentFreq = _uiState.value.recurrenceFrequency
+        val newFreq = if (isRecurring) {
+            if (currentFreq == RecurrenceFrequency.ONCE_OFF || currentFreq == RecurrenceFrequency.TENTATIVE_FORECAST) RecurrenceFrequency.MONTHLY else currentFreq
+        } else {
+            RecurrenceFrequency.ONCE_OFF
+        }
+        _uiState.value = _uiState.value.copy(isRecurring = isRecurring, recurrenceFrequency = newFreq)
     }
 
     fun updateRecurrenceFrequency(freq: RecurrenceFrequency) {
         val state = _uiState.value
-        _uiState.value = state.copy(recurrenceFrequency = freq)
-        recalculateRecurrence(freq = freq)
+        val normalized = if (freq == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else freq
+        val isRec = normalized != RecurrenceFrequency.ONCE_OFF
+        _uiState.value = state.copy(isRecurring = isRec, recurrenceFrequency = normalized)
+        recalculateRecurrence(freq = normalized)
     }
 
     fun updateRecurTillDate(date: LocalDate?) {
@@ -703,11 +709,15 @@ class AddEditViewModel(
         }
 
         val absAmount = kotlin.math.abs(amount)
-        val isContinuous = state.recurrenceFrequency == RecurrenceFrequency.CONTINUOUS
         val isPlanFuture = state.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE
 
         viewModelScope.launch {
             _uiState.value = state.copy(isSaving = true, errorMessage = null)
+            val finalFreq = if (state.isRecurring) {
+                if (state.recurrenceFrequency == RecurrenceFrequency.ONCE_OFF) RecurrenceFrequency.MONTHLY else state.recurrenceFrequency
+            } else {
+                RecurrenceFrequency.ONCE_OFF
+            }
             val entityToSave = TransactionEntity(
                 id = transactionId ?: 0L,
                 amount = absAmount,
@@ -718,10 +728,10 @@ class AddEditViewModel(
                 sortOrder = existingSortOrder,
                 subCategory = state.subCategory.trim(),
                 detail = state.detail.trim(),
-                isRecurring = state.isRecurring,
-                recurrenceFrequency = if (state.isRecurring) state.recurrenceFrequency else null,
-                recurTillDate = if (state.isRecurring && !isContinuous && !isPlanFuture && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
-                recurCount = if (state.isRecurring && !isContinuous && !isPlanFuture) state.recurCount.toIntOrNull() else null,
+                isRecurring = state.isRecurring && finalFreq != RecurrenceFrequency.ONCE_OFF,
+                recurrenceFrequency = finalFreq,
+                recurTillDate = if (state.isRecurring && !isPlanFuture && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,
+                recurCount = if (state.isRecurring && !isPlanFuture) state.recurCount.toIntOrNull() else null,
                 isRecurred = false
             )
             val savedId = repository.saveTransaction(entityToSave)

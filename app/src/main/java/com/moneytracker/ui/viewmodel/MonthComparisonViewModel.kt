@@ -10,6 +10,7 @@ import com.moneytracker.data.repository.TransactionRepository
 import com.moneytracker.util.DateUtils
 import com.moneytracker.util.SettingsManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,12 +47,23 @@ class MonthComparisonViewModel(
     private val repository: TransactionRepository
 ) : ViewModel() {
 
+    init {
+        viewModelScope.launch {
+            com.moneytracker.util.RecurringTransactionManager.processRecurringTransactions(repository)
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItems(repository)
+        }
+    }
+
     private val payDateDay = SettingsManager.getPayDateDay()
     private val _anchorPayMonthDate = MutableStateFlow(DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay))
     val anchorPayMonthDate: StateFlow<LocalDate> = _anchorPayMonthDate.asStateFlow()
 
     fun setAnchorPayMonth(date: LocalDate) {
         _anchorPayMonthDate.value = date
+        viewModelScope.launch {
+            com.moneytracker.util.RecurringTransactionManager.processRecurringTransactions(repository)
+            com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItems(repository)
+        }
     }
 
     private val _drilldownLevel = MutableStateFlow(DrilldownLevel.SUMMARY)

@@ -268,4 +268,19 @@ object DatabaseMigrations {
             db.execSQL("ALTER TABLE transactions ADD COLUMN isRecurred INTEGER NOT NULL DEFAULT 0")
         }
     }
+
+    val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val now = System.currentTimeMillis()
+            db.execSQL("ALTER TABLE transactions ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT $now")
+            db.execSQL("ALTER TABLE grocery_budget_items ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT $now")
+        }
+    }
+
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val now = System.currentTimeMillis()
+            db.execSQL("ALTER TABLE taxi_fares ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT $now")
+        }
+    }
 }

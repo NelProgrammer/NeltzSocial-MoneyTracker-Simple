@@ -30,12 +30,17 @@ class TransactionTypeConverter {
 
 class RecurrenceFrequencyConverter {
     @TypeConverter
-    fun fromFrequency(freq: RecurrenceFrequency?): String? = freq?.name
+    fun fromFrequency(freq: RecurrenceFrequency?): String? = (freq ?: RecurrenceFrequency.ONCE_OFF).name
 
     @TypeConverter
     fun toFrequency(value: String?): RecurrenceFrequency? = value?.let {
-        try { RecurrenceFrequency.valueOf(it) } catch (e: Exception) { RecurrenceFrequency.MONTHLY }
-    }
+        try {
+            val f = RecurrenceFrequency.valueOf(it)
+            if (f == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else f
+        } catch (e: Exception) {
+            RecurrenceFrequency.ONCE_OFF
+        }
+    } ?: RecurrenceFrequency.ONCE_OFF
 }
 
 @Database(
@@ -52,7 +57,7 @@ class RecurrenceFrequencyConverter {
         ShoppingListEntity::class,
         ShoppingListItemEntity::class
     ],
-    version = 15,
+    version = 17,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
@@ -99,7 +104,9 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_11_12,
                     DatabaseMigrations.MIGRATION_12_13,
                     DatabaseMigrations.MIGRATION_13_14,
-                    DatabaseMigrations.MIGRATION_14_15
+                    DatabaseMigrations.MIGRATION_14_15,
+                    DatabaseMigrations.MIGRATION_15_16,
+                    DatabaseMigrations.MIGRATION_16_17
                 )
                 .build()
         }

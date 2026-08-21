@@ -20,5 +20,6 @@ data class GroceryBudgetItemEntity(
     val isRecurring: Int = 0, // 0 = Once-off, 1 = Monthly Recurring, 2 = Planned
     val quantityActual: Int = 0,
     val unitPriceActual: Double = 0.0,
-    val costActual: Double = quantityActual * unitPriceActual
+    val costActual: Double = quantityActual * unitPriceActual,
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -217,7 +217,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
-    @Query("SELECT * FROM transactions WHERE profileId = :profileId AND isRecurring = 1 AND isRecurred = 0")
+    @Query("SELECT * FROM transactions WHERE profileId = :profileId AND isRecurring = 1")
     suspend fun getRecurringTransactions(profileId: Long): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE profileId = :profileId")

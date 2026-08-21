@@ -13,5 +13,6 @@ data class TaxiFareEntity(
     val tripsPerDay: Int = 2,
     val workingDaysPerMonth: Int = 20,
     val monthlyTotal: Double,
-    val date: Long // Start Pay Month epoch timestamp
+    val date: Long, // Start Pay Month epoch timestamp
+    val updatedAt: Long = System.currentTimeMillis()
 )

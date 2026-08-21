@@ -1,6 +1,7 @@
 package com.moneytracker.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -140,100 +141,33 @@ fun AddEditScreen(
                 mutableStateOf(categoryTypeNames.find { it.first == state.type }?.second ?: state.type.name)
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = categoryTypeDropdownExpanded,
-                    onExpandedChange = { categoryTypeDropdownExpanded = it },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    OutlinedTextField(
-                        value = categoryInputText,
-                        onValueChange = { input ->
-                            categoryInputText = input
-                            val matched = categoryTypeNames.find { it.second.equals(input, ignoreCase = true) }
-                            if (matched != null) {
-                                viewModel.updateType(matched.first)
-                            }
-                        },
-                        label = { Text("Category") },
-                        placeholder = { Text("Select or type Category") },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.ArrowDropDown,
-                                contentDescription = "Dropdown"
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        singleLine = true
-                    )
-                    DropdownMenu(
-                        expanded = categoryTypeDropdownExpanded,
-                        onDismissRequest = { categoryTypeDropdownExpanded = false }
-                    ) {
-                        for ((type, name) in categoryTypeNames) {
-                            DropdownMenuItem(
-                                text = { Text(name) },
-                                trailingIcon = {
-                                    Row {
-                                        IconButton(onClick = {
-                                            val catEntity = categories.find { it.name.equals(name, ignoreCase = true) }
-                                            editingCategory = catEntity ?: CategoryEntity(id = 0, name = name, type = type)
-                                            showCategoryDialog = true
-                                        }) {
-                                            Icon(Icons.Filled.Edit, contentDescription = "Edit Category")
-                                        }
-                                        IconButton(onClick = {
-                                            val catEntity = categories.find { it.name.equals(name, ignoreCase = true) }
-                                            if (catEntity != null) {
-                                                deletingCategory = catEntity
-                                                categoriesViewModel.deleteCategory(catEntity)
-                                            }
-                                        }) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete Category")
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    categoryInputText = name
-                                    viewModel.updateType(type)
-                                    categoryTypeDropdownExpanded = false
-                                }
-                            )
-                        }
+            // 1. Category Section (ManagedComboboxWithPills)
+            com.moneytracker.ui.components.ManagedComboboxWithPills(
+                label = "Category",
+                selectedValue = categoryInputText,
+                onValueChange = { input ->
+                    categoryInputText = input
+                    val matched = categoryTypeNames.find { it.second.equals(input, ignoreCase = true) }
+                    if (matched != null) {
+                        viewModel.updateType(matched.first)
+                    }
+                },
+                items = categoryTypeNames,
+                itemToText = { it.second },
+                onAddItem = { editingCategory = null; showCategoryDialog = true },
+                onEditItem = { pair ->
+                    val catEntity = categories.find { it.name.equals(pair.second, ignoreCase = true) }
+                    editingCategory = catEntity ?: com.moneytracker.data.local.entity.CategoryEntity(id = 0, name = pair.second, type = pair.first)
+                    showCategoryDialog = true
+                },
+                onDeleteItem = { pair ->
+                    val catEntity = categories.find { it.name.equals(pair.second, ignoreCase = true) }
+                    if (catEntity != null) {
+                        deletingCategory = catEntity
+                        categoriesViewModel.deleteCategory(catEntity)
                     }
                 }
-                IconButton(
-                    onClick = { editingCategory = null; showCategoryDialog = true },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Category")
-                }
-            }
-
-            // Category Chips for quick 1-tap selection
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                for ((type, name) in categoryTypeNames) {
-                    FilterChip(
-                        modifier = Modifier.weight(1f),
-                        selected = state.type == type,
-                        onClick = {
-                            categoryInputText = name
-                            viewModel.updateType(type)
-                        },
-                        label = { Text(if (name == "Investment") "Invest" else name, maxLines = 1) }
-                    )
-                }
-            }
+            )
 
             // Divider 1: After Category Section
             HorizontalDivider(
@@ -244,89 +178,21 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 2. SubCategory Section (Salary, Credit & Bank Charges, Utilities, University, Certificate, School, etc. from seed data)
+            // 2. SubCategory Section (ManagedComboboxWithPills)
             val availableSubCategories = remember(dbSubCategories, state.type) {
                 dbSubCategories.filter { it.type == state.type }.distinctBy { it.name }
             }
 
-            var subCategoryDropdownExpanded by remember { mutableStateOf(false) }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = subCategoryDropdownExpanded,
-                    onExpandedChange = { subCategoryDropdownExpanded = it },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    OutlinedTextField(
-                        value = state.subCategory,
-                        onValueChange = viewModel::updateSubCategory,
-                        label = { Text("SubCategory") },
-                        placeholder = { Text("Select or type SubCategory") },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.ArrowDropDown,
-                                contentDescription = "Dropdown"
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        singleLine = true
-                    )
-                    DropdownMenu(
-                        expanded = subCategoryDropdownExpanded,
-                        onDismissRequest = { subCategoryDropdownExpanded = false }
-                    ) {
-                        for (subCat in availableSubCategories) {
-                            DropdownMenuItem(
-                                text = { Text(subCat.name) },
-                                trailingIcon = {
-                                    Row {
-                                        IconButton(onClick = { editingSubCategory = subCat; showSubCategoryDialog = true }) {
-                                            Icon(Icons.Filled.Edit, contentDescription = "Edit SubCategory")
-                                        }
-                                        IconButton(onClick = {
-                                            subCategoriesViewModel.deleteSubCategory(subCat)
-                                        }) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete SubCategory")
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    viewModel.updateSubCategory(subCat.name)
-                                    subCategoryDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                IconButton(
-                    onClick = { editingSubCategory = null; showSubCategoryDialog = true },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add SubCategory")
-                }
-            }
-
-            // SubCategory chips for quick 1-tap selection
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                for (subCat in availableSubCategories.take(8)) {
-                    FilterChip(
-                        selected = state.subCategory == subCat.name,
-                        onClick = { viewModel.updateSubCategory(subCat.name) },
-                        label = { Text(subCat.name, style = MaterialTheme.typography.labelSmall) }
-                    )
-                }
-            }
+            com.moneytracker.ui.components.ManagedComboboxWithPills(
+                label = "SubCategory",
+                selectedValue = state.subCategory,
+                onValueChange = viewModel::updateSubCategory,
+                items = availableSubCategories,
+                itemToText = { it.name },
+                onAddItem = { editingSubCategory = null; showSubCategoryDialog = true },
+                onEditItem = { subCat -> editingSubCategory = subCat; showSubCategoryDialog = true },
+                onDeleteItem = { subCat -> subCategoriesViewModel.deleteSubCategory(subCat) }
+            )
 
             // Divider 2: After SubCategory Section
             HorizontalDivider(
@@ -337,7 +203,7 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 3. Detail Section (Details matching selected SubCategory / Category from seed data)
+            // 3. Detail Section (ManagedComboboxWithPills)
             val selectedSubCatObj = dbSubCategories.find { it.name.equals(state.subCategory, ignoreCase = true) }
             val availableDetails = remember(dbDetails, state.type, state.subCategory, selectedSubCatObj) {
                 if (selectedSubCatObj != null) {
@@ -347,84 +213,16 @@ fun AddEditScreen(
                 }.distinctBy { it.name }
             }
 
-            var detailDropdownExpanded by remember { mutableStateOf(false) }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ExposedDropdownMenuBox(
-                    expanded = detailDropdownExpanded,
-                    onExpandedChange = { detailDropdownExpanded = it },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    OutlinedTextField(
-                        value = state.detail,
-                        onValueChange = viewModel::updateDetail,
-                        label = { Text("Detail (optional)") },
-                        placeholder = { Text("Select or type Detail") },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.ArrowDropDown,
-                                contentDescription = "Dropdown"
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        singleLine = true
-                    )
-                    DropdownMenu(
-                        expanded = detailDropdownExpanded,
-                        onDismissRequest = { detailDropdownExpanded = false }
-                    ) {
-                        for (detail in availableDetails) {
-                            DropdownMenuItem(
-                                text = { Text(detail.name) },
-                                trailingIcon = {
-                                    Row {
-                                        IconButton(onClick = { editingDetail = detail; showDetailDialog = true }) {
-                                            Icon(Icons.Filled.Edit, contentDescription = "Edit Detail")
-                                        }
-                                        IconButton(onClick = {
-                                            detailsViewModel.deleteDetail(detail)
-                                        }) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete Detail")
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    viewModel.updateDetail(detail.name)
-                                    detailDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                IconButton(
-                    onClick = { editingDetail = null; showDetailDialog = true },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Detail")
-                }
-            }
-
-            // Detail chips for quick 1-tap selection
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                for (detail in availableDetails.take(8)) {
-                    FilterChip(
-                        selected = state.detail == detail.name,
-                        onClick = { viewModel.updateDetail(detail.name) },
-                        label = { Text(detail.name, style = MaterialTheme.typography.labelSmall) }
-                    )
-                }
-            }
+            com.moneytracker.ui.components.ManagedComboboxWithPills(
+                label = "Detail (optional)",
+                selectedValue = state.detail,
+                onValueChange = viewModel::updateDetail,
+                items = availableDetails,
+                itemToText = { it.name },
+                onAddItem = { editingDetail = null; showDetailDialog = true },
+                onEditItem = { detail -> editingDetail = detail; showDetailDialog = true },
+                onDeleteItem = { detail -> detailsViewModel.deleteDetail(detail) }
+            )
 
             // Divider 3: After Detail Section
             HorizontalDivider(
@@ -529,18 +327,14 @@ fun AddEditScreen(
                         expanded = recurrenceExpanded,
                         onDismissRequest = { recurrenceExpanded = false }
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("One-time (No Recurrence)") },
-                            onClick = {
-                                viewModel.updateIsRecurring(false)
-                                recurrenceExpanded = false
-                            }
-                        )
-                        RecurrenceFrequency.values().forEach { freq ->
+                        listOf(
+                            RecurrenceFrequency.ONCE_OFF,
+                            RecurrenceFrequency.MONTHLY,
+                            RecurrenceFrequency.PLAN_FUTURE
+                        ).forEach { freq ->
                             DropdownMenuItem(
                                 text = { Text(freq.label) },
                                 onClick = {
-                                    viewModel.updateIsRecurring(true)
                                     viewModel.updateRecurrenceFrequency(freq)
                                     recurrenceExpanded = false
                                 }
@@ -571,7 +365,7 @@ fun AddEditScreen(
                         value = state.recurCount,
                         onValueChange = viewModel::updateRecurCount,
                         label = { Text("Limit (count)") },
-                        placeholder = { Text("e.g. 12") },
+                        placeholder = { Text("Optional limit") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f)
@@ -582,7 +376,7 @@ fun AddEditScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("End Date") },
-                        placeholder = { Text("Till Date") },
+                        placeholder = { Text("Optional date") },
                         trailingIcon = {
                             IconButton(onClick = { tillDatePicker.show() }) {
                                 Icon(Icons.Filled.CalendarToday, contentDescription = "Pick End Date")
@@ -591,9 +385,10 @@ fun AddEditScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
-            } else if (state.isRecurring && state.recurrenceFrequency == RecurrenceFrequency.CONTINUOUS) {
                 Text(
-                    text = "Recurs every month indefinitely on PayDate",
+                    text = if (state.recurCount.isBlank() && state.recurTillDate == null) 
+                        "Repeats continuously every month indefinitely" 
+                        else "Repeats monthly until limit/end date is reached",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -622,6 +417,32 @@ fun AddEditScreen(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            if (state.updatedAt > 0L) {
+                var showDebugInfo by remember { mutableStateOf(false) }
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp)) {
+                    Text(
+                        text = if (showDebugInfo) "System Info ▲" else "System Info ▼",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .clickable { showDebugInfo = !showDebugInfo }
+                            .padding(vertical = 2.dp)
+                    )
+                    if (showDebugInfo) {
+                        val formattedTime = remember(state.updatedAt) {
+                            java.time.Instant.ofEpochMilli(state.updatedAt)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                        }
+                        Text(
+                            text = "Last updated: $formattedTime",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
 
             // 7. Action Buttons (Save & Delete)

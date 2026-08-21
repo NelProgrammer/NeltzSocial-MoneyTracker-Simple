@@ -430,6 +430,32 @@ private fun AddEditTaxiRouteDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                if (route != null && route.updatedAt > 0L) {
+                    var showDebugInfo by remember { mutableStateOf(false) }
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                        Text(
+                            text = if (showDebugInfo) "System Info ▲" else "System Info ▼",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .clickable { showDebugInfo = !showDebugInfo }
+                                .padding(vertical = 2.dp)
+                        )
+                        if (showDebugInfo) {
+                            val formattedTime = remember(route.updatedAt) {
+                                java.time.Instant.ofEpochMilli(route.updatedAt)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                            }
+                            Text(
+                                text = "Last updated: $formattedTime",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {

@@ -55,6 +55,9 @@ class TransactionRepository(
     fun observePermanentProfiles(): Flow<List<ProfileEntity>> =
         profileDao?.observePermanentProfiles() ?: flowOf(emptyList())
 
+    suspend fun getAllProfileEntities(): List<ProfileEntity> =
+        profileDao?.observeAll()?.firstOrNull() ?: emptyList()
+
     suspend fun getGuestProfile(): ProfileEntity? =
         profileDao?.getGuestProfile()
 
@@ -164,17 +167,35 @@ class TransactionRepository(
     suspend fun getRecurringTransactions(): List<TransactionEntity> =
         transactionDao.getRecurringTransactions(activeProfileId)
 
+    suspend fun getRecurringTransactionsForProfile(profileId: Long): List<TransactionEntity> =
+        transactionDao.getRecurringTransactions(profileId)
+
     suspend fun getAllEntities(): List<TransactionEntity> =
         transactionDao.getAllEntities(activeProfileId)
 
+    suspend fun getAllEntitiesForProfile(profileId: Long): List<TransactionEntity> =
+        transactionDao.getAllEntities(profileId)
+
     suspend fun saveTransaction(transaction: TransactionEntity): Long {
-        val pid = if (transaction.id == 0L || transaction.profileId <= 0L) activeProfileId else transaction.profileId
+        val pid = if (transaction.profileId > 0L) transaction.profileId else activeProfileId
         val sortOrder = if (transaction.id == 0L) transactionDao.nextSortOrder(pid) else transaction.sortOrder
         val entity = transaction.copy(
             profileId = pid,
             sortOrder = sortOrder,
-            amount = kotlin.math.abs(transaction.amount)
+            amount = kotlin.math.abs(transaction.amount),
+            updatedAt = System.currentTimeMillis()
         )
+        return if (entity.id == 0L) {
+            transactionDao.insert(entity)
+        } else {
+            transactionDao.update(entity)
+            entity.id
+        }
+    }
+
+    suspend fun saveTransactionDirect(transaction: TransactionEntity): Long {
+        val pid = if (transaction.profileId > 0L) transaction.profileId else activeProfileId
+        val entity = transaction.copy(profileId = pid)
         return if (entity.id == 0L) {
             transactionDao.insert(entity)
         } else {
@@ -288,8 +309,8 @@ class TransactionRepository(
 
     suspend fun saveTaxiFare(fare: TaxiFareEntity): Long {
         val dao = taxiFareDao ?: return 0L
-        val pid = if (fare.profileId == 0L) activeProfileId else fare.profileId
-        val entity = fare.copy(profileId = pid)
+        val pid = if (fare.profileId > 0L) fare.profileId else activeProfileId
+        val entity = fare.copy(profileId = pid, updatedAt = System.currentTimeMillis())
         return if (entity.id == 0L) {
             dao.insert(entity)
         } else {
@@ -311,6 +332,21 @@ class TransactionRepository(
 
     suspend fun getGroceryBudgetItemById(id: Long): GroceryBudgetItemEntity? =
         groceryBudgetDao?.getById(id)
+
+    suspend fun getAllGroceryBudgetItems(): List<GroceryBudgetItemEntity> =
+        groceryBudgetDao?.getAllForProfile(activeProfileId) ?: emptyList()
+
+    suspend fun getAllGroceryBudgetItemsForProfile(profileId: Long): List<GroceryBudgetItemEntity> =
+        groceryBudgetDao?.getAllForProfile(profileId) ?: emptyList()
+
+    suspend fun saveGroceryBudgetItemDirect(item: GroceryBudgetItemEntity): Long {
+        val dao = groceryBudgetDao ?: return 0L
+        return if (item.id == 0L) dao.insert(item) else { dao.update(item); item.id }
+    }
+
+    suspend fun deleteGroceryBudgetItemDirect(item: GroceryBudgetItemEntity) {
+        groceryBudgetDao?.delete(item)
+    }
 
     suspend fun autoPopulateRecurringAndPlannedGroceryItems(startDate: Long, endDate: Long, targetDate: Long) {
         val dao = groceryBudgetDao ?: return
@@ -348,19 +384,28 @@ class TransactionRepository(
 
     suspend fun saveGroceryBudgetItem(item: GroceryBudgetItemEntity): Long {
         val dao = groceryBudgetDao ?: return 0L
-        val pid = if (item.profileId == 0L) activeProfileId else item.profileId
+        val pid = if (item.profileId > 0L) item.profileId else activeProfileId
         val existing = if (item.id != 0L) dao.getById(item.id) else null
         val qA = if (item.quantityActual > 0) item.quantityActual else (existing?.quantityActual ?: 0)
         val pA = if (item.unitPriceActual > 0.0) item.unitPriceActual else (existing?.unitPriceActual ?: 0.0)
         val cA = if (item.costActual > 0.0) item.costActual else (qA * pA)
         val costB = item.quantityBudget * item.unitPriceBudget
-        val entity = item.copy(profileId = pid, costBudget = costB, quantityActual = qA, unitPriceActual = pA, costActual = cA)
-        return if (entity.id == 0L) {
+        val entity = item.copy(
+            profileId = pid,
+            costBudget = costB,
+            quantityActual = qA,
+            unitPriceActual = pA,
+            costActual = cA,
+            updatedAt = System.currentTimeMillis()
+        )
+        val savedId = if (entity.id == 0L) {
             dao.insert(entity)
         } else {
             dao.update(entity)
             entity.id
         }
+        com.moneytracker.util.RecurringGroceryManager.processSingleGroceryItemRecurrence(this, entity.copy(id = savedId))
+        return savedId
     }
 
     suspend fun updateGroceryBudgetItemWithRecurrenceChange(
@@ -369,7 +414,7 @@ class TransactionRepository(
         currentMonthStart: Long
     ): Long {
         val dao = groceryBudgetDao ?: return 0L
-        val pid = if (item.profileId == 0L) activeProfileId else item.profileId
+        val pid = if (item.profileId > 0L) item.profileId else activeProfileId
         val existing = if (existingItemId != 0L) dao.getById(existingItemId) else null
         val qA = if (item.quantityActual > 0) item.quantityActual else (existing?.quantityActual ?: 0)
         val pA = if (item.unitPriceActual > 0.0) item.unitPriceActual else (existing?.unitPriceActual ?: 0.0)
@@ -381,7 +426,8 @@ class TransactionRepository(
             costBudget = costB,
             quantityActual = qA,
             unitPriceActual = pA,
-            costActual = cA
+            costActual = cA,
+            updatedAt = System.currentTimeMillis()
         )
 
         val id = if (existingItemId == 0L) {
@@ -405,11 +451,13 @@ class TransactionRepository(
             dao.update(older.copy(isRecurring = 0))
         }
 
+        com.moneytracker.util.RecurringGroceryManager.processSingleGroceryItemRecurrence(this, entity.copy(id = id))
         return id
     }
 
     suspend fun deleteGroceryBudgetItem(item: GroceryBudgetItemEntity) {
         groceryBudgetDao?.delete(item)
+        com.moneytracker.util.RecurringGroceryManager.processSingleGroceryItemRecurrence(this, item.copy(isRecurring = 0))
     }
 
     // Unit Size CRUD Operations
@@ -475,6 +523,20 @@ class TransactionRepository(
 
     suspend fun updateShoppingListItem(item: ShoppingListItemEntity) {
         shoppingListItemDao?.update(item)
+    }
+
+    suspend fun saveShoppingListItem(item: ShoppingListItemEntity): Long {
+        val sItemDao = shoppingListItemDao ?: return 0L
+        return if (item.id == 0L) {
+            sItemDao.insert(item)
+        } else {
+            sItemDao.update(item)
+            item.id
+        }
+    }
+
+    suspend fun deleteShoppingListItem(item: ShoppingListItemEntity) {
+        shoppingListItemDao?.delete(item)
     }
 
     suspend fun confirmAndCloseShoppingList(

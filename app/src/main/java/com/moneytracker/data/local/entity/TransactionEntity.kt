@@ -33,5 +33,6 @@ data class TransactionEntity(
     val recurrenceFrequency: RecurrenceFrequency? = null,
     val recurTillDate: Long? = null,
     val recurCount: Int? = null,
-    val isRecurred: Boolean = false
+    val isRecurred: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
 )

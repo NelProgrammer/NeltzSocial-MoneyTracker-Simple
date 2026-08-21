@@ -170,14 +170,13 @@ fun PayMonthFilterHeader(
 }
 
 private fun formatPayMonthShort(startDate: LocalDate, payDateDay: Int): String {
-    val endDate = startDate.plusMonths(1).minusDays(1)
     val monthFormatter = DateTimeFormatter.ofPattern("MMM yyyy")
-    return "${endDate.format(monthFormatter)}"
+    return startDate.format(monthFormatter)
 }
 
 private fun formatPayMonthFull(startDate: LocalDate, payDateDay: Int): String {
     val endDate = startDate.plusMonths(1).minusDays(1)
     val dayFormatter = DateTimeFormatter.ofPattern("d MMM")
     val yearFormatter = DateTimeFormatter.ofPattern("MMM yyyy")
-    return "${startDate.format(dayFormatter)} - ${endDate.format(dayFormatter)} (${endDate.format(yearFormatter)})"
+    return "${startDate.format(dayFormatter)} - ${endDate.format(dayFormatter)} (${startDate.format(yearFormatter)})"
 }

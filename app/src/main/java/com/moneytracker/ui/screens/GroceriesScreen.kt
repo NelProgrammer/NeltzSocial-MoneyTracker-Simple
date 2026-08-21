@@ -348,14 +348,29 @@ fun GroceriesScreen(
 
     // Active Shopping List Popup Dialog
     if (activeShoppingList != null) {
+        val list = activeShoppingList!!
         ShoppingListPopupDialog(
-            shoppingList = activeShoppingList!!,
+            shoppingList = list,
             items = activeShoppingListItems,
             onDismiss = { viewModel.openShoppingList(null) },
             onToggleItemChecked = { viewModel.toggleShoppingListItemChecked(it) },
             onUpdateActuals = { item, qty, price -> viewModel.updateShoppingListItemActuals(item, qty, price) },
+            onAddItem = { cat, subCat, detail, unitSize, qtyB, priceB, qtyA, priceA ->
+                viewModel.addShoppingListItem(
+                    shoppingListId = list.id,
+                    category = cat,
+                    subCategory = subCat,
+                    itemDetail = detail,
+                    unitSize = unitSize,
+                    quantityBudget = qtyB,
+                    unitPriceBudget = priceB,
+                    quantityActual = qtyA,
+                    unitPriceActual = priceA
+                )
+            },
+            onDeleteItem = { viewModel.deleteShoppingListItem(it) },
             onConfirmAndClose = { createTxn -> viewModel.confirmAndCloseActiveShoppingList(createTxn) },
-            onReopen = { viewModel.reopenShoppingList(activeShoppingList!!) }
+            onReopen = { viewModel.reopenShoppingList(list) }
         )
     }
 
@@ -1102,71 +1117,29 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // Category Editable Dropdown (Grocery Specific)
-                ExposedDropdownMenuBox(
-                    expanded = catExpanded,
-                    onExpandedChange = { catExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = categoryInput,
-                        onValueChange = { categoryInput = it },
-                        label = { Text("Category (e.g., Starch, Dairy, Produce)") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        singleLine = true
-                    )
-                    DropdownMenu(
-                        expanded = catExpanded,
-                        onDismissRequest = { catExpanded = false }
-                    ) {
-                        availableCategoryNames.forEach { catName ->
-                            DropdownMenuItem(
-                                text = { Text(catName) },
-                                onClick = {
-                                    categoryInput = catName
-                                    val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[catName]
-                                    if (catSubs != null && catSubs.isNotEmpty() && !catSubs.contains(subCategoryInput)) {
-                                        subCategoryInput = catSubs.first()
-                                    }
-                                    catExpanded = false
-                                }
-                            )
+                // Category (ManagedComboboxWithPills - Grocery Specific)
+                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                    label = "Category",
+                    selectedValue = categoryInput,
+                    onValueChange = { catName ->
+                        categoryInput = catName
+                        val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[catName]
+                        if (catSubs != null && catSubs.isNotEmpty() && !catSubs.contains(subCategoryInput)) {
+                            subCategoryInput = catSubs.first()
                         }
-                    }
-                }
+                    },
+                    items = availableCategoryNames,
+                    itemToText = { it }
+                )
 
-                // SubCategory Editable Dropdown (Grocery Specific)
-                ExposedDropdownMenuBox(
-                    expanded = subCatExpanded,
-                    onExpandedChange = { subCatExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = subCategoryInput,
-                        onValueChange = { subCategoryInput = it },
-                        label = { Text("Sub-Category (e.g., Rice, Milk, Chicken)") },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        singleLine = true
-                    )
-                    DropdownMenu(
-                        expanded = subCatExpanded,
-                        onDismissRequest = { subCatExpanded = false }
-                    ) {
-                        availableSubCatNames.forEach { subName ->
-                            DropdownMenuItem(
-                                text = { Text(subName) },
-                                onClick = {
-                                    subCategoryInput = subName
-                                    subCatExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                // SubCategory (ManagedComboboxWithPills - Grocery Specific)
+                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                    label = "Sub-Category",
+                    selectedValue = subCategoryInput,
+                    onValueChange = { subCategoryInput = it },
+                    items = availableSubCatNames,
+                    itemToText = { it }
+                )
 
                 // Item Detail (Free text)
                 OutlinedTextField(
@@ -1288,6 +1261,32 @@ private fun AddEditBudgetItemDialog(
                         onClick = { isRecurringInput = 2 },
                         label = { Text("Planned") }
                     )
+                }
+
+                if (item != null && item.updatedAt > 0L) {
+                    var showDebugInfo by remember { mutableStateOf(false) }
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                        Text(
+                            text = if (showDebugInfo) "System Info ▲" else "System Info ▼",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .clickable { showDebugInfo = !showDebugInfo }
+                                .padding(vertical = 2.dp)
+                        )
+                        if (showDebugInfo) {
+                            val formattedTime = remember(item.updatedAt) {
+                                java.time.Instant.ofEpochMilli(item.updatedAt)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                            }
+                            Text(
+                                text = "Last updated: $formattedTime",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
             }
         },
