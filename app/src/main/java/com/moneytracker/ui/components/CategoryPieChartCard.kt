@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -65,9 +67,22 @@ fun getSliceColor(index: Int, baseColor: Color): Color {
         com.moneytracker.ui.theme.EducationColor -> listOf(
             Color(0xFF6A1B9A), Color(0xFF4A148C), Color(0xFF8E24AA), Color(0xFFAB47BC), Color(0xFF7B1FA2), Color(0xFFBA68C8)
         )
-        else -> listOf(
+        com.moneytracker.ui.theme.ExpenseColor -> listOf(
             Color(0xFFC62828), Color(0xFFEF6C00), Color(0xFFD81B60), Color(0xFFE65100), Color(0xFFF4511E), Color(0xFF8E24AA)
         )
+        else -> {
+            val r = baseColor.red
+            val g = baseColor.green
+            val b = baseColor.blue
+            listOf(
+                baseColor,
+                Color(red = (r * 0.82f).coerceIn(0f, 1f), green = (g * 0.82f).coerceIn(0f, 1f), blue = (b * 0.82f).coerceIn(0f, 1f)),
+                Color(red = (r * 1.18f).coerceIn(0f, 1f), green = (g * 1.18f).coerceIn(0f, 1f), blue = (b * 1.18f).coerceIn(0f, 1f)),
+                Color(red = (r * 0.65f).coerceIn(0f, 1f), green = (g * 0.65f).coerceIn(0f, 1f), blue = (b * 0.65f).coerceIn(0f, 1f)),
+                Color(red = (r * 1.35f).coerceIn(0f, 1f), green = (g * 1.35f).coerceIn(0f, 1f), blue = (b * 1.35f).coerceIn(0f, 1f)),
+                Color(red = (r * 0.50f).coerceIn(0f, 1f), green = (g * 0.50f).coerceIn(0f, 1f), blue = (b * 0.50f).coerceIn(0f, 1f))
+            )
+        }
     }
     return palette[index % palette.size]
 }
@@ -85,9 +100,9 @@ private fun DonutChart(
     isCompact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val sizeDp = if (isCompact) 85.dp else 110.dp
-    val heightDp = if (isCompact) 95.dp else 130.dp
-    val strokeWidthDp = if (isCompact) 14.dp else 22.dp
+    val sizeDp = if (isCompact) 100.dp else 125.dp
+    val heightDp = if (isCompact) 110.dp else 140.dp
+    val strokeWidthDp = if (isCompact) 14.dp else 20.dp
 
     if (summaries.isEmpty() || totalAmount <= 0.0) {
         Column(
@@ -133,31 +148,11 @@ private fun DonutChart(
         ) {
             Canvas(modifier = Modifier.size(sizeDp)) {
                 val strokeWidth = strokeWidthDp.toPx()
+                val glowInset = 7.dp.toPx()
+                val mainArcTopLeft = Offset(glowInset, glowInset)
+                val mainArcSize = Size(size.width - 2 * glowInset, size.height - 2 * glowInset)
 
-                // Pass 1: Draw glowing halo behind Debt Funding slices
-                var haloAngle = -90f
-                summaries.forEach { summary ->
-                    val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
-                    if (summary.isDebtFunding && sweepAngle > 0f) {
-                        drawArc(
-                            color = Color(0xFFFF6D00).copy(alpha = glowAlpha * 0.7f),
-                            startAngle = haloAngle - 1f,
-                            sweepAngle = sweepAngle + 2f,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth + 5.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                        drawArc(
-                            color = Color(0xFFFFD54F).copy(alpha = glowAlpha * 0.9f),
-                            startAngle = haloAngle,
-                            sweepAngle = sweepAngle,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth + 2.5.dp.toPx(), cap = StrokeCap.Round)
-                        )
-                    }
-                    haloAngle += sweepAngle
-                }
-
-                // Pass 2: Draw the slice arcs and inner/outer glowing borders
+                // Pass 1: Draw the solid category slices (pure solid fill)
                 var startAngle = -90f
                 summaries.forEachIndexed { index, summary ->
                     val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
@@ -168,19 +163,75 @@ private fun DonutChart(
                         startAngle = startAngle,
                         sweepAngle = sweepAngle,
                         useCenter = false,
+                        topLeft = mainArcTopLeft,
+                        size = mainArcSize,
                         style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
                     )
+                    startAngle += sweepAngle
+                }
 
+                // Pass 2: Draw Electric Neon Cyan glow mathematically aligned to the outer and inner edges of the doughnut
+                val glowBorderWidth = 2.dp.toPx()
+                val auraWidth = 4.5.dp.toPx()
+                val halfStroke = strokeWidth / 2f
+
+                val outerDiameter = mainArcSize.width + strokeWidth
+                val outerTopLeft = Offset(glowInset - halfStroke, glowInset - halfStroke)
+                val outerSize = Size(outerDiameter, outerDiameter)
+
+                val innerDiameter = mainArcSize.width - strokeWidth
+                val innerTopLeft = Offset(glowInset + halfStroke, glowInset + halfStroke)
+                val innerSize = Size(innerDiameter, innerDiameter)
+
+                var haloAngle = -90f
+                summaries.forEach { summary ->
+                    val sweepAngle = (summary.total / totalAmount * 360f).toFloat()
                     if (summary.isDebtFunding && sweepAngle > 0f) {
+                        val glowAlphaVal = 0.8f + 0.2f * glowAlpha
+                        val glowBorderColor = Color(0xFF00E5FF).copy(alpha = glowAlphaVal)
+                        val glowAuraColor = Color(0xFF00E5FF).copy(alpha = glowAlpha * 0.45f)
+
+                        // 1. Outer Arc Glow (Centered precisely on the doughnut's outer boundary radius)
                         drawArc(
-                            color = Color(0xFFFFF8E1).copy(alpha = glowAlpha),
-                            startAngle = startAngle,
+                            color = glowAuraColor,
+                            startAngle = haloAngle,
                             sweepAngle = sweepAngle,
                             useCenter = false,
-                            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Butt)
+                            topLeft = outerTopLeft,
+                            size = outerSize,
+                            style = Stroke(width = auraWidth, cap = StrokeCap.Butt)
+                        )
+                        drawArc(
+                            color = glowBorderColor,
+                            startAngle = haloAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = outerTopLeft,
+                            size = outerSize,
+                            style = Stroke(width = glowBorderWidth, cap = StrokeCap.Butt)
+                        )
+
+                        // 2. Inner Arc Glow (Centered precisely on the doughnut's inner boundary radius)
+                        drawArc(
+                            color = glowAuraColor,
+                            startAngle = haloAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = innerTopLeft,
+                            size = innerSize,
+                            style = Stroke(width = auraWidth, cap = StrokeCap.Butt)
+                        )
+                        drawArc(
+                            color = glowBorderColor,
+                            startAngle = haloAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = innerTopLeft,
+                            size = innerSize,
+                            style = Stroke(width = glowBorderWidth, cap = StrokeCap.Butt)
                         )
                     }
-                    startAngle += sweepAngle
+                    haloAngle += sweepAngle
                 }
             }
 
@@ -327,14 +378,14 @@ fun CategoryPieChartCard(
                                     val pct = if (totalAmount > 0) (summary.total / totalAmount).toFloat() else 0f
 
                                     val debtBorder = if (summary.isDebtFunding) {
-                                        BorderStroke(1.5.dp, Color(0xFFFF6D00).copy(alpha = glowAlpha))
+                                        BorderStroke(1.5.dp, Color(0xFF00E5FF).copy(alpha = glowAlpha))
                                     } else null
 
                                     Surface(
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(6.dp),
                                         border = debtBorder,
-                                        color = if (summary.isDebtFunding) Color(0xFFFF6D00).copy(alpha = 0.08f) else Color.Transparent
+                                        color = if (summary.isDebtFunding) Color(0xFF00E5FF).copy(alpha = 0.08f) else Color.Transparent
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(if (summary.isDebtFunding) 4.dp else 0.dp),
@@ -775,14 +826,14 @@ fun DualIncomePieChartCard(
                                 val pct = if (usageTotal > 0) (summary.total / usageTotal).toFloat() else 0f
 
                                 val debtBorder = if (summary.isDebtFunding) {
-                                    BorderStroke(1.5.dp, Color(0xFFFF6D00).copy(alpha = glowAlpha))
+                                    BorderStroke(1.5.dp, Color(0xFF00E5FF).copy(alpha = glowAlpha))
                                 } else null
 
                                 Surface(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(6.dp),
                                     border = debtBorder,
-                                    color = if (summary.isDebtFunding) Color(0xFFFF6D00).copy(alpha = 0.08f) else Color.Transparent
+                                    color = if (summary.isDebtFunding) Color(0xFF00E5FF).copy(alpha = 0.08f) else Color.Transparent
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(if (summary.isDebtFunding) 4.dp else 0.dp),

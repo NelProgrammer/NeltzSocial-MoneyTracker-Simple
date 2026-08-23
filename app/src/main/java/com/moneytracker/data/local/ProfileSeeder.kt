@@ -96,7 +96,7 @@ object ProfileSeeder {
         forceReseed: Boolean = false
     ) {
         val count = database.transactionDao().countForProfile(profileId)
-        val needsReseed = forceReseed || count == 0 || count > 85
+        val needsReseed = forceReseed || count == 0
 
         if (!needsReseed) return // Already seeded!
 

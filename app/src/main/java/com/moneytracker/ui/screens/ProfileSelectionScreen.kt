@@ -314,7 +314,7 @@ private fun CreateProfileDialog(
                         username = it
                         errorMessage = null
                     },
-                    label = { Text("Username (4-20 chars)") },
+                    label = { Text("Username (2-20 chars)") },
                     singleLine = true,
                     isError = errorMessage != null,
                     modifier = Modifier.fillMaxWidth()
@@ -332,7 +332,10 @@ private fun CreateProfileDialog(
                     )
                     Switch(
                         checked = isPasswordProtected,
-                        onCheckedChange = { isPasswordProtected = it }
+                        onCheckedChange = { 
+                            isPasswordProtected = it
+                            errorMessage = null
+                        }
                     )
                 }
 
@@ -346,6 +349,7 @@ private fun CreateProfileDialog(
                         label = { Text("Password (4-10 chars)") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
+                        isError = errorMessage != null,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -362,6 +366,18 @@ private fun CreateProfileDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val uError = com.moneytracker.util.ProfileValidator.validateUsername(username)
+                    if (uError != null) {
+                        errorMessage = uError
+                        return@TextButton
+                    }
+                    if (isPasswordProtected) {
+                        val pError = com.moneytracker.util.ProfileValidator.validatePassword(password)
+                        if (pError != null) {
+                            errorMessage = pError
+                            return@TextButton
+                        }
+                    }
                     onConfirm(username, isPasswordProtected, if (isPasswordProtected) password else null)
                 }
             ) {

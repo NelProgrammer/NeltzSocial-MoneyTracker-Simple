@@ -30,6 +30,8 @@ import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.CategoryPieChartCard
 import com.moneytracker.ui.components.DualIncomePieChartCard
 import com.moneytracker.ui.components.PayMonthFilterHeader
+import androidx.compose.foundation.lazy.items
+import com.moneytracker.ui.theme.getCategoryBaseColor
 import com.moneytracker.ui.theme.EducationColor
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
@@ -57,6 +59,7 @@ fun DashboardScreen(
     val educationDetailBreakdown by viewModel.educationDetailBreakdown.collectAsState()
     val expenseBreakdown by viewModel.expenseBreakdown.collectAsState()
     val expenseDetailBreakdown by viewModel.expenseDetailBreakdown.collectAsState()
+    val customCategoryBreakdowns by viewModel.customCategoryBreakdowns.collectAsState()
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
@@ -171,6 +174,21 @@ fun DashboardScreen(
                     totalAmount = summary.education,
                     baseColor = EducationColor,
                     emptyMessage = "No education expenses recorded for this pay period."
+                )
+            }
+
+            // 9. Custom Category Pie Charts (Dynamically added for any custom category with transactions)
+            items(
+                items = customCategoryBreakdowns,
+                key = { it.categoryName }
+            ) { customBreakdown ->
+                CategoryPieChartCard(
+                    title = "${customBreakdown.categoryName} Breakdown",
+                    summaries = customBreakdown.subCategorySummaries,
+                    detailSummaries = customBreakdown.detailSummaries,
+                    totalAmount = customBreakdown.totalAmount,
+                    baseColor = getCategoryBaseColor(customBreakdown.categoryName),
+                    emptyMessage = "No ${customBreakdown.categoryName} transactions recorded for this pay period."
                 )
             }
         }

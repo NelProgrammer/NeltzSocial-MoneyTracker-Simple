@@ -49,20 +49,20 @@ class CategoriesViewModel(
     fun updateType(type: TransactionType) { _editState.value = _editState.value.copy(type = type) }
     fun updateIcon(iconName: String) { _editState.value = _editState.value.copy(iconName = iconName) }
 
-    fun saveCategory(onDone: () -> Unit = {}) {
+    fun saveCategory(onDone: (Long) -> Unit = {}) {
         val state = _editState.value
         if (state.name.isBlank()) return
         viewModelScope.launch {
-            repository.saveCategory(
+            val newId = repository.saveCategory(
                 CategoryEntity(
                     id = state.id,
-                    name = state.name,
+                    name = state.name.trim(),
                     type = state.type,
                     iconName = state.iconName
                 )
             )
             runSortProcess()
-            onDone()
+            onDone(newId)
         }
     }
 

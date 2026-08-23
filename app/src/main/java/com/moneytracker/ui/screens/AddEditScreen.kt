@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,25 +78,57 @@ fun AddEditScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // Category (SubCategoryEntity) ViewModel & State
+    // 1. ViewModels & State Collection
     val categoriesViewModel: CategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
+    val subCategoriesViewModel: SubCategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
+    val detailsViewModel: DetailsViewModel = viewModel(factory = ViewModelFactory(repository))
+
+    val categories by categoriesViewModel.categories.collectAsState()
+    val dbSubCategories by subCategoriesViewModel.subCategories.collectAsState()
+    val dbDetails by detailsViewModel.details.collectAsState()
+
     var editingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
     var deletingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
-    val categories by categoriesViewModel.categories.collectAsState()
     var showCategoryDialog by remember { mutableStateOf(false) }
 
-    // SubCategory ViewModel & State
-    val subCategoriesViewModel: SubCategoriesViewModel = viewModel(factory = ViewModelFactory(repository))
     var editingSubCategory by remember { mutableStateOf<SubCategoryEntity?>(null) }
-    val dbSubCategories by subCategoriesViewModel.subCategories.collectAsState()
     var showSubCategoryDialog by remember { mutableStateOf(false) }
 
-    // Detail ViewModel & State
-    val detailsViewModel: DetailsViewModel = viewModel(factory = ViewModelFactory(repository))
     var editingDetail by remember { mutableStateOf<DetailEntity?>(null) }
-    val dbDetails by detailsViewModel.details.collectAsState()
     var showDetailDialog by remember { mutableStateOf(false) }
     var showDeleteTxnDialog by remember { mutableStateOf(false) }
+
+    // 2. Smooth, continuous category input text
+    var categoryInputText by remember {
+        mutableStateOf(
+            categories.find { it.id == state.categoryId }?.name ?: state.type.name
+        )
+    }
+
+    LaunchedEffect(state.categoryId) {
+        val foundCat = categories.find { it.id == state.categoryId }
+        if (foundCat != null) {
+            categoryInputText = foundCat.name
+        }
+    }
+
+    // 3. Matched Category Entity / Type from categoryInputText
+    val matchedCategory = remember(categoryInputText, categories) {
+        categories.find { it.name.equals(categoryInputText.trim(), ignoreCase = true) }
+    }
+    val isCategoryUnmatched = remember(categoryInputText, matchedCategory) {
+        categoryInputText.isNotBlank() && matchedCategory == null
+    }
+
+    val matchedSubCat = remember(state.subCategory, dbSubCategories, matchedCategory) {
+        dbSubCategories.find {
+            it.name.equals(state.subCategory.trim(), ignoreCase = true) &&
+            (matchedCategory == null || it.categoryId == matchedCategory.id || (it.categoryId == null && it.type == matchedCategory.type))
+        }
+    }
+    val isSubCategoryUnmatched = remember(state.subCategory, matchedSubCat) {
+        state.subCategory.isNotBlank() && matchedSubCat == null
+    }
 
     Scaffold(
         topBar = {
@@ -127,45 +160,28 @@ fun AddEditScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 1. Category Section (Editable Dropdown: Income, Investment, Education, Expense)
-            var categoryTypeDropdownExpanded by remember { mutableStateOf(false) }
-            val categoryTypeNames = remember {
-                listOf(
-                    TransactionType.INCOME to "Income",
-                    TransactionType.INVESTMENT to "Investment",
-                    TransactionType.EDUCATION to "Education",
-                    TransactionType.EXPENSE to "Expense"
-                )
-            }
-            var categoryInputText by remember(state.type) {
-                mutableStateOf(categoryTypeNames.find { it.first == state.type }?.second ?: state.type.name)
-            }
-
-            // 1. Category Section (ManagedComboboxWithPills)
+            // 1. Category Section (ManagedComboboxWithPills - 100% Database Driven)
             com.moneytracker.ui.components.ManagedComboboxWithPills(
                 label = "Category",
                 selectedValue = categoryInputText,
                 onValueChange = { input ->
                     categoryInputText = input
-                    val matched = categoryTypeNames.find { it.second.equals(input, ignoreCase = true) }
-                    if (matched != null) {
-                        viewModel.updateType(matched.first)
+                    val matchedCat = categories.find { it.name.equals(input.trim(), ignoreCase = true) }
+                    if (matchedCat != null) {
+                        viewModel.updateType(matchedCat.type)
+                        viewModel.updateCategory(matchedCat.id)
                     }
                 },
-                items = categoryTypeNames,
-                itemToText = { it.second },
+                items = categories,
+                itemToText = { it.name },
                 onAddItem = { editingCategory = null; showCategoryDialog = true },
-                onEditItem = { pair ->
-                    val catEntity = categories.find { it.name.equals(pair.second, ignoreCase = true) }
-                    editingCategory = catEntity ?: com.moneytracker.data.local.entity.CategoryEntity(id = 0, name = pair.second, type = pair.first)
+                onEditItem = { cat ->
+                    editingCategory = cat
                     showCategoryDialog = true
                 },
-                onDeleteItem = { pair ->
-                    val catEntity = categories.find { it.name.equals(pair.second, ignoreCase = true) }
-                    if (catEntity != null) {
-                        deletingCategory = catEntity
-                        categoriesViewModel.deleteCategory(catEntity)
-                    }
+                onDeleteItem = { cat ->
+                    deletingCategory = cat
+                    categoriesViewModel.deleteCategory(cat)
                 }
             )
 
@@ -178,16 +194,22 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 2. SubCategory Section (ManagedComboboxWithPills)
-            val availableSubCategories = remember(dbSubCategories, state.type) {
-                dbSubCategories.filter { it.type == state.type }.distinctBy { it.name }
-            }
-
+            // 2. SubCategory Section (ManagedComboboxWithPills - with Component Parent Filtering & Auto-Reset)
             com.moneytracker.ui.components.ManagedComboboxWithPills(
                 label = "SubCategory",
                 selectedValue = state.subCategory,
                 onValueChange = viewModel::updateSubCategory,
-                items = availableSubCategories,
+                items = dbSubCategories,
+                parentFilterKey = categoryInputText,
+                filterPredicate = { subCat ->
+                    if (isCategoryUnmatched) {
+                        false
+                    } else if (matchedCategory != null) {
+                        subCat.categoryId == matchedCategory.id || (subCat.categoryId == null && subCat.type == matchedCategory.type)
+                    } else {
+                        subCat.type == state.type
+                    }
+                },
                 itemToText = { it.name },
                 onAddItem = { editingSubCategory = null; showSubCategoryDialog = true },
                 onEditItem = { subCat -> editingSubCategory = subCat; showSubCategoryDialog = true },
@@ -203,21 +225,24 @@ fun AddEditScreen(
                 thickness = 1.5.dp
             )
 
-            // 3. Detail Section (ManagedComboboxWithPills)
-            val selectedSubCatObj = dbSubCategories.find { it.name.equals(state.subCategory, ignoreCase = true) }
-            val availableDetails = remember(dbDetails, state.type, state.subCategory, selectedSubCatObj) {
-                if (selectedSubCatObj != null) {
-                    dbDetails.filter { it.subCategoryId == selectedSubCatObj.id || it.type == state.type }
-                } else {
-                    dbDetails.filter { it.type == state.type }
-                }.distinctBy { it.name }
-            }
-
+            // 3. Detail Section (ManagedComboboxWithPills - with Component Parent Filtering & Auto-Reset)
             com.moneytracker.ui.components.ManagedComboboxWithPills(
                 label = "Detail (optional)",
                 selectedValue = state.detail,
                 onValueChange = viewModel::updateDetail,
-                items = availableDetails,
+                items = dbDetails,
+                parentFilterKey = Pair(categoryInputText, state.subCategory),
+                filterPredicate = { detail ->
+                    if (isCategoryUnmatched || isSubCategoryUnmatched) {
+                        false
+                    } else if (matchedSubCat != null) {
+                        detail.subCategoryId == matchedSubCat.id
+                    } else if (matchedCategory != null) {
+                        detail.categoryId == matchedCategory.id && detail.subCategoryId == null
+                    } else {
+                        false
+                    }
+                },
                 itemToText = { it.name },
                 onAddItem = { editingDetail = null; showDetailDialog = true },
                 onEditItem = { detail -> editingDetail = detail; showDetailDialog = true },
@@ -541,11 +566,14 @@ fun AddEditScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         if (name.isNotBlank()) {
+                            val trimmed = name.trim()
                             categoriesViewModel.startEdit(editingCategory)
-                            categoriesViewModel.updateName(name.trim())
+                            categoriesViewModel.updateName(trimmed)
                             categoriesViewModel.updateType(type)
-                            categoriesViewModel.saveCategory {
+                            categoriesViewModel.saveCategory { newId ->
+                                categoryInputText = trimmed
                                 viewModel.updateType(type)
+                                viewModel.updateCategory(newId)
                                 showCategoryDialog = false
                             }
                         }
@@ -596,11 +624,13 @@ fun AddEditScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         if (subCatName.isNotBlank()) {
+                            val trimmed = subCatName.trim()
                             subCategoriesViewModel.startEdit(editingSubCategory)
-                            subCategoriesViewModel.updateName(subCatName.trim())
+                            subCategoriesViewModel.updateName(trimmed)
+                            subCategoriesViewModel.updateCategoryId(matchedCategory?.id)
                             subCategoriesViewModel.updateType(subCatType)
                             subCategoriesViewModel.saveSubCategory {
-                                viewModel.updateSubCategory(subCatName.trim())
+                                viewModel.updateSubCategory(trimmed)
                                 viewModel.updateType(subCatType)
                                 showSubCategoryDialog = false
                             }
@@ -630,19 +660,24 @@ fun AddEditScreen(
                             value = detailName,
                             onValueChange = { detailName = it },
                             label = { Text("Detail Name") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
                         )
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        detailsViewModel.startEdit(editingDetail)
-                        detailsViewModel.updateName(detailName)
-                        detailsViewModel.updateType(state.type)
-                        detailsViewModel.updateCategoryId(state.categoryId)
-                        detailsViewModel.saveDetail {
-                            viewModel.updateSubCategory(detailName)
-                            showDetailDialog = false
+                        if (detailName.isNotBlank()) {
+                            val trimmed = detailName.trim()
+                            detailsViewModel.startEdit(editingDetail)
+                            detailsViewModel.updateName(trimmed)
+                            detailsViewModel.updateSubCategoryId(matchedSubCat?.id)
+                            detailsViewModel.updateCategoryId(matchedCategory?.id)
+                            detailsViewModel.updateType(matchedCategory?.type ?: state.type)
+                            detailsViewModel.saveDetail {
+                                viewModel.updateDetail(trimmed)
+                                showDetailDialog = false
+                            }
                         }
                     }) {
                         Text("Save")

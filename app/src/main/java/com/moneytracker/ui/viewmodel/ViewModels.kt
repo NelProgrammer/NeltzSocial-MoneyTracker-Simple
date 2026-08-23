@@ -32,6 +32,13 @@ data class SortCriterion(
     val direction: TransactionsViewModel.SortDirection = TransactionsViewModel.SortDirection.ASC
 )
 
+data class CustomCategoryBreakdown(
+    val categoryName: String,
+    val totalAmount: Double,
+    val subCategorySummaries: List<CategorySummary>,
+    val detailSummaries: List<CategorySummary>
+)
+
 fun buildTransactionComparator(secondarySorts: List<SortCriterion>): Comparator<TransactionWithCategory> {
     // 1. Fixed #1 Primary Sort: Category (INCOME = 0, INVESTMENT = 1, EXPENSE = 2)
     var comparator: Comparator<TransactionWithCategory> = compareBy { t ->
@@ -203,7 +210,7 @@ class DashboardViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // 2nd Pie: Income Funding / Utilization (How Income is Used & Remaining Balance)
+    // 2nd Pie: Income Funding / Utilization (How Income is Used & Remaining Balance / Debt Funding)
     val incomeUsageBreakdown: StateFlow<List<CategorySummary>> = payMonthTransactions
         .map { list ->
             val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
@@ -212,22 +219,43 @@ class DashboardViewModel(
             val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
             val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
             val totalOutflows = expenseTotal + investTotal + eduTotal
-            val hasDeficit = totalOutflows > incomeTotal
 
             val items = mutableListOf<CategorySummary>()
-            if (expenseTotal > 0) {
-                items.add(CategorySummary(101L, "Expenses", expenseTotal, isDebtFunding = hasDeficit, customColorHex = 0xFFD32F2F))
-            }
-            if (investTotal > 0) {
-                items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
-            }
-            if (eduTotal > 0) {
-                items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
-            }
 
-            if (incomeTotal > totalOutflows) {
-                val remaining = incomeTotal - totalOutflows
-                items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
+            if (totalOutflows > incomeTotal && totalOutflows > 0) {
+                // Deficit: Investments and Education funded, and Expenses split into Income-Funded vs Debt-Funded
+                val deficit = totalOutflows - incomeTotal
+                val incomeForExpenses = (incomeTotal - investTotal - eduTotal).coerceAtLeast(0.0)
+                val debtFundedExpenses = expenseTotal - incomeForExpenses
+
+                if (incomeForExpenses > 0) {
+                    items.add(CategorySummary(101L, "Expenses (Income Funded)", incomeForExpenses, isDebtFunding = false, customColorHex = 0xFFD32F2F))
+                }
+                if (debtFundedExpenses > 0) {
+                    // The portion of expenses funded by debt (has outer glow)
+                    items.add(CategorySummary(105L, "Expenses (Debt Funded)", debtFundedExpenses, isDebtFunding = true, customColorHex = 0xFFD32F2F))
+                }
+                if (investTotal > 0) {
+                    items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
+                }
+                if (eduTotal > 0) {
+                    items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
+                }
+            } else {
+                // Surplus or balanced condition
+                if (expenseTotal > 0) {
+                    items.add(CategorySummary(101L, "Expenses", expenseTotal, isDebtFunding = false, customColorHex = 0xFFD32F2F))
+                }
+                if (investTotal > 0) {
+                    items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
+                }
+                if (eduTotal > 0) {
+                    items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
+                }
+                if (incomeTotal > totalOutflows) {
+                    val remaining = incomeTotal - totalOutflows
+                    items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
+                }
             }
             items
         }
@@ -252,17 +280,29 @@ class DashboardViewModel(
                         categoryId = txns.first().categoryId,
                         categoryName = detailName,
                         total = txns.sumOf { kotlin.math.abs(it.amount) },
-                        customColorHex = hex
+                        customColorHex = hex,
+                        isDebtFunding = false
                     )
                 }
                 .sortedByDescending { it.total }
 
+            val items = mutableListOf<CategorySummary>()
             var runningOutflow = 0.0
-            val items = outflowDetails.map { detail ->
+            outflowDetails.forEach { detail ->
+                val start = runningOutflow
                 runningOutflow += detail.total
-                val needsDebt = runningOutflow > incomeTotal
-                detail.copy(isDebtFunding = needsDebt)
-            }.toMutableList()
+                if (runningOutflow <= incomeTotal) {
+                    items.add(detail.copy(isDebtFunding = false))
+                } else if (start >= incomeTotal) {
+                    items.add(detail.copy(isDebtFunding = true))
+                } else {
+                    // Spans the threshold: split into income-funded and debt-funded parts
+                    val incomePart = incomeTotal - start
+                    val debtPart = runningOutflow - incomeTotal
+                    items.add(detail.copy(total = incomePart, isDebtFunding = false))
+                    items.add(detail.copy(categoryName = "${detail.categoryName} (Debt)", total = debtPart, isDebtFunding = true))
+                }
+            }
 
             if (incomeTotal > totalOutflows) {
                 val remaining = incomeTotal - totalOutflows
@@ -359,6 +399,46 @@ class DashboardViewModel(
                     )
                 }
                 .sortedByDescending { it.total }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // Dynamic Breakdown for any Custom Categories with transactions in the pay period
+    val customCategoryBreakdowns: StateFlow<List<CustomCategoryBreakdown>> = payMonthTransactions
+        .map { list ->
+            val standardNames = setOf("income", "investment", "education", "expense")
+            val nonStandardTxns = list.filter {
+                it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE &&
+                !standardNames.contains(it.categoryName.trim().lowercase())
+            }
+            nonStandardTxns.groupBy { it.categoryName.trim() }
+                .map { (catName, txns) ->
+                    val total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    val subCatSummaries = txns.groupBy { it.subCategory.ifBlank { it.categoryName } }
+                        .map { (subCat, subTxns) ->
+                            CategorySummary(
+                                categoryId = subTxns.first().categoryId,
+                                categoryName = subCat,
+                                total = subTxns.sumOf { kotlin.math.abs(it.amount) }
+                            )
+                        }.sortedByDescending { it.total }
+
+                    val detailSummaries = txns.groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
+                        .map { (det, detTxns) ->
+                            CategorySummary(
+                                categoryId = detTxns.first().categoryId,
+                                categoryName = det,
+                                total = detTxns.sumOf { kotlin.math.abs(it.amount) }
+                            )
+                        }.sortedByDescending { it.total }
+
+                    CustomCategoryBreakdown(
+                        categoryName = catName,
+                        totalAmount = total,
+                        subCategorySummaries = subCatSummaries,
+                        detailSummaries = detailSummaries
+                    )
+                }
+                .sortedByDescending { it.totalAmount }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

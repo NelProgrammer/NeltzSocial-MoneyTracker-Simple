@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneytracker.data.local.entity.ProfileEntity
+import com.moneytracker.util.ProfileValidator
 
 @Composable
 fun ProfileManagementDialog(
@@ -47,7 +48,7 @@ fun ProfileManagementDialog(
                         username = it
                         errorMessage = null
                     },
-                    label = { Text("Username (4-20 chars, no spaces)") },
+                    label = { Text("Username (2-20 chars, no spaces)") },
                     singleLine = true,
                     isError = errorMessage != null,
                     modifier = Modifier.fillMaxWidth()
@@ -65,7 +66,10 @@ fun ProfileManagementDialog(
                     )
                     Switch(
                         checked = isPasswordProtected,
-                        onCheckedChange = { isPasswordProtected = it }
+                        onCheckedChange = { 
+                            isPasswordProtected = it
+                            errorMessage = null
+                        }
                     )
                 }
 
@@ -79,6 +83,7 @@ fun ProfileManagementDialog(
                         label = { Text("Password (4-10 chars, no spaces)") },
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
+                        isError = errorMessage != null,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -95,6 +100,19 @@ fun ProfileManagementDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val uError = ProfileValidator.validateUsername(username)
+                    if (uError != null) {
+                        errorMessage = uError
+                        return@TextButton
+                    }
+                    if (isPasswordProtected) {
+                        val pError = ProfileValidator.validatePassword(password)
+                        if (pError != null) {
+                            errorMessage = pError
+                            return@TextButton
+                        }
+                    }
+
                     if (profile.isGuest && onConvertGuest != null) {
                         onConvertGuest(username, isPasswordProtected, if (isPasswordProtected) password else null)
                     } else {

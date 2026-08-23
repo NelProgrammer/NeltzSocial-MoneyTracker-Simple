@@ -1,13 +1,17 @@
 package com.moneytracker.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowOverflow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,13 +22,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -33,6 +38,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,12 +64,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import com.moneytracker.data.local.ComponentStorageManager
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -232,6 +243,8 @@ fun <T> ManagedComboboxWithPills(
     onValueChange: (String) -> Unit,
     items: List<T>,
     filterPredicate: ((T) -> Boolean)? = null,
+    parentFilterKey: Any? = null,
+    autoResetOnParentChange: Boolean = true,
     initialSettings: ComboboxSettings = ComboboxSettings(),
     onSettingsChange: ((ComboboxSettings) -> Unit)? = null,
     itemToText: (T) -> String = { it.toString() },
@@ -245,81 +258,154 @@ fun <T> ManagedComboboxWithPills(
     var settings by remember(initialSettings) { mutableStateOf(initialSettings) }
 
     val coroutineScope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
 
-    // 1. Parent Filtering
-    val parentFilteredItems = remember(items, filterPredicate) {
+    // 1. Parent Filtering (Encapsulated in Component)
+    val parentFilteredItems = remember(items, filterPredicate, parentFilterKey) {
         if (filterPredicate != null) items.filter(filterPredicate) else items
     }
 
-    // 2. Search / Live-Filtering as user types + Sort Order
-    val displayItems = remember(parentFilteredItems, selectedValue, settings.isAlphabeticalSort) {
-        val searchFiltered = if (selectedValue.isNotBlank()) {
-            val query = selectedValue.trim()
-            val matches = parentFilteredItems.filter { itemToText(it).contains(query, ignoreCase = true) }
-            if (matches.isNotEmpty()) matches else parentFilteredItems
+    // Auto-Reset inside Component when parent filter changes & current selection is invalid
+    if (autoResetOnParentChange) {
+        var isInitialComposition by remember { mutableStateOf(true) }
+        LaunchedEffect(parentFilteredItems, parentFilterKey) {
+            if (isInitialComposition) {
+                isInitialComposition = false
+                return@LaunchedEffect
+            }
+            if (selectedValue.isNotEmpty() && parentFilteredItems.none { itemToText(it).equals(selectedValue.trim(), ignoreCase = true) }) {
+                onValueChange("")
+            }
+        }
+    }
+
+    // 2. All Available Pill Items (respects alphabetical sort)
+    val allPillItems = remember(parentFilteredItems, settings.isAlphabeticalSort) {
+        if (settings.isAlphabeticalSort) {
+            parentFilteredItems.sortedBy { itemToText(it).lowercase() }
         } else {
             parentFilteredItems
         }
+    }
 
-        if (settings.isAlphabeticalSort) {
-            searchFiltered.sortedBy { itemToText(it).lowercase() }
+    // 3. Search / Live-Filtering as user types in dropdown + Sort Order
+    val displayItems = remember(allPillItems, selectedValue) {
+        val isExactMatch = allPillItems.any { itemToText(it).equals(selectedValue.trim(), ignoreCase = true) }
+        if (selectedValue.isNotBlank() && !isExactMatch) {
+            val query = selectedValue.trim()
+            val matches = allPillItems.filter { itemToText(it).contains(query, ignoreCase = true) }
+            if (matches.isNotEmpty()) matches else allPillItems
         } else {
-            searchFiltered
+            allPillItems
         }
     }
 
-    // 3. Adaptive Dropdown Height based on `settings.maxVisibleItems`
+    // 4. Adaptive Dropdown Height based on `settings.maxVisibleItems`
     val maxDropdownHeight = remember(settings.maxVisibleItems) {
-        (settings.maxVisibleItems * 48 + 76).dp
+        (settings.maxVisibleItems * 48 + 120).dp
+    }
+    val maxListHeight = remember(settings.maxVisibleItems) {
+        (settings.maxVisibleItems * 48).dp
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        // --- ROW 1: INPUT FIELD + ADD BUTTON (+) + GEAR SETTINGS (⚙) ---
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it },
-                modifier = Modifier.weight(1f)
-            ) {
-                OutlinedTextField(
-                    value = selectedValue,
-                    onValueChange = {
-                        onValueChange(it)
-                        expanded = true
-                    },
-                    label = { Text(label) },
-                    placeholder = { Text("Select a: $label item") },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Expand $label"
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    singleLine = true
-                )
+    var textFieldValue by remember(selectedValue) {
+        mutableStateOf(
+            TextFieldValue(
+                text = selectedValue,
+                selection = TextRange(selectedValue.length)
+            )
+        )
+    }
+    var isFocused by remember { mutableStateOf(false) }
 
-                // Dropdown Menu with Up/Down buttons and adaptive scrolling
-                DropdownMenu(
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            // --- ROW 1: INPUT FIELD + ADD BUTTON (+) + GEAR SETTINGS (⚙) ---
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ExposedDropdownMenuBox(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .heightIn(max = maxDropdownHeight)
+                    onExpandedChange = { expanded = it },
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = textFieldValue,
+                        onValueChange = { newValue ->
+                            textFieldValue = newValue
+                            if (newValue.text != selectedValue) {
+                                onValueChange(newValue.text)
+                            }
+                        },
+                        label = { Text(label) },
+                        placeholder = { Text("Select a: $label item") },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (selectedValue.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            textFieldValue = TextFieldValue("")
+                                            onValueChange("")
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Clear $label"
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { expanded = !expanded }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Expand $label"
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused && !isFocused) {
+                                    if (selectedValue.isNotEmpty()) {
+                                        textFieldValue = TextFieldValue(
+                                            text = selectedValue,
+                                            selection = TextRange(0, selectedValue.length)
+                                        )
+                                    }
+                                }
+                                isFocused = focusState.isFocused
+                            },
+                        singleLine = true
+                    )
+
+                    // Dropdown Menu with Up/Down buttons and adaptive scrolling
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        properties = PopupProperties(focusable = false),
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .heightIn(max = maxDropdownHeight)
+                    ) {
                         // ▲ Up Scroll Button (at the START of the list)
                         Surface(
                             onClick = {
                                 coroutineScope.launch {
-                                    val target = max(0, listState.firstVisibleItemIndex - settings.scrollStep)
-                                    listState.animateScrollToItem(target)
+                                    val target = max(0, scrollState.value - (settings.scrollStep * 140))
+                                    scrollState.animateScrollTo(target)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -368,13 +454,13 @@ fun <T> ManagedComboboxWithPills(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                         // Scrollable List of Items
-                        LazyColumn(
-                            state = listState,
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f, fill = false)
+                                .heightIn(max = maxListHeight)
+                                .verticalScroll(scrollState)
                         ) {
-                            items(displayItems) { item ->
+                            displayItems.forEach { item ->
                                 val itemText = itemToText(item)
                                 val isSelected = selectedValue.equals(itemText, ignoreCase = true)
 
@@ -435,11 +521,8 @@ fun <T> ManagedComboboxWithPills(
                         Surface(
                             onClick = {
                                 coroutineScope.launch {
-                                    val target = min(
-                                        displayItems.size - 1,
-                                        listState.firstVisibleItemIndex + settings.scrollStep
-                                    )
-                                    if (target >= 0) listState.animateScrollToItem(target)
+                                    val target = min(scrollState.maxValue, scrollState.value + (settings.scrollStep * 140))
+                                    scrollState.animateScrollTo(target)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -469,73 +552,156 @@ fun <T> ManagedComboboxWithPills(
                         }
                     }
                 }
-            }
 
-            // Add Item Button (+)
-            if (onAddItem != null) {
+                // Add Item Button (+)
+                if (onAddItem != null) {
+                    IconButton(
+                        onClick = onAddItem,
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add $label",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                // Gear Settings Button (⚙)
                 IconButton(
-                    onClick = onAddItem,
-                    modifier = Modifier.padding(start = 4.dp)
+                    onClick = { showSettingsDialog = true },
+                    modifier = Modifier.padding(start = 2.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add $label",
-                        tint = MaterialTheme.colorScheme.primary
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Configure $label Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Gear Settings Button (⚙)
-            IconButton(
-                onClick = { showSettingsDialog = true },
-                modifier = Modifier.padding(start = 2.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Configure $label Settings",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+            // --- ROW 2: DEDICATED EXPANDABLE PILLS CARD ---
+            if (allPillItems.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // --- ROW 2: QUICK-PICK PILLS ---
-        if (displayItems.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
+                var isPillsExpanded by remember { mutableStateOf(false) }
 
-            if (settings.pillRows <= 1) {
-                // 1 Row (Default): Horizontal Scrollable
-                Row(
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .animateContentSize()
                 ) {
-                    displayItems.forEach { item ->
-                        val itemText = itemToText(item)
-                        FilterChip(
-                            selected = selectedValue.equals(itemText, ignoreCase = true),
-                            onClick = { onValueChange(itemText) },
-                            label = { Text(itemText, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            } else {
-                // Multi-Row Mode: FlowRow Wrap
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    maxItemsInEachRow = Int.MAX_VALUE,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp)
-                ) {
-                    displayItems.forEach { item ->
-                        val itemText = itemToText(item)
-                        FilterChip(
-                            selected = selectedValue.equals(itemText, ignoreCase = true),
-                            onClick = { onValueChange(itemText) },
-                            label = { Text(itemText, style = MaterialTheme.typography.labelSmall) }
-                        )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        // Pills Card Header with Expand/Collapse toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isPillsExpanded = !isPillsExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Quick Pick",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                                ) {
+                                    Text(
+                                        text = "${allPillItems.size}",
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (isPillsExpanded) "Collapse" else "Expand (${settings.pillRows} row${if (settings.pillRows > 1) "s" else ""})",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Icon(
+                                    imageVector = if (isPillsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (isPillsExpanded) "Collapse Pills" else "Expand Pills",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Pills Content:
+                        if (isPillsExpanded) {
+                            // Fully expanded: Multi-row wrap of all pills
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                maxItemsInEachRow = Int.MAX_VALUE,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                allPillItems.forEach { item ->
+                                    val itemText = itemToText(item)
+                                    FilterChip(
+                                        selected = selectedValue.equals(itemText, ignoreCase = true),
+                                        onClick = { onValueChange(itemText) },
+                                        label = { Text(itemText, style = MaterialTheme.typography.labelSmall) }
+                                    )
+                                }
+                            }
+                        } else {
+                            // Collapsed: Display default number of lines (1 or 2 as configured)
+                            if (settings.pillRows <= 1) {
+                                // 1 Row: Horizontal Scrollable
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    allPillItems.forEach { item ->
+                                        val itemText = itemToText(item)
+                                        FilterChip(
+                                            selected = selectedValue.equals(itemText, ignoreCase = true),
+                                            onClick = { onValueChange(itemText) },
+                                            label = { Text(itemText, style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+                            } else {
+                                // 2+ Rows: FlowRow strictly limited by maxLines = settings.pillRows
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    maxLines = settings.pillRows,
+                                    overflow = FlowRowOverflow.Clip,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    allPillItems.forEach { item ->
+                                        val itemText = itemToText(item)
+                                        FilterChip(
+                                            selected = selectedValue.equals(itemText, ignoreCase = true),
+                                            onClick = { onValueChange(itemText) },
+                                            label = { Text(itemText, style = MaterialTheme.typography.labelSmall) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

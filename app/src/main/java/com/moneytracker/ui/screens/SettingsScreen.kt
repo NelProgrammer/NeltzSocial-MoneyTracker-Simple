@@ -450,7 +450,9 @@ fun SettingsScreen(
                     isPasswordProtected = isPasswordProtected,
                     newPasswordInput = password,
                     onSuccess = { showProfileDialog = false },
-                    onError = { }
+                    onError = { error ->
+                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 )
             },
             onConvertGuest = { username, isPasswordProtected, password ->
@@ -460,7 +462,9 @@ fun SettingsScreen(
                     isPasswordProtected = isPasswordProtected,
                     passwordInput = password,
                     onSuccess = { showProfileDialog = false },
-                    onError = { }
+                    onError = { error ->
+                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+                    }
                 )
             }
         )
