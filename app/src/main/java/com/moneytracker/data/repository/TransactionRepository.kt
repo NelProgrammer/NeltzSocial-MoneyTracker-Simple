@@ -498,10 +498,21 @@ class TransactionRepository(
     fun observeUnitSizes(): Flow<List<UnitSizeEntity>> =
         unitSizeDao?.observeAll(activeProfileId) ?: flowOf(emptyList())
 
+    suspend fun countUnitSizes(profileId: Long = activeProfileId): Int =
+        unitSizeDao?.count(profileId) ?: 0
+
+    suspend fun cleanDuplicateUnitSizes(profileId: Long = activeProfileId) {
+        unitSizeDao?.deleteDuplicates(profileId)
+    }
+
     suspend fun saveUnitSize(unitSize: UnitSizeEntity): Long {
         val dao = unitSizeDao ?: return 0L
-        val pid = if (unitSize.profileId == 0L) activeProfileId else unitSize.profileId
-        return dao.insert(unitSize.copy(profileId = pid))
+        val pid = if (unitSize.id == 0L || unitSize.profileId <= 0L) activeProfileId else unitSize.profileId
+        val trimmed = unitSize.name.trim()
+        if (trimmed.isBlank()) return 0L
+        val existing = dao.getByName(pid, trimmed)
+        if (existing != null) return existing.id
+        return dao.insert(unitSize.copy(id = 0L, profileId = pid, name = trimmed))
     }
 
     suspend fun deleteUnitSize(unitSize: UnitSizeEntity) {

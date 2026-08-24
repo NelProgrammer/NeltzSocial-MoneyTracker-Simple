@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Repeat
@@ -51,11 +54,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,7 +95,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroceriesScreen(
+fun AddEditGroceriesScreen(
     viewModel: GroceriesViewModel,
     repository: TransactionRepository
 ) {
@@ -552,12 +559,12 @@ private fun UnifiedGroceryTable(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(horizontal = 6.dp, vertical = 7.dp),
+                    .padding(horizontal = 4.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 1. Select Column
                 Box(
-                    modifier = Modifier.width(36.dp),
+                    modifier = Modifier.width(30.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -570,17 +577,17 @@ private fun UnifiedGroceryTable(
                 // 2. Category Column
                 Text(
                     text = "Category",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.9f)
+                    modifier = Modifier.weight(0.85f)
                 )
 
                 // 3. Item Column
                 Text(
                     text = "Item",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1.2f)
+                    modifier = Modifier.weight(1.15f)
                 )
 
                 // 4. Budget Column
@@ -590,19 +597,19 @@ private fun UnifiedGroceryTable(
                 ) {
                     Text(
                         text = "Budget",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.End
                     )
                     Text(
                         text = "Qty×Unit | Cost",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = TextAlign.End
                     )
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
 
                 // 5. Actual Column
                 Column(
@@ -611,19 +618,19 @@ private fun UnifiedGroceryTable(
                 ) {
                     Text(
                         text = "Actual",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.End
                     )
                     Text(
                         text = "Qty×Unit | Cost",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = TextAlign.End
                     )
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
 
                 // 6. Remain Column
                 Column(
@@ -632,13 +639,13 @@ private fun UnifiedGroceryTable(
                 ) {
                     Text(
                         text = "Remain",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.secondary,
                         textAlign = TextAlign.End
                     )
                     Text(
                         text = "Qty×Unit | Cost",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = TextAlign.End
                     )
@@ -688,26 +695,26 @@ private fun UnifiedGroceryItemTableRow(
                 onDoubleClick = onEdit,
                 onLongClick = { showActionDialog = true }
             )
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 1. Dedicated Select Column
         Box(
-            modifier = Modifier.width(36.dp),
+            modifier = Modifier.width(30.dp),
             contentAlignment = Alignment.Center
         ) {
             Checkbox(
                 checked = isSelected,
                 onCheckedChange = { onToggleSelect() },
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
             )
         }
 
         // 2. Category Column
         Column(
             modifier = Modifier
-                .weight(0.9f)
-                .padding(end = 4.dp),
+                .weight(0.85f)
+                .padding(end = 2.dp),
             verticalArrangement = Arrangement.Center
         ) {
             Surface(
@@ -716,11 +723,11 @@ private fun UnifiedGroceryItemTableRow(
             ) {
                 Text(
                     text = item.category,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.5.dp)
                 )
             }
         }
@@ -728,14 +735,14 @@ private fun UnifiedGroceryItemTableRow(
         // 3. Item Column (Subcategory, Name & Unit Size, Recurrence badge, Note)
         Column(
             modifier = Modifier
-                .weight(1.2f)
-                .padding(end = 4.dp),
+                .weight(1.15f)
+                .padding(end = 2.dp),
             verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             // 1. Subcategory
             Text(
                 text = item.subCategory,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -751,7 +758,7 @@ private fun UnifiedGroceryItemTableRow(
             if (nameAndUnit.isNotBlank()) {
                 Text(
                     text = nameAndUnit,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -780,7 +787,7 @@ private fun UnifiedGroceryItemTableRow(
             if (item.note.isNotBlank()) {
                 Text(
                     text = item.note,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.5.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -795,14 +802,14 @@ private fun UnifiedGroceryItemTableRow(
         ) {
             Text(
                 text = "${item.quantityBudget} × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 maxLines = 1
             )
             Text(
                 text = CurrencyUtils.formatZar(item.costBudget),
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.End,
@@ -810,7 +817,7 @@ private fun UnifiedGroceryItemTableRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(2.dp))
 
         // 5. Actual Column (Qty × Unit Price -> Total Cost)
         val isOver = item.costActual > item.costBudget && item.costBudget > 0
@@ -822,14 +829,14 @@ private fun UnifiedGroceryItemTableRow(
         ) {
             Text(
                 text = "${item.quantityActual} × ${CurrencyUtils.formatZar(item.unitPriceActual)}",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 maxLines = 1
             )
             Text(
                 text = CurrencyUtils.formatZar(item.costActual),
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 fontWeight = FontWeight.Bold,
                 color = actualColor,
                 textAlign = TextAlign.End,
@@ -837,7 +844,7 @@ private fun UnifiedGroceryItemTableRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(2.dp))
 
         // 6. Remain Column (Qty × Unit Price -> Remaining Cost)
         val remainingQty = item.quantityBudget - item.quantityActual
@@ -854,14 +861,14 @@ private fun UnifiedGroceryItemTableRow(
         ) {
             Text(
                 text = "$remainingQty × ${CurrencyUtils.formatZar(item.unitPriceBudget)}",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 maxLines = 1
             )
             Text(
                 text = CurrencyUtils.formatZar(remainingCost),
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 fontWeight = FontWeight.Bold,
                 color = remainColor,
                 textAlign = TextAlign.End,
@@ -1013,9 +1020,66 @@ private fun AddEditBudgetItemDialog(
         }
     }
 
-    var categoryInput by remember { mutableStateOf(item?.category ?: "Starch") }
-    var subCategoryInput by remember { mutableStateOf(item?.subCategory ?: "Rice") }
-    var itemDetailInput by remember { mutableStateOf(item?.itemDetail ?: "") }
+    // Dynamic categories, subcategories, and details management
+    var customCategories by remember { mutableStateOf<List<String>>(emptyList()) }
+    var customSubCategories by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    var customDetails by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+
+    val allBudgetItems by viewModel.budgetItems.collectAsState()
+
+    val allCategories = remember(allBudgetItems, customCategories) {
+        (GROCERY_DEFAULT_CATEGORIES_MAP.keys + customCategories + allBudgetItems.map { it.category }).filter { it.isNotBlank() }.distinct()
+    }
+
+    val subCatFilterMap = remember(allBudgetItems, customSubCategories) {
+        val map = mutableMapOf<String, MutableList<String>>()
+        GROCERY_DEFAULT_CATEGORIES_MAP.forEach { (cat, subs) ->
+            map.getOrPut(cat) { mutableListOf() }.addAll(subs)
+        }
+        allBudgetItems.forEach { item ->
+            if (item.category.isNotBlank() && item.subCategory.isNotBlank()) {
+                map.getOrPut(item.category) { mutableListOf() }.add(item.subCategory)
+            }
+        }
+        customSubCategories.forEach { (cat, subs) ->
+            map.getOrPut(cat) { mutableListOf() }.addAll(subs)
+        }
+        map.mapValues { it.value.distinct() }
+    }
+
+    val allSubCategories = remember(subCatFilterMap) {
+        subCatFilterMap.values.flatten().distinct()
+    }
+
+    val detailFilterMap = remember(allBudgetItems, customDetails) {
+        val map = mutableMapOf<String, MutableList<String>>()
+        allBudgetItems.forEach { item ->
+            if (item.subCategory.isNotBlank() && item.itemDetail.isNotBlank()) {
+                map.getOrPut(item.subCategory) { mutableListOf() }.add(item.itemDetail)
+            }
+        }
+        customDetails.forEach { (sub, dets) ->
+            map.getOrPut(sub) { mutableListOf() }.addAll(dets)
+        }
+        map.mapValues { it.value.distinct() }
+    }
+
+    val allDetails = remember(detailFilterMap) {
+        detailFilterMap.values.flatten().distinct()
+    }
+
+    // 3-Tier Cascading Orchestrator: Category -> SubCategory -> Detail
+    val orchestrator = com.moneytracker.ui.components.rememberSimpleStringComboboxOrchestrator(
+        categories = allCategories,
+        subCategories = allSubCategories,
+        details = allDetails,
+        subCatFilterMap = subCatFilterMap,
+        detailFilterMap = detailFilterMap,
+        initialCategory = item?.category ?: "Starch",
+        initialSubCategory = item?.subCategory ?: "Rice",
+        initialDetail = item?.itemDetail ?: ""
+    )
+
     var measureValueInput by remember { mutableStateOf(initialMeasureValue) }
     var unitMeasureInput by remember { mutableStateOf(initialUnitMeasure) }
     var noteInput by remember { mutableStateOf(item?.note ?: "") }
@@ -1024,66 +1088,104 @@ private fun AddEditBudgetItemDialog(
     var isRecurringInput by remember { mutableStateOf(item?.isRecurring ?: 1) } // Default 1 = Monthly Recurring
 
     val unitSizes by viewModel.unitSizes.collectAsState()
-    var showUnitSizeCrudDialog by remember { mutableStateOf(false) }
+    var editingUnitSize by remember { mutableStateOf<UnitSizeEntity?>(null) }
+    var showUnitDialog by remember { mutableStateOf(false) }
 
-    // Editable Dropdown Expanded States
-    var catExpanded by remember { mutableStateOf(false) }
-    var subCatExpanded by remember { mutableStateOf(false) }
-    var unitMeasureExpanded by remember { mutableStateOf(false) }
+    // CRUD Dialog States
+    var showAddCatDialog by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<String?>(null) }
 
-    val allBudgetItems by viewModel.budgetItems.collectAsState()
-    val availableCategoryNames = remember(allBudgetItems) {
-        val existingCats = allBudgetItems.map { it.category }.filter { it.isNotBlank() }
-        (GROCERY_DEFAULT_CATEGORIES_MAP.keys + existingCats).distinct()
-    }
+    var showAddSubCatDialog by remember { mutableStateOf(false) }
+    var editingSubCategory by remember { mutableStateOf<String?>(null) }
 
-    val availableSubCatNames = remember(categoryInput, allBudgetItems) {
-        val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[categoryInput] ?: emptyList()
-        val existingSubs = allBudgetItems
-            .filter { it.category.equals(categoryInput, ignoreCase = true) }
-            .map { it.subCategory }
-            .filter { it.isNotBlank() }
-        val fallbackSubs = GROCERY_DEFAULT_CATEGORIES_MAP.values.flatten()
-        (catSubs + existingSubs + fallbackSubs).distinct()
-    }
+    var showAddDetailDialog by remember { mutableStateOf(false) }
+    var editingDetail by remember { mutableStateOf<String?>(null) }
+
     var showDuplicateDialog by remember { mutableStateOf<GroceryBudgetItemEntity?>(null) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (item == null) "Add Grocery Budget Item" else "Edit Grocery Budget Item",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                if (item != null) {
-                    IconButton(
-                        onClick = {
-                            viewModel.deleteGroceryBudgetItem(item)
-                            onDismiss()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Item",
-                            tint = ExpenseColor
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = if (item == null) "Add Grocery Budget Item" else "Edit Grocery Budget Item",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        }
+                    },
+                    actions = {
+                        if (item != null) {
+                            IconButton(
+                                onClick = {
+                                    viewModel.deleteGroceryBudgetItem(item)
+                                    onDismiss()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Item",
+                                    tint = ExpenseColor
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                val duplicate = viewModel.findDuplicateItem(
+                                    category = orchestrator.categoryText,
+                                    subCategory = orchestrator.subCategoryText,
+                                    itemDetail = orchestrator.detailText,
+                                    excludeId = item?.id ?: 0L
+                                )
+
+                                if (duplicate != null) {
+                                    showDuplicateDialog = duplicate
+                                } else {
+                                    val qty = qtyBudgetInput.toIntOrNull() ?: 1
+                                    val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                                    val computedUnitSize = if (measureValueInput.isBlank()) {
+                                        unitMeasureInput.trim()
+                                    } else {
+                                        "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                                    }
+                                    val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                                    onSave(
+                                        orchestrator.categoryText,
+                                        orchestrator.subCategoryText,
+                                        orchestrator.detailText,
+                                        computedUnitSize,
+                                        noteInput,
+                                        qty,
+                                        price,
+                                        isRecurringInput,
+                                        startTs
+                                    )
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text("Save")
+                        }
                     }
-                }
+                )
             }
-        },
-        text = {
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Start Month Dropdown
                 ExposedDropdownMenuBox(
@@ -1117,92 +1219,87 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // Category (ManagedComboboxWithPills - Grocery Specific)
+                // 1. Category (ManagedComboboxWithPills - Root)
                 com.moneytracker.ui.components.ManagedComboboxWithPills(
                     label = "Category",
-                    selectedValue = categoryInput,
+                    selectedValue = orchestrator.categoryText,
                     onValueChange = { catName ->
-                        categoryInput = catName
-                        val catSubs = GROCERY_DEFAULT_CATEGORIES_MAP[catName]
-                        if (catSubs != null && catSubs.isNotEmpty() && !catSubs.contains(subCategoryInput)) {
-                            subCategoryInput = catSubs.first()
-                        }
+                        orchestrator.categoryText = catName
                     },
-                    items = availableCategoryNames,
-                    itemToText = { it }
+                    items = orchestrator.categories,
+                    itemToText = { it },
+                    onAddItem = { editingCategory = null; showAddCatDialog = true },
+                    onEditItem = { cat -> editingCategory = cat; showAddCatDialog = true },
+                    onDeleteItem = { cat ->
+                        customCategories = customCategories - cat
+                        if (orchestrator.categoryText.equals(cat, ignoreCase = true)) {
+                            orchestrator.categoryText = ""
+                        }
+                    }
                 )
 
-                // SubCategory (ManagedComboboxWithPills - Grocery Specific)
+                // 2. SubCategory (ManagedComboboxWithPills - Child of Category)
                 com.moneytracker.ui.components.ManagedComboboxWithPills(
                     label = "Sub-Category",
-                    selectedValue = subCategoryInput,
-                    onValueChange = { subCategoryInput = it },
-                    items = availableSubCatNames,
-                    itemToText = { it }
+                    selectedValue = orchestrator.subCategoryText,
+                    onValueChange = { subName -> orchestrator.subCategoryText = subName },
+                    items = orchestrator.subCategories,
+                    parentFilterKey = orchestrator.categoryText,
+                    filterPredicate = { orchestrator.isSubCategoryValid(it) },
+                    itemToText = { it },
+                    onAddItem = { editingSubCategory = null; showAddSubCatDialog = true },
+                    onEditItem = { sub -> editingSubCategory = sub; showAddSubCatDialog = true },
+                    onDeleteItem = { sub ->
+                        val cat = orchestrator.categoryText
+                        customSubCategories = customSubCategories + (cat to ((customSubCategories[cat] ?: emptyList()) - sub))
+                        if (orchestrator.subCategoryText.equals(sub, ignoreCase = true)) {
+                            orchestrator.subCategoryText = ""
+                        }
+                    }
                 )
 
-                // Item Detail (Free text)
+                // 3. Detail / Item Name (ManagedComboboxWithPills - Grandchild of SubCategory)
+                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                    label = "Detail / Item Name",
+                    selectedValue = orchestrator.detailText,
+                    onValueChange = { detName -> orchestrator.detailText = detName },
+                    items = orchestrator.details,
+                    parentFilterKey = Pair(orchestrator.categoryText, orchestrator.subCategoryText),
+                    filterPredicate = { orchestrator.isDetailValid(it) },
+                    itemToText = { it },
+                    onAddItem = { editingDetail = null; showAddDetailDialog = true },
+                    onEditItem = { det -> editingDetail = det; showAddDetailDialog = true },
+                    onDeleteItem = { det ->
+                        val sub = orchestrator.subCategoryText
+                        customDetails = customDetails + (sub to ((customDetails[sub] ?: emptyList()) - det))
+                        if (orchestrator.detailText.equals(det, ignoreCase = true)) {
+                            orchestrator.detailText = ""
+                        }
+                    }
+                )
+
+                // 4. Measure Value (Numeric)
                 OutlinedTextField(
-                    value = itemDetailInput,
-                    onValueChange = { itemDetailInput = it },
-                    label = { Text("Detail / Item Name (e.g., White Rice 2kg)") },
+                    value = measureValueInput,
+                    onValueChange = { measureValueInput = it },
+                    label = { Text("Measure (e.g. 500, 2, 1)") },
+                    placeholder = { Text("Numeric measure size") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Split Unit Size: Numeric Measure Value + Unit Measure Dropdown
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = measureValueInput,
-                        onValueChange = { measureValueInput = it },
-                        label = { Text("Measure (e.g. 500)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    ExposedDropdownMenuBox(
-                        expanded = unitMeasureExpanded,
-                        onExpandedChange = { unitMeasureExpanded = it },
-                        modifier = Modifier.weight(1.3f)
-                    ) {
-                        OutlinedTextField(
-                            value = unitMeasureInput,
-                            onValueChange = { unitMeasureInput = it },
-                            label = { Text("Unit") },
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            singleLine = true
-                        )
-                        DropdownMenu(
-                            expanded = unitMeasureExpanded,
-                            onDismissRequest = { unitMeasureExpanded = false }
-                        ) {
-                            unitSizes.forEach { sizeEntity ->
-                                DropdownMenuItem(
-                                    text = { Text(sizeEntity.name) },
-                                    onClick = {
-                                        unitMeasureInput = sizeEntity.name
-                                        unitMeasureExpanded = false
-                                    }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("+ Manage Units...", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
-                                onClick = {
-                                    unitMeasureExpanded = false
-                                    showUnitSizeCrudDialog = true
-                                }
-                            )
-                        }
-                    }
-                }
+                // 5. Unit (ManagedComboboxWithPills - Standalone without parent)
+                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                    label = "Unit",
+                    selectedValue = unitMeasureInput,
+                    onValueChange = { unitMeasureInput = it },
+                    items = unitSizes,
+                    itemToText = { it.name },
+                    onAddItem = { editingUnitSize = null; showUnitDialog = true },
+                    onEditItem = { unit -> editingUnitSize = unit; showUnitDialog = true },
+                    onDeleteItem = { unit -> viewModel.deleteUnitSize(unit) }
+                )
 
                 // Note Field (Optional)
                 OutlinedTextField(
@@ -1288,72 +1385,62 @@ private fun AddEditBudgetItemDialog(
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val duplicate = viewModel.findDuplicateItem(
-                        category = categoryInput,
-                        subCategory = subCategoryInput,
-                        itemDetail = itemDetailInput,
-                        excludeId = item?.id ?: 0L
-                    )
 
-                    if (duplicate != null) {
-                        showDuplicateDialog = duplicate
-                    } else {
-                        val qty = qtyBudgetInput.toIntOrNull() ?: 1
-                        val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
-                        val computedUnitSize = if (measureValueInput.isBlank()) {
-                            unitMeasureInput.trim()
-                        } else {
-                            "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
-                        }
-                        val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
-                        onSave(
-                            categoryInput,
-                            subCategoryInput,
-                            itemDetailInput,
-                            computedUnitSize,
-                            noteInput,
-                            qty,
-                            price,
-                            isRecurringInput,
-                            startTs
-                        )
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (item != null) {
-                    TextButton(
-                        onClick = {
-                            viewModel.deleteGroceryBudgetItem(item)
-                            onDismiss()
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = ExpenseColor)
+                // Bottom Action buttons
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 2.dp)
-                        )
-                        Text("Delete")
+                        Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Button(
+                        onClick = {
+                            val duplicate = viewModel.findDuplicateItem(
+                                category = orchestrator.categoryText,
+                                subCategory = orchestrator.subCategoryText,
+                                itemDetail = orchestrator.detailText,
+                                excludeId = item?.id ?: 0L
+                            )
+
+                            if (duplicate != null) {
+                                showDuplicateDialog = duplicate
+                            } else {
+                                val qty = qtyBudgetInput.toIntOrNull() ?: 1
+                                val price = unitPriceBudgetInput.toDoubleOrNull() ?: 0.0
+                                val computedUnitSize = if (measureValueInput.isBlank()) {
+                                    unitMeasureInput.trim()
+                                } else {
+                                    "${measureValueInput.trim()} ${unitMeasureInput.trim()}".trim()
+                                }
+                                val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                                onSave(
+                                    orchestrator.categoryText,
+                                    orchestrator.subCategoryText,
+                                    orchestrator.detailText,
+                                    computedUnitSize,
+                                    noteInput,
+                                    qty,
+                                    price,
+                                    isRecurringInput,
+                                    startTs
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(if (item != null) 1.5f else 1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text(if (item == null) "Add Item to Budget" else "Save Changes")
+                    }
                 }
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
-    )
+    }
 
     // Duplicate Capture Confirmation Dialog
     if (showDuplicateDialog != null) {
@@ -1368,8 +1455,11 @@ private fun AddEditBudgetItemDialog(
             title = { Text("Duplicate Item Detected") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val catDisplay = orchestrator.categoryText.ifBlank { "Groceries" }
+                    val subDisplay = orchestrator.subCategoryText.ifBlank { "General" }
+                    val detDisplay = orchestrator.detailText.ifBlank { subDisplay }
                     Text(
-                        text = "An item for '${categoryInput.ifBlank { "Groceries" }} > ${subCategoryInput.ifBlank { "General" }} > ${itemDetailInput.ifBlank { subCategoryInput }}' already exists in this month's budget.",
+                        text = "An item for '$catDisplay > $subDisplay > $detDisplay' already exists in this month's budget.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -1401,9 +1491,9 @@ private fun AddEditBudgetItemDialog(
                         val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
                         viewModel.saveGroceryBudgetItem(
                             id = duplicate.id,
-                            category = categoryInput,
-                            subCategory = subCategoryInput,
-                            itemDetail = itemDetailInput,
+                            category = orchestrator.categoryText,
+                            subCategory = orchestrator.subCategoryText,
+                            itemDetail = orchestrator.detailText,
                             unitSize = computedUnitSize,
                             note = noteInput,
                             quantityBudget = qty,
@@ -1438,9 +1528,9 @@ private fun AddEditBudgetItemDialog(
                                 val startTs = com.moneytracker.util.DateUtils.startOfPayMonth(startMonthInput, payDateDay)
                                 viewModel.saveGroceryBudgetItem(
                                     id = 0L,
-                                    category = categoryInput,
-                                    subCategory = subCategoryInput,
-                                    itemDetail = itemDetailInput,
+                                    category = orchestrator.categoryText,
+                                    subCategory = orchestrator.subCategoryText,
+                                    itemDetail = orchestrator.detailText,
                                     unitSize = computedUnitSize,
                                     note = noteInput,
                                     quantityBudget = qty,
@@ -1470,62 +1560,169 @@ private fun AddEditBudgetItemDialog(
         )
     }
 
-    // Unit Size CRUD Management Sub-Dialog
-    if (showUnitSizeCrudDialog) {
-        var newUnitInput by remember { mutableStateOf("") }
+    // Category Add/Edit Dialog
+    if (showAddCatDialog) {
+        var catNameInput by remember(editingCategory) { mutableStateOf(editingCategory ?: "") }
         AlertDialog(
-            onDismissRequest = { showUnitSizeCrudDialog = false },
-            title = { Text("Manage Unit Sizes") },
+            onDismissRequest = { showAddCatDialog = false },
+            title = { Text(if (editingCategory == null) "Add Category" else "Edit Category") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = newUnitInput,
-                            onValueChange = { newUnitInput = it },
-                            label = { Text("New Unit Size (e.g. 5kg)") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = {
-                            if (newUnitInput.isNotBlank()) {
-                                viewModel.addUnitSize(newUnitInput)
-                                newUnitInput = ""
-                            }
-                        }) {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                    ) {
-                        items(unitSizes) { u ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(u.name, style = MaterialTheme.typography.bodyMedium)
-                                IconButton(onClick = { viewModel.deleteUnitSize(u) }) {
-                                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete Unit", tint = ExpenseColor)
-                                }
-                            }
-                        }
-                    }
-                }
+                OutlinedTextField(
+                    value = catNameInput,
+                    onValueChange = { catNameInput = it },
+                    label = { Text("Category Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             confirmButton = {
-                TextButton(onClick = { showUnitSizeCrudDialog = false }) {
-                    Text("Done")
+                TextButton(onClick = {
+                    val trimmed = catNameInput.trim()
+                    if (trimmed.isNotBlank()) {
+                        if (editingCategory != null && editingCategory != trimmed) {
+                            customCategories = customCategories.filter { it != editingCategory } + trimmed
+                            if (orchestrator.categoryText == editingCategory) {
+                                orchestrator.categoryText = trimmed
+                            }
+                        } else {
+                            customCategories = (customCategories + trimmed).distinct()
+                            orchestrator.categoryText = trimmed
+                        }
+                        showAddCatDialog = false
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCatDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // SubCategory Add/Edit Dialog
+    if (showAddSubCatDialog) {
+        var subCatNameInput by remember(editingSubCategory) { mutableStateOf(editingSubCategory ?: "") }
+        val currentCat = orchestrator.categoryText.ifBlank { "General" }
+        AlertDialog(
+            onDismissRequest = { showAddSubCatDialog = false },
+            title = { Text(if (editingSubCategory == null) "Add Sub-Category under '$currentCat'" else "Edit Sub-Category") },
+            text = {
+                OutlinedTextField(
+                    value = subCatNameInput,
+                    onValueChange = { subCatNameInput = it },
+                    label = { Text("Sub-Category Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = subCatNameInput.trim()
+                    if (trimmed.isNotBlank()) {
+                        val existingList = customSubCategories[currentCat] ?: emptyList()
+                        if (editingSubCategory != null && editingSubCategory != trimmed) {
+                            customSubCategories = customSubCategories + (currentCat to (existingList.filter { it != editingSubCategory } + trimmed).distinct())
+                            if (orchestrator.subCategoryText == editingSubCategory) {
+                                orchestrator.subCategoryText = trimmed
+                            }
+                        } else {
+                            customSubCategories = customSubCategories + (currentCat to (existingList + trimmed).distinct())
+                            orchestrator.subCategoryText = trimmed
+                        }
+                        showAddSubCatDialog = false
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddSubCatDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Detail Add/Edit Dialog
+    if (showAddDetailDialog) {
+        var detNameInput by remember(editingDetail) { mutableStateOf(editingDetail ?: "") }
+        val currentSub = orchestrator.subCategoryText.ifBlank { "General" }
+        AlertDialog(
+            onDismissRequest = { showAddDetailDialog = false },
+            title = { Text(if (editingDetail == null) "Add Detail Item under '$currentSub'" else "Edit Detail Item") },
+            text = {
+                OutlinedTextField(
+                    value = detNameInput,
+                    onValueChange = { detNameInput = it },
+                    label = { Text("Item Name / Detail") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = detNameInput.trim()
+                    if (trimmed.isNotBlank()) {
+                        val existingList = customDetails[currentSub] ?: emptyList()
+                        if (editingDetail != null && editingDetail != trimmed) {
+                            customDetails = customDetails + (currentSub to (existingList.filter { it != editingDetail } + trimmed).distinct())
+                            if (orchestrator.detailText == editingDetail) {
+                                orchestrator.detailText = trimmed
+                            }
+                        } else {
+                            customDetails = customDetails + (currentSub to (existingList + trimmed).distinct())
+                            orchestrator.detailText = trimmed
+                        }
+                        showAddDetailDialog = false
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDetailDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Add / Edit Unit Dialog
+    if (showUnitDialog) {
+        var unitNameInput by remember(editingUnitSize) { mutableStateOf(editingUnitSize?.name ?: "") }
+        AlertDialog(
+            onDismissRequest = { showUnitDialog = false },
+            title = { Text(if (editingUnitSize == null) "Add Unit" else "Edit Unit") },
+            text = {
+                OutlinedTextField(
+                    value = unitNameInput,
+                    onValueChange = { unitNameInput = it },
+                    label = { Text("Unit Name (e.g. kg, L, Pack)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (unitNameInput.isNotBlank()) {
+                        val trimmed = unitNameInput.trim()
+                        if (editingUnitSize != null) {
+                            viewModel.deleteUnitSize(editingUnitSize!!)
+                        }
+                        viewModel.addUnitSize(trimmed)
+                        unitMeasureInput = trimmed
+                        showUnitDialog = false
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnitDialog = false }) {
+                    Text("Cancel")
                 }
             }
         )

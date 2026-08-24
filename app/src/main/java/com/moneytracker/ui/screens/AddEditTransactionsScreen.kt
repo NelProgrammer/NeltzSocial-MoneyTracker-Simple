@@ -69,7 +69,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddEditScreen(
+fun AddEditTransactionsScreen(
     viewModel: AddEditViewModel,
     repository: TransactionRepository,
     title: String,

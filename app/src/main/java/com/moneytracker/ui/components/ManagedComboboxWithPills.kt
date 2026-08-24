@@ -29,8 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -44,6 +46,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -74,7 +77,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
-import com.moneytracker.data.local.ComponentStorageManager
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
@@ -85,152 +87,6 @@ data class ComboboxSettings(
     val scrollStep: Int = 3,            // Default 3 items per scroll click
     val isAlphabeticalSort: Boolean = false
 )
-
-/**
- * Autonomous, Self-Persisting Managed Combobox with Quick-Pick Pills.
- * Automatically saves and loads from app-internal JSON storage using coordinates:
- * { screenId: { componentId: { label: { filterKey: [ items... ] } } } }
- */
-@Composable
-fun SelfStoringManagedCombobox(
-    screenId: String,
-    componentId: String,
-    label: String,
-    selectedValue: String,
-    onValueChange: (String) -> Unit,
-    filterKey: String? = null,
-    defaultItems: List<String> = emptyList(),
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val storageManager = remember { ComponentStorageManager.getInstance(context) }
-    val scope = rememberCoroutineScope()
-
-    var itemsList by remember(screenId, componentId, label, filterKey) {
-        mutableStateOf<List<String>>(emptyList())
-    }
-    var initialSettings by remember(screenId, componentId) {
-        mutableStateOf(ComboboxSettings())
-    }
-
-    var showAddDialog by remember { mutableStateOf(false) }
-    var editingItem by remember { mutableStateOf<String?>(null) }
-
-    // Auto-load values and settings from internal files
-    LaunchedEffect(screenId, componentId, label, filterKey) {
-        itemsList = storageManager.getValues(screenId, componentId, label, filterKey, defaultItems)
-        initialSettings = storageManager.getSettings(screenId, componentId)
-    }
-
-    ManagedComboboxWithPills(
-        label = label,
-        selectedValue = selectedValue,
-        onValueChange = onValueChange,
-        items = itemsList,
-        initialSettings = initialSettings,
-        onSettingsChange = { newSettings ->
-            scope.launch {
-                storageManager.saveSettings(screenId, componentId, newSettings)
-            }
-        },
-        itemToText = { it },
-        onAddItem = { showAddDialog = true },
-        onEditItem = { editingItem = it },
-        onDeleteItem = { itemToDelete ->
-            scope.launch {
-                itemsList = storageManager.deleteItem(screenId, componentId, label, filterKey, itemToDelete)
-                if (selectedValue.equals(itemToDelete, ignoreCase = true)) {
-                    onValueChange("")
-                }
-            }
-        },
-        modifier = modifier
-    )
-
-    // Add Item Dialog
-    if (showAddDialog) {
-        var newItemText by remember { mutableStateOf("") }
-        val keyDisplay = if (!filterKey.isNullOrBlank()) " under '$filterKey'" else ""
-
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("Add $label$keyDisplay") },
-            text = {
-                OutlinedTextField(
-                    value = newItemText,
-                    onValueChange = { newItemText = it },
-                    label = { Text("$label Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmed = newItemText.trim()
-                        if (trimmed.isNotBlank()) {
-                            scope.launch {
-                                itemsList = storageManager.addItem(screenId, componentId, label, filterKey, trimmed)
-                                onValueChange(trimmed)
-                            }
-                        }
-                        showAddDialog = false
-                    }
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Edit Item Dialog
-    if (editingItem != null) {
-        val original = editingItem!!
-        var editedText by remember(original) { mutableStateOf(original) }
-
-        AlertDialog(
-            onDismissRequest = { editingItem = null },
-            title = { Text("Edit $label") },
-            text = {
-                OutlinedTextField(
-                    value = editedText,
-                    onValueChange = { editedText = it },
-                    label = { Text("$label Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmed = editedText.trim()
-                        if (trimmed.isNotBlank()) {
-                            scope.launch {
-                                itemsList = storageManager.editItem(screenId, componentId, label, filterKey, original, trimmed)
-                                if (selectedValue.equals(original, ignoreCase = true)) {
-                                    onValueChange(trimmed)
-                                }
-                            }
-                        }
-                        editingItem = null
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingItem = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
 
 /**
  * Standard Reusable Combobox with Up/Down buttons, Search, Quick-Pick Pills, and Gear Settings.
@@ -359,6 +215,9 @@ fun <T> ManagedComboboxWithPills(
                             if (newValue.text != selectedValue) {
                                 onValueChange(newValue.text)
                             }
+                            if (!expanded) {
+                                expanded = true
+                            }
                         },
                         label = { Text(label) },
                         placeholder = { Text("Select a: $label item") },
@@ -369,6 +228,7 @@ fun <T> ManagedComboboxWithPills(
                                         onClick = {
                                             textFieldValue = TextFieldValue("")
                                             onValueChange("")
+                                            expanded = true
                                         }
                                     ) {
                                         Icon(
@@ -377,12 +237,7 @@ fun <T> ManagedComboboxWithPills(
                                         )
                                     }
                                 }
-                                IconButton(onClick = { expanded = !expanded }) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = "Expand $label"
-                                    )
-                                }
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                             }
                         },
                         modifier = Modifier
@@ -390,12 +245,7 @@ fun <T> ManagedComboboxWithPills(
                             .menuAnchor()
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused && !isFocused) {
-                                    if (selectedValue.isNotEmpty()) {
-                                        textFieldValue = TextFieldValue(
-                                            text = selectedValue,
-                                            selection = TextRange(0, selectedValue.length)
-                                        )
-                                    }
+                                    expanded = true
                                 }
                                 isFocused = focusState.isFocused
                             },
@@ -403,12 +253,11 @@ fun <T> ManagedComboboxWithPills(
                     )
 
                     // Dropdown Menu with Up/Down buttons and adaptive scrolling
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
-                        properties = PopupProperties(focusable = false),
                         modifier = Modifier
-                            .fillMaxWidth(0.92f)
+                            .fillMaxWidth()
                             .heightIn(max = maxDropdownHeight)
                     ) {
                         // ▲ Up Scroll Button (at the START of the list)
@@ -475,8 +324,33 @@ fun <T> ManagedComboboxWithPills(
                                 val itemText = itemToText(item)
                                 val isSelected = selectedValue.equals(itemText, ignoreCase = true)
 
-                                DropdownMenuItem(
-                                    text = {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                            else Color.Transparent
+                                        )
+                                        .clickable {
+                                            onValueChange(itemText)
+                                            expanded = false
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp).padding(end = 4.dp)
+                                            )
+                                        }
                                         Text(
                                             text = itemText,
                                             style = MaterialTheme.typography.bodyMedium,
@@ -485,44 +359,42 @@ fun <T> ManagedComboboxWithPills(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                    },
-                                    onClick = {
-                                        onValueChange(itemText)
-                                        expanded = false
-                                    },
-                                    trailingIcon = {
-                                        if (onEditItem != null || onDeleteItem != null) {
-                                            Row {
-                                                if (onEditItem != null) {
-                                                    IconButton(
-                                                        onClick = { onEditItem(item) },
-                                                        modifier = Modifier.size(32.dp)
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Edit,
-                                                            contentDescription = "Edit",
-                                                            modifier = Modifier.size(16.dp),
-                                                            tint = MaterialTheme.colorScheme.primary
-                                                        )
-                                                    }
+                                    }
+
+                                    if (onEditItem != null || onDeleteItem != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            if (onEditItem != null) {
+                                                IconButton(
+                                                    onClick = { onEditItem(item) },
+                                                    modifier = Modifier.size(30.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "Edit",
+                                                        modifier = Modifier.size(15.dp),
+                                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                                                    )
                                                 }
-                                                if (onDeleteItem != null) {
-                                                    IconButton(
-                                                        onClick = { onDeleteItem(item) },
-                                                        modifier = Modifier.size(32.dp)
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Delete,
-                                                            contentDescription = "Delete",
-                                                            modifier = Modifier.size(16.dp),
-                                                            tint = MaterialTheme.colorScheme.error
-                                                        )
-                                                    }
+                                            }
+                                            if (onDeleteItem != null) {
+                                                IconButton(
+                                                    onClick = { onDeleteItem(item) },
+                                                    modifier = Modifier.size(30.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete",
+                                                        modifier = Modifier.size(15.dp),
+                                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                                                    )
                                                 }
                                             }
                                         }
                                     }
-                                )
+                                }
                             }
                         }
 

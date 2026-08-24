@@ -328,8 +328,17 @@ interface GroceryBudgetDao {
 
 @Dao
 interface UnitSizeDao {
-    @Query("SELECT * FROM unit_sizes WHERE profileId = :profileId ORDER BY name ASC")
+    @Query("SELECT * FROM unit_sizes WHERE profileId = :profileId GROUP BY LOWER(TRIM(name)) ORDER BY name ASC")
     fun observeAll(profileId: Long): Flow<List<com.moneytracker.data.local.entity.UnitSizeEntity>>
+
+    @Query("SELECT * FROM unit_sizes WHERE profileId = :profileId AND LOWER(TRIM(name)) = LOWER(TRIM(:name)) LIMIT 1")
+    suspend fun getByName(profileId: Long, name: String): com.moneytracker.data.local.entity.UnitSizeEntity?
+
+    @Query("SELECT COUNT(*) FROM unit_sizes WHERE profileId = :profileId")
+    suspend fun count(profileId: Long): Int
+
+    @Query("DELETE FROM unit_sizes WHERE profileId = :profileId AND id NOT IN (SELECT MIN(id) FROM unit_sizes WHERE profileId = :profileId GROUP BY LOWER(TRIM(name)))")
+    suspend fun deleteDuplicates(profileId: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(unitSize: com.moneytracker.data.local.entity.UnitSizeEntity): Long

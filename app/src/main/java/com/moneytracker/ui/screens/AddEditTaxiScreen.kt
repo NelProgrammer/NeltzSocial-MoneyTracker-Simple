@@ -8,15 +8,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
@@ -32,13 +36,17 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,7 +73,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaxiFareScreen(
+fun AddEditTaxiScreen(
     viewModel: TaxiFareViewModel,
     contentPadding: PaddingValues
 ) {
@@ -336,32 +344,62 @@ private fun AddEditTaxiRouteDialog(
     var tripsInput by remember { mutableStateOf(route?.tripsPerDay?.toString() ?: "2") }
     var daysInput by remember { mutableStateOf(route?.workingDaysPerMonth?.toString() ?: "20") }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (route == null) "Add Taxi Route" else "Edit Taxi Route",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                if (route != null && onDelete != null) {
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete Route",
-                            tint = ExpenseColor
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = if (route == null) "Add Taxi Route" else "Edit Taxi Route",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        }
+                    },
+                    actions = {
+                        if (route != null && onDelete != null) {
+                            IconButton(onClick = onDelete) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Route",
+                                    tint = ExpenseColor
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = {
+                                val fare = fareInput.toDoubleOrNull() ?: 0.0
+                                val trips = tripsInput.toIntOrNull() ?: 2
+                                val days = daysInput.toIntOrNull() ?: 20
+                                val startTs = DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                                if (name.isNotBlank() && fare > 0.0) {
+                                    onConfirm(route?.id ?: 0L, name, fare, trips, days, startTs)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text("Save")
+                        }
                     }
-                }
+                )
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 // Start Month Dropdown
                 ExposedDropdownMenuBox(
                     expanded = startMonthExpanded,
@@ -456,44 +494,37 @@ private fun AddEditTaxiRouteDialog(
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val fare = fareInput.toDoubleOrNull() ?: 0.0
-                    val trips = tripsInput.toIntOrNull() ?: 2
-                    val days = daysInput.toIntOrNull() ?: 20
-                    val startTs = DateUtils.startOfPayMonth(startMonthInput, payDateDay)
-                    if (name.isNotBlank() && fare > 0.0) {
-                        onConfirm(route?.id ?: 0L, name, fare, trips, days, startTs)
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(if (route == null) "Add" else "Save")
-            }
-        },
-        dismissButton = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (route != null && onDelete != null) {
-                    TextButton(
-                        onClick = onDelete,
-                        colors = ButtonDefaults.textButtonColors(contentColor = ExpenseColor)
+
+                // Bottom Action buttons
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 2.dp)
-                        )
-                        Text("Delete")
+                        Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Button(
+                        onClick = {
+                            val fare = fareInput.toDoubleOrNull() ?: 0.0
+                            val trips = tripsInput.toIntOrNull() ?: 2
+                            val days = daysInput.toIntOrNull() ?: 20
+                            val startTs = DateUtils.startOfPayMonth(startMonthInput, payDateDay)
+                            if (name.isNotBlank() && fare > 0.0) {
+                                onConfirm(route?.id ?: 0L, name, fare, trips, days, startTs)
+                            }
+                        },
+                        modifier = Modifier.weight(if (route != null) 1.5f else 1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text(if (route == null) "Add Route" else "Save Changes")
+                    }
                 }
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
-    )
+    }
 }

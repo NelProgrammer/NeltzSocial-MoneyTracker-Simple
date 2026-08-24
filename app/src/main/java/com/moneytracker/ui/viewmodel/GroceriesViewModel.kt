@@ -109,7 +109,10 @@ class GroceriesViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GroceryBudgetOverview())
 
     init {
-        seedDefaultUnitSizesIfNeeded()
+        viewModelScope.launch {
+            repository.cleanDuplicateUnitSizes()
+            seedDefaultUnitSizesIfNeeded()
+        }
         triggerAutoPopulate()
         viewModelScope.launch {
             com.moneytracker.util.RecurringGroceryManager.processRecurringGroceryItemsIfDue(repository)
@@ -124,18 +127,15 @@ class GroceriesViewModel(
         }
     }
 
-    private fun seedDefaultUnitSizesIfNeeded() {
-        viewModelScope.launch {
-            unitSizes.collect { sizes ->
-                if (sizes.isEmpty()) {
-                    val defaults = listOf(
-                        "kg", "g", "Lit", "mL", "Bag", "Pocket", "Bottle", "Box", "Pack", "Tin", "Tray",
-                        "6s", "12s", "18s", "24s", "30s", "48s", "60s"
-                    )
-                    defaults.forEach { name ->
-                        repository.saveUnitSize(UnitSizeEntity(name = name))
-                    }
-                }
+    private suspend fun seedDefaultUnitSizesIfNeeded() {
+        val count = repository.countUnitSizes()
+        if (count == 0) {
+            val defaults = listOf(
+                "kg", "g", "Lit", "mL", "Bag", "Pocket", "Bottle", "Box", "Pack", "Tin", "Tray",
+                "6s", "12s", "18s", "24s", "30s", "48s", "60s"
+            )
+            defaults.forEach { name ->
+                repository.saveUnitSize(UnitSizeEntity(name = name))
             }
         }
     }

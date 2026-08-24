@@ -1,115 +1,188 @@
-# Master Prompt: Generate the Autonomous Managed Combobox with Pills in Any Language / Framework
+# Master Prompt: Generate the Autonomous Managed Combobox & Cascading Orchestrator in Any Language / Framework
 
-Use the prompt below with any AI coding assistant or software engineer to generate the **Autonomous Managed Combobox with Pills Component** in any programming language or UI framework (such as React, SwiftUI, Flutter, Vue 3, Svelte, Angular, Jetpack Compose, or C#/.NET MAUI).
+Use this master prompt with any AI coding assistant, LLM, or software engineering team to implement the production-grade **Autonomous Managed Combobox with Pills Component** and its **Cascading Orchestrator Tool** in any programming language or UI framework (such as React / TypeScript, SwiftUI, Flutter, Vue 3, Svelte 5, Angular, Jetpack Compose, C# / .NET MAUI, or Python / PyQt).
 
 ---
 
 ```markdown
 # Role & Task
-You are a Principal Software Architect and UI Component Engineer. Your task is to implement an enterprise-grade, autonomous, generic **Managed Combobox with Quick-Pick Pills Component** (`ManagedComboboxWithPills<T>`) and its parent orchestrator pattern in [INSERT TARGET LANGUAGE / FRAMEWORK HERE (e.g. React/TypeScript, SwiftUI, Flutter, Vue 3, Svelte, Angular, Jetpack Compose, C#/.NET MAUI)].
+You are a Principal Software Architect and UI Framework Engineer. Your task is to implement an enterprise-grade, generic **Managed Combobox with Quick-Pick Pills Component** (`ManagedComboboxWithPills<T>`) and its accompanying **Cascading Combobox Orchestrator Tool** (`CascadingComboboxOrchestrator<TCat, TSub, TDet>`) in:
+👉 **TARGET LANGUAGE / FRAMEWORK**: [INSERT TARGET FRAMEWORK HERE, e.g., React + TypeScript / SwiftUI / Flutter / Jetpack Compose / Vue 3 + TypeScript / Svelte 5 / C# .NET MAUI]
 
-The component MUST adhere strictly to the behavioral contracts, state machines, and cascading algorithms defined in this specification.
-
----
-
-## 1. Core Architectural Principles
-
-1. **Autonomous Cascading Invalidation & Dynamic Entity Sourcing**:
-   * **No Hardcoded Categories**: All categories (Income, Expense, Investment, Asset, etc.) are 100% dynamic domain entities loaded from and saved to the database. They can be created, edited/renamed, or deleted at runtime.
-   * The component receives the full, raw domain entity dataset (`items: List<T>`), a parent identifier (`parentFilterKey`), and a filtering rule (`filterPredicate: (T) -> Boolean`).
-   * The component **internally** computes its filtered subset (`parentFilteredItems = items.filter(filterPredicate)`).
-   * If the parent context changes and makes the component's current `selectedValue` invalid, the component **autonomously clears itself** (`onValueChange("")`) without requiring manual reset logic in the screen controller.
-   * On initial component mounting (e.g., in Edit Mode with pre-populated records), the component **must preserve** valid pre-populated selections without triggering premature wipeouts.
-
-2. **Instant Overwrite & Smooth Text Editing**:
-   * When an existing item is selected and the user focuses the text input, the component must automatically **select all text** (`[0..length]`).
-   * Typing any character on the keyboard must **immediately replace/overwrite** the selected text without requiring manual backspacing.
-   * An integrated **Clear (✕)** button must be available in the input field's trailing icons for one-tap clearing.
-
-3. **Non-Blocking Continuous Typing & Live Dropdown Search**:
-   * Typing into the text field must never drop soft-keyboard focus or recreate the popup window on every keystroke.
-   * The dropdown menu popup must be configured as non-focusable (`focusable = false` / non-modal) so that the soft-keyboard connection remains active while the dropdown live-filters results matching the typed query.
-   * An exact match in the text field displays the full list or matching pills; typing a partial query filters the dropdown in real-time.
-
-4. **Dedicated Pills Card vs. CRUD Add Button Separation**:
-   * The `(+)` button next to the input field is **strictly for CRUD item addition** (opening a creation dialog). It must NOT be used for expanding/collapsing lists.
-   * Below the input field, render a dedicated **Quick-Pick Pills Card**:
-     * **Card Header**: Displays `"Quick Pick [count]"` with an Expand/Collapse toggle button (`▲` / `▼`).
-     * **Collapsed View (Default)**: Strictly constrains the pills to the configured row limit (e.g., 1 or 2 rows).
-     * **Expanded View**: Wraps and displays all available pills in full multi-row layout.
-     * **Pill Interactions**: Tapping a pill selects it (`onValueChange(itemText)`). Long-pressing or setting toggles show inline Edit `(✎)` and Delete `(✕)` buttons for direct management.
-
-5. **Integrated Settings Management `(⚙)`**:
-   * A gear icon in the input field header opens a personalization dialog allowing users to configure:
-     * Number of visible pill rows (1 or 2).
-     * Sorting mode (Alphabetical vs. Insertion / ID order).
-     * Maximum visible dropdown items before scrolling.
-     * Scroll step speed.
+The implementation MUST adhere strictly to the decoupled architecture, state machines, behavioral contracts, and algorithms detailed below.
 
 ---
 
-## 2. Generic Component Interface & Parameter Contract
+## 1. Architectural Model & Separation of Concerns
 
-Implement the generic component with the following signature:
+The architecture strictly separates UI rendering from hierarchical state orchestration:
 
 ```
-ManagedComboboxWithPills<T>(
-    label: String,                               // Display label (e.g. "Category", "SubCategory")
-    selectedValue: String,                       // Current bound text value
-    onValueChange: (String) -> Unit,             // Value update & reset callback
-    items: List<T>,                              // Full raw entity collection
-    filterPredicate: ((T) -> Boolean)? = null,   // Parent membership rule
-    parentFilterKey: Any? = null,                // Parent tracker key (triggers filter re-eval)
-    autoResetOnParentChange: Boolean = true,     // Autonomous reset flag
-    itemToText: (T) -> String,                   // Entity to display string extractor
-    onAddItem: (() -> Unit)? = null,             // CRUD: Add new entity callback
-    onEditItem: ((T) -> Unit)? = null,           // CRUD: Edit existing entity callback
-    onDeleteItem: ((T) -> Unit)? = null          // CRUD: Delete entity callback
-)
+┌────────────────────────────────────────────────────────────────────────┐
+│                        SCREEN / VIEW CONTROLLER                        │
+│  - Host Container: Instantiates Orchestrator with domain datasets      │
+│  - Mounts UI Comboboxes and connects them to the Orchestrator          │
+└──────────────────┬─────────────────────────────────┬───────────────────┘
+                   │                                 │
+                   ▼ (1. Initializes)                ▼ (2. Mounts)
+┌────────────────────────────────────┐ ┌─────────────────────────────────┐
+│     CascadingComboboxOrchestrator  │ │   ManagedComboboxWithPills<T>   │
+│   (State & Cascading Engine Tool)  │ │      (Pure Generic UI Widget)   │
+│                                    │ │                                 │
+│  - Coordinates the Combos' updates │◄┼── (3. Emits onValueChange events│
+│  - Resolves active matched parents │ │       when user selects/types)  │
+│  - Handles cascade resets & rules  │─┼─► (4. Feeds state, items &      │
+│  - Computes dynamic predicates     │ │       active predicates)        │
+└────────────────────────────────────┘ └─────────────────────────────────┘
+```
+
+1. **`ManagedComboboxWithPills<T>` (UI Primitive)**:
+   * 100% generic (`<T>`), dumb, and reusable in single-tier or multi-tier contexts.
+   * Completely unaware of the Orchestrator or sibling comboboxes.
+   * Receives `items: List<T>`, `selectedValue: String`, `parentFilterKey: Any?`, and `filterPredicate: ((T) -> Boolean)?`.
+2. **`CascadingComboboxOrchestrator` (Screen Tool)**:
+   * Reusable state holder and predicate evaluator instantiated by the screen.
+   * Completely unaware of UI widgets or rendering elements.
+   * Coordinates parent entity matching, active selection text, and cascading validation rules.
+3. **Screen / View Controller (Glue)**:
+   * Instantiates the Orchestrator with domain data and binds its properties to the dumb Combobox instances.
+
+---
+
+## 2. Core Functional Requirements for `ManagedComboboxWithPills<T>`
+
+### A. Autonomous Cascading Invalidation
+* The component receives the full raw domain entity dataset (`items: List<T>`), an optional parent tracker (`parentFilterKey`), and a filtering rule (`filterPredicate: (T) -> Boolean`).
+* Internally computes `parentFilteredItems = (filterPredicate != null) ? items.filter(filterPredicate) : items`.
+* If `parentFilterKey` changes and makes the current `selectedValue` invalid within `parentFilteredItems`, the component **autonomously resets itself** (`onValueChange("")`).
+* On initial mounting / edit-mode loading with pre-existing records, pre-populated values **must be preserved** without premature wipeouts.
+
+### B. Instant Overwrite & Text Editing
+* When focusing the input field containing an existing value, the component selects the entire text range `[0..length]`.
+* Typing any new character immediately replaces/overwrites the selected text without requiring manual backspacing.
+* A clear **(✕)** trailing icon provides one-tap clearing and immediately opens the dropdown for a new selection.
+
+### C. Live Search & Non-Blocking Typing
+* Typing into the input field filters dropdown suggestions in real-time.
+* The dropdown popup must be non-modal / non-focus-stealing so soft-keyboard focus is never lost while typing.
+* The dropdown list displays a default first option: `"Select a: [label] item"` (which clears the selection), followed by the scrollable list of filtered items.
+
+### D. Dedicated Quick-Pick Pills Card vs. CRUD Add Button
+* **CRUD Add Button `(+)`**: Located next to the input field, strictly for opening a modal/dialog to create a new entity in the database.
+* **Settings Gear `(⚙)`**: Opens a personalization dialog (pill row count, alphabetical vs. ID sort, visible item count, scroll step).
+* **Dedicated Pills Card**:
+  * Located below the input field.
+  * Header shows `"Quick Pick [count]"` with an Expand/Collapse toggle (`▲` / `▼`).
+  * Collapsed View (Default): Constrains pills to the configured row count (1 or 2 rows).
+  * Expanded View: Wraps and shows all available items.
+  * Tapping a pill selects it. Long-pressing or settings mode exposes inline Edit `(✎)` and Delete `(✕)` actions on the pill chip.
+
+### E. Smooth Dual-Expansion ("Either / Or")
+* The dropdown menu MUST expand smoothly when:
+  1. Tapping / clicking anywhere on the text field or focusing it.
+  2. Clicking the trailing drop-down arrow icon.
+  3. Typing any character in the input field.
+* Clicking the trailing dropdown arrow must NOT double-toggle or cancel expansion.
+
+---
+
+## 3. Core Functional Requirements for `CascadingComboboxOrchestrator`
+
+The Orchestrator provides:
+1. **Multi-Tier Reactive State**: Holds bound string values (`categoryText`, `subCategoryText`, `detailText`).
+2. **Active Parent Entity Resolution**: Computes `matchedCategory: TCat?`, `matchedSubCategory: TSub?`, and `matchedDetail: TDet?` by matching text and parent IDs.
+3. **Dynamic Filtering Predicates**:
+   * `isSubCategoryValid(sub: TSub): Boolean` -> Checks if child entity belongs to `matchedCategory`.
+   * `isDetailValid(det: TDet): Boolean` -> Checks if grandchild entity belongs to `matchedSubCategory`.
+4. **Lightweight String-Based Variant**:
+   * `SimpleStringComboboxOrchestrator` for screens operating directly on plain strings and map-based lookup tables.
+
+---
+
+## 4. Contract Specifications & Signatures
+
+### 4.1 `ManagedComboboxWithPills<T>` Signature
+```typescript
+interface ManagedComboboxProps<T> {
+  label: string;
+  selectedValue: string;
+  onValueChange: (value: string) => void;
+  items: T[];
+  itemToText: (item: T) => string;
+  filterPredicate?: (item: T) => boolean;
+  parentFilterKey?: any;
+  autoResetOnParentChange?: boolean;
+  initialSettings?: ComboboxSettings;
+  onAddItem?: () => void;
+  onEditItem?: (item: T) => void;
+  onDeleteItem?: (item: T) => void;
+}
+```
+
+### 4.2 `CascadingComboboxOrchestrator` Signature
+```typescript
+interface CascadingOrchestrator<TCat, TSub, TDet> {
+  categories: TCat[];
+  subCategories: TSub[];
+  details: TDet[];
+  
+  categoryText: string;
+  subCategoryText: string;
+  detailText: string;
+
+  matchedCategory?: TCat;
+  matchedSubCategory?: TSub;
+  matchedDetail?: TDet;
+
+  isSubCategoryValid: (sub: TSub) => boolean;
+  isDetailValid: (det: TDet) => boolean;
+}
 ```
 
 ---
 
-## 3. Algorithmic State Machines to Implement
+## 5. Algorithmic State Machines
 
-### A. Focus & Overwrite Engine:
+### A. Autonomous Reset Engine
 ```text
-ON FocusGained:
-    IF selectedValue is NOT EMPTY:
-        Set TextSelection = [0 .. Length(selectedValue)]
-
-ON TextInput(newChar):
-    If TextSelection spanned entire text:
-        Replace entire text with newChar
-    Else:
-        Append/insert newChar normally
-    Emit onValueChange(newText)
-```
-
-### B. Autonomous Cascading Reset Engine:
-```text
-ON (items, filterPredicate, parentFilterKey) Changed:
+ON (items, filterPredicate, parentFilterKey) CHANGED:
     parentFilteredItems = (filterPredicate != null) ? items.filter(filterPredicate) : items
     
     IF hasInitialized == FALSE:
-        IF items is NOT EMPTY or parentFilterKey is NOT NULL:
+        IF items is NOT EMPTY OR parentFilterKey is NOT NULL:
             hasInitialized = TRUE
             lastKnownParentKey = parentFilterKey
         RETURN
         
-    // Only execute reset when parent filter key has ACTUALLY changed from previous value
     IF lastKnownParentKey != parentFilterKey:
         lastKnownParentKey = parentFilterKey
-        IF items is NOT EMPTY and selectedValue is NOT EMPTY:
-            IF parentFilteredItems does NOT contain any item where itemToText(item) == selectedValue:
-                Emit onValueChange("") // Self-reset cascades down cleanly
+        IF items is NOT EMPTY AND selectedValue is NOT EMPTY:
+            IF NOT parentFilteredItems.any(item => itemToText(item).equalsIgnoreCase(selectedValue.trim())):
+                onValueChange("") // Self-resets cleanly down the cascade
+```
+
+### B. Focus & Overwrite Engine
+```text
+ON FocusGained:
+    IF selectedValue is NOT EMPTY:
+        Set TextSelectionRange = [0 .. selectedValue.length]
+    Set DropdownExpanded = TRUE
+
+ON TextInput(newChar):
+    IF TextSelectionRange spanned entire text:
+        Replace entire text buffer with newChar
+    ELSE:
+        Insert newChar at cursor
+    Set DropdownExpanded = TRUE
+    Emit onValueChange(newTextBuffer)
 ```
 
 ---
 
-## 4. Required Deliverables
+## 6. Required Output & Deliverables
 
-1. **Component Source Code**: Complete, production-ready, typed component code in the target language/framework.
-2. **State Management Hook / Controller**: Implementation of focus selection, dropdown visibility, search filtering, and pill row limiting.
-3. **Usage Example**: A complete 3-tier cascading example (`Category` → `SubCategory` → `Detail`) demonstrating how the parent screen orchestrates the flow without writing manual reset boilerplate.
+Please generate clean, fully-typed, production-ready source code containing:
+1. **The Combobox UI Component (`ManagedComboboxWithPills`)**: Complete with dropdown search, pills card (collapsible rows), focus overwrite, settings modal, and inline CRUD.
+2. **The Orchestrator Tool (`CascadingComboboxOrchestrator`)**: Generic 3-tier and simplified string-based orchestrator implementations.
+3. **Complete Screen Example**: An end-to-end form (`Category` -> `SubCategory` -> `Detail`) demonstrating how the screen instantiates the Orchestrator and binds it to 3 Combobox instances with zero manual reset boilerplate.
 ```

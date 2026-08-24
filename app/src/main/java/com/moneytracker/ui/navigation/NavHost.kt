@@ -21,12 +21,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.moneytracker.data.repository.TransactionRepository
-import com.moneytracker.ui.screens.AddEditScreen
+import com.moneytracker.ui.screens.AddEditTransactionsScreen
 import com.moneytracker.ui.screens.DashboardScreen
 import com.moneytracker.ui.screens.StatsScreen
 import com.moneytracker.ui.screens.TransactionsScreen
-import com.moneytracker.ui.screens.GroceriesScreen
-import com.moneytracker.ui.screens.TaxiFareScreen
+import com.moneytracker.ui.screens.AddEditGroceriesScreen
+import com.moneytracker.ui.screens.AddEditTaxiScreen
 import com.moneytracker.ui.screens.MonthComparisonScreen
 import com.moneytracker.ui.screens.CategoriesScreen
 import com.moneytracker.ui.screens.SettingsScreen
@@ -58,7 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
-import com.moneytracker.ui.screens.ShoppingListScreen
+import com.moneytracker.ui.screens.AddEditShoppingListScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object ProfileSelection : Screen("profileSelection", "Profile", Icons.Default.Person)
@@ -215,7 +215,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     val viewModel: GroceriesViewModel = viewModel(
                         factory = ViewModelFactory(repository)
                     )
-                    GroceriesScreen(
+                    AddEditGroceriesScreen(
                         viewModel = viewModel,
                         repository = repository
                     )
@@ -224,7 +224,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     val viewModel: GroceriesViewModel = viewModel(
                         factory = ViewModelFactory(repository)
                     )
-                    ShoppingListScreen(
+                    AddEditShoppingListScreen(
                         viewModel = viewModel,
                         contentPadding = innerPadding
                     )
@@ -233,7 +233,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     val viewModel: TaxiFareViewModel = viewModel(
                         factory = ViewModelFactory(repository)
                     )
-                    TaxiFareScreen(
+                    AddEditTaxiScreen(
                         viewModel = viewModel,
                         contentPadding = innerPadding
                     )
@@ -276,7 +276,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     val viewModel: AddEditViewModel = viewModel(
                         factory = ViewModelFactory(repository)
                     )
-                    AddEditScreen(
+                    AddEditTransactionsScreen(
                         viewModel = viewModel,
                         repository = repository,
                         title = "Add Transaction",
@@ -291,7 +291,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     val viewModel: AddEditViewModel = viewModel(
                         factory = ViewModelFactory(repository, transactionId)
                     )
-                    AddEditScreen(
+                    AddEditTransactionsScreen(
                         viewModel = viewModel,
                         repository = repository,
                         title = "Edit Transaction",

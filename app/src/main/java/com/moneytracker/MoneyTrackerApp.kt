@@ -39,6 +39,7 @@ class MoneyTrackerApp : Application() {
 
         applicationScope.launch {
             ProfileManager.initSession(this@MoneyTrackerApp, database, repository)
+            repository.cleanDuplicateUnitSizes()
         }
     }
 }
