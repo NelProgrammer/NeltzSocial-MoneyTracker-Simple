@@ -265,16 +265,27 @@ fun <T> ManagedComboboxWithPills(
         if (filterPredicate != null) items.filter(filterPredicate) else items
     }
 
-    // Auto-Reset inside Component when parent filter changes & current selection is invalid
+    // Auto-Reset inside Component ONLY when parent filter key ACTUALLY changes & current selection is invalid
     if (autoResetOnParentChange) {
-        var isInitialComposition by remember { mutableStateOf(true) }
-        LaunchedEffect(parentFilteredItems, parentFilterKey) {
-            if (isInitialComposition) {
-                isInitialComposition = false
+        var hasInitialized by remember { mutableStateOf(false) }
+        var lastKnownParentKey by remember { mutableStateOf<Any?>(null) }
+
+        LaunchedEffect(parentFilterKey, parentFilteredItems) {
+            if (!hasInitialized) {
+                if (items.isNotEmpty() || parentFilterKey != null) {
+                    hasInitialized = true
+                    lastKnownParentKey = parentFilterKey
+                }
                 return@LaunchedEffect
             }
-            if (selectedValue.isNotEmpty() && parentFilteredItems.none { itemToText(it).equals(selectedValue.trim(), ignoreCase = true) }) {
-                onValueChange("")
+
+            // Only trigger reset when parent filter key has actually changed
+            if (lastKnownParentKey != parentFilterKey) {
+                lastKnownParentKey = parentFilterKey
+                if (items.isNotEmpty() && selectedValue.isNotEmpty() &&
+                    parentFilteredItems.none { itemToText(it).equals(selectedValue.trim(), ignoreCase = true) }) {
+                    onValueChange("")
+                }
             }
         }
     }

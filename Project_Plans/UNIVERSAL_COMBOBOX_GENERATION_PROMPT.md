@@ -91,13 +91,18 @@ ON TextInput(newChar):
 ON (items, filterPredicate, parentFilterKey) Changed:
     parentFilteredItems = (filterPredicate != null) ? items.filter(filterPredicate) : items
     
-    IF isInitialMount == TRUE:
-        isInitialMount = FALSE
+    IF hasInitialized == FALSE:
+        IF items is NOT EMPTY or parentFilterKey is NOT NULL:
+            hasInitialized = TRUE
+            lastKnownParentKey = parentFilterKey
         RETURN
         
-    IF selectedValue is NOT EMPTY:
-        IF parentFilteredItems does NOT contain any item where itemToText(item) == selectedValue:
-            Emit onValueChange("") // Self-reset cascades down
+    // Only execute reset when parent filter key has ACTUALLY changed from previous value
+    IF lastKnownParentKey != parentFilterKey:
+        lastKnownParentKey = parentFilterKey
+        IF items is NOT EMPTY and selectedValue is NOT EMPTY:
+            IF parentFilteredItems does NOT contain any item where itemToText(item) == selectedValue:
+                Emit onValueChange("") // Self-reset cascades down cleanly
 ```
 
 ---

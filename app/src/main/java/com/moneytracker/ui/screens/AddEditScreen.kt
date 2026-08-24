@@ -99,16 +99,24 @@ fun AddEditScreen(
     var showDeleteTxnDialog by remember { mutableStateOf(false) }
 
     // 2. Smooth, continuous category input text
-    var categoryInputText by remember {
-        mutableStateOf(
-            categories.find { it.id == state.categoryId }?.name ?: state.type.name
-        )
-    }
+    var categoryInputText by remember { mutableStateOf("") }
 
-    LaunchedEffect(state.categoryId) {
-        val foundCat = categories.find { it.id == state.categoryId }
-        if (foundCat != null) {
-            categoryInputText = foundCat.name
+    LaunchedEffect(state.categoryId, state.type, categories) {
+        if (categories.isNotEmpty()) {
+            val foundCat = categories.find { it.id == state.categoryId }
+            if (foundCat != null) {
+                categoryInputText = foundCat.name
+            } else if (state.categoryId == null) {
+                val matchByType = categories.find { it.type == state.type }
+                if (matchByType != null) {
+                    categoryInputText = matchByType.name
+                    viewModel.updateCategory(matchByType.id)
+                } else {
+                    categoryInputText = state.type.name.lowercase().replaceFirstChar { it.uppercase() }
+                }
+            }
+        } else if (categoryInputText.isBlank()) {
+            categoryInputText = state.type.name.lowercase().replaceFirstChar { it.uppercase() }
         }
     }
 
@@ -570,10 +578,10 @@ fun AddEditScreen(
                             categoriesViewModel.startEdit(editingCategory)
                             categoriesViewModel.updateName(trimmed)
                             categoriesViewModel.updateType(type)
-                            categoriesViewModel.saveCategory { newId ->
+                            categoriesViewModel.saveCategory { savedCategoryId ->
                                 categoryInputText = trimmed
                                 viewModel.updateType(type)
-                                viewModel.updateCategory(newId)
+                                viewModel.updateCategory(savedCategoryId)
                                 showCategoryDialog = false
                             }
                         }

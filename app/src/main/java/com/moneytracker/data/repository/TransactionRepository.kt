@@ -227,12 +227,23 @@ class TransactionRepository(
         return if (entity.id == 0L) {
             categoryDao.insert(entity)
         } else {
+            val oldCategory = categoryDao.getById(entity.id)
             categoryDao.update(entity)
+            if (oldCategory != null && oldCategory.type != entity.type) {
+                // Cascade type update to all subcategories, details, and transactions for this category
+                subCategoryDao.updateTypeForCategory(pid, entity.id, entity.type)
+                detailDao.updateTypeForCategory(pid, entity.id, entity.type)
+                transactionDao.updateTypeForCategory(pid, entity.id, entity.type)
+            }
             entity.id
         }
     }
 
     suspend fun deleteCategory(category: CategoryEntity) {
+        val pid = if (category.profileId <= 0L) activeProfileId else category.profileId
+        // Delete all child subcategories and details associated with this category to prevent orphan records
+        subCategoryDao.deleteAllForCategory(pid, category.id)
+        detailDao.deleteAllForCategory(pid, category.id)
         categoryDao.delete(category)
     }
 
@@ -242,12 +253,30 @@ class TransactionRepository(
         return if (entity.id == 0L) {
             subCategoryDao.insert(entity)
         } else {
+            val oldSubCategory = subCategoryDao.getById(entity.id)
             subCategoryDao.update(entity)
+            if (oldSubCategory != null) {
+                // 1. If name changed, rename in all transactions
+                if (oldSubCategory.name != entity.name) {
+                    transactionDao.renameSubCategory(pid, oldSubCategory.name, entity.name, entity.categoryId)
+                }
+                // 2. If categoryId changed, migrate child details and transactions to the new categoryId
+                if (oldSubCategory.categoryId != entity.categoryId && entity.categoryId != null) {
+                    detailDao.updateCategoryForSubCategory(pid, entity.id, entity.categoryId, entity.type)
+                    transactionDao.updateCategoryForSubCategory(pid, entity.name, entity.categoryId, entity.type)
+                } else if (oldSubCategory.type != entity.type && entity.type != null) {
+                    detailDao.updateTypeForSubCategory(pid, entity.id, entity.type)
+                    transactionDao.updateTypeForSubCategory(pid, entity.name, entity.type)
+                }
+            }
             entity.id
         }
     }
 
     suspend fun deleteSubCategory(subCategory: SubCategoryEntity) {
+        val pid = if (subCategory.profileId <= 0L) activeProfileId else subCategory.profileId
+        // Delete all child details associated with this subcategory to prevent orphan records
+        detailDao.deleteAllForSubCategory(pid, subCategory.id)
         subCategoryDao.delete(subCategory)
     }
 
@@ -257,7 +286,12 @@ class TransactionRepository(
         return if (entity.id == 0L) {
             detailDao.insert(entity)
         } else {
+            val oldDetail = detailDao.getById(entity.id)
             detailDao.update(entity)
+            if (oldDetail != null && oldDetail.name != entity.name) {
+                // Rename detail in transactions
+                transactionDao.renameDetail(pid, oldDetail.name, entity.name)
+            }
             entity.id
         }
     }

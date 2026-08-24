@@ -53,7 +53,7 @@ class CategoriesViewModel(
         val state = _editState.value
         if (state.name.isBlank()) return
         viewModelScope.launch {
-            val newId = repository.saveCategory(
+            val savedCategoryId = repository.saveCategory(
                 CategoryEntity(
                     id = state.id,
                     name = state.name.trim(),
@@ -62,7 +62,7 @@ class CategoriesViewModel(
                 )
             )
             runSortProcess()
-            onDone(newId)
+            onDone(savedCategoryId)
         }
     }
 

@@ -98,8 +98,14 @@ interface SubCategoryDao {
     @Update
     suspend fun update(subCategory: SubCategoryEntity)
 
+    @Query("UPDATE sub_categories SET type = :type WHERE profileId = :profileId AND categoryId = :categoryId")
+    suspend fun updateTypeForCategory(profileId: Long, categoryId: Long, type: TransactionType)
+
     @Delete
     suspend fun delete(subCategory: SubCategoryEntity)
+
+    @Query("DELETE FROM sub_categories WHERE profileId = :profileId AND categoryId = :categoryId")
+    suspend fun deleteAllForCategory(profileId: Long, categoryId: Long)
 
     @Query("DELETE FROM sub_categories WHERE profileId = :profileId")
     suspend fun deleteAllForProfile(profileId: Long)
@@ -122,8 +128,23 @@ interface DetailDao {
     @Update
     suspend fun update(detail: DetailEntity)
 
+    @Query("UPDATE details SET type = :type WHERE profileId = :profileId AND categoryId = :categoryId")
+    suspend fun updateTypeForCategory(profileId: Long, categoryId: Long, type: TransactionType)
+
+    @Query("UPDATE details SET categoryId = :categoryId, type = COALESCE(:type, type) WHERE profileId = :profileId AND subCategoryId = :subCategoryId")
+    suspend fun updateCategoryForSubCategory(profileId: Long, subCategoryId: Long, categoryId: Long, type: TransactionType?)
+
+    @Query("UPDATE details SET type = :type WHERE profileId = :profileId AND subCategoryId = :subCategoryId")
+    suspend fun updateTypeForSubCategory(profileId: Long, subCategoryId: Long, type: TransactionType)
+
     @Delete
     suspend fun delete(detail: DetailEntity)
+
+    @Query("DELETE FROM details WHERE profileId = :profileId AND categoryId = :categoryId")
+    suspend fun deleteAllForCategory(profileId: Long, categoryId: Long)
+
+    @Query("DELETE FROM details WHERE profileId = :profileId AND subCategoryId = :subCategoryId")
+    suspend fun deleteAllForSubCategory(profileId: Long, subCategoryId: Long)
 
     @Query("DELETE FROM details WHERE profileId = :profileId")
     suspend fun deleteAllForProfile(profileId: Long)
@@ -207,6 +228,21 @@ interface TransactionDao {
 
     @Update
     suspend fun update(transaction: TransactionEntity)
+
+    @Query("UPDATE transactions SET type = :type WHERE profileId = :profileId AND categoryId = :categoryId")
+    suspend fun updateTypeForCategory(profileId: Long, categoryId: Long, type: TransactionType)
+
+    @Query("UPDATE transactions SET subCategory = :newName WHERE profileId = :profileId AND subCategory = :oldName AND (:categoryId IS NULL OR categoryId = :categoryId)")
+    suspend fun renameSubCategory(profileId: Long, oldName: String, newName: String, categoryId: Long?)
+
+    @Query("UPDATE transactions SET categoryId = :categoryId, type = COALESCE(:type, type) WHERE profileId = :profileId AND subCategory = :subCategoryName")
+    suspend fun updateCategoryForSubCategory(profileId: Long, subCategoryName: String, categoryId: Long, type: TransactionType?)
+
+    @Query("UPDATE transactions SET type = :type WHERE profileId = :profileId AND subCategory = :subCategoryName")
+    suspend fun updateTypeForSubCategory(profileId: Long, subCategoryName: String, type: TransactionType)
+
+    @Query("UPDATE transactions SET detail = :newName WHERE profileId = :profileId AND detail = :oldName")
+    suspend fun renameDetail(profileId: Long, oldName: String, newName: String)
 
     @Delete
     suspend fun delete(transaction: TransactionEntity)

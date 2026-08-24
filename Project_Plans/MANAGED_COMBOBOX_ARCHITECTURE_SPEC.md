@@ -192,7 +192,12 @@ INPUT:
     filterPredicate: Function(T -> Boolean), 
     parentFilterKey: Any, 
     currentSelectedValue: String, 
-    isInitialComposition: Boolean
+    hasInitialized: Boolean,
+    lastKnownParentKey: Any
+
+OUTPUT: 
+    parentFilteredItems: List<T>, 
+    stateAction: Optional Reset Trigger
 
 BEGIN
     // Step 1: Internal Filtering
@@ -202,24 +207,31 @@ BEGIN
         parentFilteredItems = items
     END IF
 
-    // Step 2: Invalidation Check
-    IF isInitialComposition == TRUE THEN
-        SET isInitialComposition = FALSE
+    // Step 2: Baseline Initialization (Ignores initial async DB loads)
+    IF hasInitialized == FALSE THEN
+        IF items IS NOT EMPTY OR parentFilterKey IS NOT NULL THEN
+            SET hasInitialized = TRUE
+            SET lastKnownParentKey = parentFilterKey
+        END IF
         RETURN parentFilteredItems
     END IF
 
-    // Step 3: Self-Triggered Cleanup
-    IF currentSelectedValue IS NOT EMPTY THEN
-        SET matchFound = FALSE
-        FOR EACH item IN parentFilteredItems DO
-            IF itemToText(item) EQUALS_IGNORE_CASE currentSelectedValue.trim() THEN
-                matchFound = TRUE
-                BREAK
-            END IF
-        END FOR
+    // Step 3: Self-Triggered Cleanup ONLY when parent filter key has actually changed
+    IF lastKnownParentKey != parentFilterKey THEN
+        SET lastKnownParentKey = parentFilterKey
 
-        IF matchFound == FALSE THEN
-            CALL onValueChange("")
+        IF items IS NOT EMPTY AND currentSelectedValue IS NOT EMPTY THEN
+            SET matchFound = FALSE
+            FOR EACH item IN parentFilteredItems DO
+                IF itemToText(item) EQUALS_IGNORE_CASE currentSelectedValue.trim() THEN
+                    matchFound = TRUE
+                    BREAK
+                END IF
+            END FOR
+
+            IF matchFound == FALSE THEN
+                CALL onValueChange("")
+            END IF
         END IF
     END IF
 
