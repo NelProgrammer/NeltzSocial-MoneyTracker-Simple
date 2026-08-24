@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import android.util.Log
+import com.moneytracker.ui.theme.getCategoryColorHex
 import java.time.LocalDate
 
 // Sort Data Models
@@ -127,12 +128,13 @@ class DashboardViewModel(
             val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
             val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
             val expenseTotal = active.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
+            val totalOutflows = active.filter { it.type != TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
             MonthlySummary(
                 income = incomeTotal,
                 investment = investTotal,
                 education = eduTotal,
                 expense = expenseTotal,
-                balance = incomeTotal - investTotal - eduTotal - expenseTotal
+                balance = incomeTotal - totalOutflows
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MonthlySummary())
@@ -215,47 +217,61 @@ class DashboardViewModel(
         .map { list ->
             val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
             val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
-            val expenseTotal = active.filter { it.type == TransactionType.EXPENSE }.sumOf { kotlin.math.abs(it.amount) }
-            val investTotal = active.filter { it.type == TransactionType.INVESTMENT }.sumOf { kotlin.math.abs(it.amount) }
-            val eduTotal = active.filter { it.type == TransactionType.EDUCATION }.sumOf { kotlin.math.abs(it.amount) }
-            val totalOutflows = expenseTotal + investTotal + eduTotal
+            val outflowTxns = active.filter { it.type != TransactionType.INCOME }
+            val totalOutflows = outflowTxns.sumOf { kotlin.math.abs(it.amount) }
+
+            // Dynamically group all outflow transactions by category name
+            val groupedCategories = outflowTxns
+                .groupBy { it.categoryName.ifBlank { it.type.name } }
+                .map { (catName, txns) ->
+                    val total = txns.sumOf { kotlin.math.abs(it.amount) }
+                    val colorHex = getCategoryColorHex(catName, txns.firstOrNull()?.type)
+                    CategorySummary(
+                        categoryId = txns.first().categoryId,
+                        categoryName = catName,
+                        total = total,
+                        isDebtFunding = false,
+                        customColorHex = colorHex
+                    )
+                }
+                .sortedByDescending { it.total }
 
             val items = mutableListOf<CategorySummary>()
+            var runningOutflow = 0.0
 
-            if (totalOutflows > incomeTotal && totalOutflows > 0) {
-                // Deficit: Investments and Education funded, and Expenses split into Income-Funded vs Debt-Funded
-                val deficit = totalOutflows - incomeTotal
-                val incomeForExpenses = (incomeTotal - investTotal - eduTotal).coerceAtLeast(0.0)
-                val debtFundedExpenses = expenseTotal - incomeForExpenses
+            groupedCategories.forEach { catSummary ->
+                val start = runningOutflow
+                runningOutflow += catSummary.total
 
-                if (incomeForExpenses > 0) {
-                    items.add(CategorySummary(101L, "Expenses (Income Funded)", incomeForExpenses, isDebtFunding = false, customColorHex = 0xFFD32F2F))
+                if (runningOutflow <= incomeTotal) {
+                    // Fully income funded
+                    items.add(catSummary.copy(isDebtFunding = false))
+                } else if (start >= incomeTotal) {
+                    // Fully debt funded
+                    items.add(catSummary.copy(
+                        categoryName = "${catSummary.categoryName} (Debt)",
+                        isDebtFunding = true
+                    ))
+                } else {
+                    // Partially income funded & partially debt funded
+                    val incomePart = (incomeTotal - start).coerceAtLeast(0.0)
+                    val debtPart = (runningOutflow - incomeTotal).coerceAtLeast(0.0)
+                    if (incomePart > 0) {
+                        items.add(catSummary.copy(total = incomePart, isDebtFunding = false))
+                    }
+                    if (debtPart > 0) {
+                        items.add(catSummary.copy(
+                            categoryName = "${catSummary.categoryName} (Debt)",
+                            total = debtPart,
+                            isDebtFunding = true
+                        ))
+                    }
                 }
-                if (debtFundedExpenses > 0) {
-                    // The portion of expenses funded by debt (has outer glow)
-                    items.add(CategorySummary(105L, "Expenses (Debt Funded)", debtFundedExpenses, isDebtFunding = true, customColorHex = 0xFFD32F2F))
-                }
-                if (investTotal > 0) {
-                    items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
-                }
-                if (eduTotal > 0) {
-                    items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
-                }
-            } else {
-                // Surplus or balanced condition
-                if (expenseTotal > 0) {
-                    items.add(CategorySummary(101L, "Expenses", expenseTotal, isDebtFunding = false, customColorHex = 0xFFD32F2F))
-                }
-                if (investTotal > 0) {
-                    items.add(CategorySummary(102L, "Investments", investTotal, isDebtFunding = false, customColorHex = 0xFF1976D2))
-                }
-                if (eduTotal > 0) {
-                    items.add(CategorySummary(103L, "Education", eduTotal, isDebtFunding = false, customColorHex = 0xFF7B1FA2))
-                }
-                if (incomeTotal > totalOutflows) {
-                    val remaining = incomeTotal - totalOutflows
-                    items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
-                }
+            }
+
+            if (incomeTotal > totalOutflows) {
+                val remaining = incomeTotal - totalOutflows
+                items.add(CategorySummary(104L, "Remaining Income", remaining, isDebtFunding = false, customColorHex = 0xFF2E7D32))
             }
             items
         }
@@ -265,22 +281,19 @@ class DashboardViewModel(
         .map { list ->
             val active = list.filter { it.recurrenceFrequency != RecurrenceFrequency.PLAN_FUTURE }
             val incomeTotal = active.filter { it.type == TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
-            val totalOutflows = active.filter { it.type != TransactionType.INCOME }.sumOf { kotlin.math.abs(it.amount) }
+            val outflowTxns = active.filter { it.type != TransactionType.INCOME }
+            val totalOutflows = outflowTxns.sumOf { kotlin.math.abs(it.amount) }
 
-            val outflowDetails = active.filter { it.type != TransactionType.INCOME }
+            val outflowDetails = outflowTxns
                 .groupBy { it.detail.ifBlank { it.subCategory.ifBlank { it.categoryName } } }
                 .map { (detailName, txns) ->
-                    val type = txns.first().type
-                    val hex = when (type) {
-                        TransactionType.INVESTMENT -> 0xFF1976D2
-                        TransactionType.EDUCATION -> 0xFF7B1FA2
-                        else -> 0xFFD32F2F
-                    }
+                    val catName = txns.first().categoryName
+                    val colorHex = getCategoryColorHex(catName, txns.first().type)
                     CategorySummary(
                         categoryId = txns.first().categoryId,
                         categoryName = detailName,
                         total = txns.sumOf { kotlin.math.abs(it.amount) },
-                        customColorHex = hex,
+                        customColorHex = colorHex,
                         isDebtFunding = false
                     )
                 }
@@ -294,13 +307,23 @@ class DashboardViewModel(
                 if (runningOutflow <= incomeTotal) {
                     items.add(detail.copy(isDebtFunding = false))
                 } else if (start >= incomeTotal) {
-                    items.add(detail.copy(isDebtFunding = true))
+                    items.add(detail.copy(
+                        categoryName = "${detail.categoryName} (Debt)",
+                        isDebtFunding = true
+                    ))
                 } else {
-                    // Spans the threshold: split into income-funded and debt-funded parts
-                    val incomePart = incomeTotal - start
-                    val debtPart = runningOutflow - incomeTotal
-                    items.add(detail.copy(total = incomePart, isDebtFunding = false))
-                    items.add(detail.copy(categoryName = "${detail.categoryName} (Debt)", total = debtPart, isDebtFunding = true))
+                    val incomePart = (incomeTotal - start).coerceAtLeast(0.0)
+                    val debtPart = (runningOutflow - incomeTotal).coerceAtLeast(0.0)
+                    if (incomePart > 0) {
+                        items.add(detail.copy(total = incomePart, isDebtFunding = false))
+                    }
+                    if (debtPart > 0) {
+                        items.add(detail.copy(
+                            categoryName = "${detail.categoryName} (Debt)",
+                            total = debtPart,
+                            isDebtFunding = true
+                        ))
+                    }
                 }
             }
 

@@ -21,20 +21,22 @@ val ExpenseColor: Color = Color(0xFFC62828)
 
 // Curated distinct color palette for custom categories
 val CustomCategoryPalette: List<Color> = listOf(
-    Color(0xFFFF8F00), // Amber / Orange
-    Color(0xFF00897B), // Teal
-    Color(0xFF3949AB), // Indigo
-    Color(0xFFE53935), // Crimson
-    Color(0xFFD81B60), // Pink / Rose
-    Color(0xFF00ACC1), // Cyan
-    Color(0xFF7CB342), // Lime Green
-    Color(0xFF8E24AA), // Purple
-    Color(0xFFF4511E), // Deep Orange
-    Color(0xFF5E35B1), // Deep Purple
-    Color(0xFF039BE5), // Light Blue
-    Color(0xFF43A047), // Green
-    Color(0xFF6D4C41), // Brown
-    Color(0xFF546E7A)  // Slate
+    Color(0xFFFFB300), // Amber / Gold
+    Color(0xFF00BFA5), // Vibrant Teal
+    Color(0xFF3D5AFE), // Electric Indigo
+    Color(0xFFFF4081), // Hot Pink / Magenta
+    Color(0xFF00E5FF), // Radiant Cyan
+    Color(0xFF76FF03), // Chartreuse
+    Color(0xFFFF6D00), // Bright Orange
+    Color(0xFF651FFF), // Deep Purple / Violet
+    Color(0xFF00B0FF), // Sky Blue
+    Color(0xFFFF5252), // Coral Red
+    Color(0xFFAEEA00), // Lime Neon
+    Color(0xFFD84315), // Rust / Terracotta
+    Color(0xFF1DE9B6), // Mint / Turquoise
+    Color(0xFF7C4DFF), // Royal Lavender
+    Color(0xFFFFAB00), // Pure Amber
+    Color(0xFF0091EA)  // Light Blue
 )
 
 fun getCategoryBaseColor(categoryName: String, fallbackType: com.moneytracker.data.local.entity.TransactionType? = null): Color {
@@ -57,6 +59,15 @@ fun getCategoryBaseColor(categoryName: String, fallbackType: com.moneytracker.da
             CustomCategoryPalette[hash % CustomCategoryPalette.size]
         }
     }
+}
+
+fun getCategoryColorHex(categoryName: String, fallbackType: com.moneytracker.data.local.entity.TransactionType? = null): Long {
+    val color = getCategoryBaseColor(categoryName, fallbackType)
+    val a = (color.alpha * 255.0f + 0.5f).toInt()
+    val r = (color.red * 255.0f + 0.5f).toInt()
+    val g = (color.green * 255.0f + 0.5f).toInt()
+    val b = (color.blue * 255.0f + 0.5f).toInt()
+    return (((a and 0xFF) shl 24) or ((r and 0xFF) shl 16) or ((g and 0xFF) shl 8) or (b and 0xFF)).toLong() and 0xFFFFFFFFL
 }
 
 // 1. Emerald Green Palette

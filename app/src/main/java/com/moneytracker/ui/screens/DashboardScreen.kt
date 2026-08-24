@@ -126,7 +126,7 @@ fun DashboardScreen(
 
             // 4. Combined Income Overview (Income Sources and Utilization)
             item {
-                val totalOutflows = summary.expense + summary.investment + summary.education
+                val totalOutflows = incomeUsageBreakdown.filter { !it.categoryName.startsWith("Remaining Income") }.sumOf { it.total }
                 val usageTotal = if (summary.income > 0) maxOf(summary.income, totalOutflows) else totalOutflows
                 DualIncomePieChartCard(
                     title = "Income Sources and Utilization",
