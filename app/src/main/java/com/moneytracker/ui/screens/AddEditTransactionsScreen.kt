@@ -273,19 +273,30 @@ fun AddEditTransactionsScreen(
             ) {
                 val autoPrefix = if (state.type == TransactionType.INCOME) "+ " else "- "
                 val autoColor = if (state.type == TransactionType.INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                val isFormulaInput = com.moneytracker.util.FormulaEvaluator.isFormula(state.amount)
+                val evaluatedAmount = if (isFormulaInput) com.moneytracker.util.FormulaEvaluator.evaluate(state.amount) else state.amount.toDoubleOrNull()
+                val calculatedLabel = if (isFormulaInput && evaluatedAmount != null) {
+                    val sign = if (state.type == TransactionType.INCOME) "+" else "-"
+                    "Amount ($sign${com.moneytracker.util.CurrencyUtils.format(kotlin.math.abs(evaluatedAmount))})"
+                } else {
+                    "Amount"
+                }
 
                 OutlinedTextField(
                     value = state.amount,
                     onValueChange = viewModel::updateAmount,
-                    label = { Text("Amount") },
+                    label = { Text(calculatedLabel) },
                     prefix = {
-                        Text(
-                            text = autoPrefix,
-                            color = autoColor,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                        )
+                        if (!isFormulaInput) {
+                            Text(
+                                text = autoPrefix,
+                                color = autoColor,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    placeholder = { Text("e.g. 150 or = 2*5*30") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )

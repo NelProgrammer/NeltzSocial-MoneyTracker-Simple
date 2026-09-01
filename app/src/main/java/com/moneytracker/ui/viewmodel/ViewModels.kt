@@ -836,12 +836,16 @@ class AddEditViewModel(
 
     fun save(onSuccess: () -> Unit, forceSave: Boolean = false) {
         val state = _uiState.value
-        val amount = state.amount.toDoubleOrNull()
+        val amount = if (com.moneytracker.util.FormulaEvaluator.isFormula(state.amount)) {
+            com.moneytracker.util.FormulaEvaluator.evaluate(state.amount)
+        } else {
+            state.amount.toDoubleOrNull()
+        }
         val categoryId = state.categoryId
 
         when {
             amount == null || amount <= 0 -> {
-                _uiState.value = state.copy(errorMessage = "Enter a valid amount")
+                _uiState.value = state.copy(errorMessage = "Enter a valid amount or formula (e.g. = 2*5*30.00)")
                 return
             }
             categoryId == null -> {

@@ -4,14 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +20,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowOverflow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -41,7 +39,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.FilterList
@@ -58,17 +55,16 @@ import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -76,7 +72,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,11 +84,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -218,6 +213,101 @@ private fun ExpandableSettingsSection(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     Spacer(modifier = Modifier.height(8.dp))
                     content()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Column Border Resize Handle:
+ * Envelopes the column border line with 2 vertical dotted lines,
+ * and sandwiches the enveloping vertical line with left and right arrows (⯇❘⯈) at hover/drag.
+ * Tight detection range strictly on the border line.
+ */
+@Composable
+private fun ColumnBorderResizeHandle(
+    columnId: String,
+    currentWidth: Dp,
+    onWidthChange: (Dp) -> Unit,
+    height: Dp,
+    borderLineColor: Color,
+    modifier: Modifier = Modifier
+) {
+    var isHoveredOrDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = modifier
+            .width(8.dp)
+            .height(height)
+            .pointerInput(columnId) {
+                detectHorizontalDragGestures(
+                    onDragStart = { isHoveredOrDragging = true },
+                    onDragEnd = { isHoveredOrDragging = false },
+                    onDragCancel = { isHoveredOrDragging = false }
+                ) { change, dragAmount ->
+                    change.consume()
+                    with(density) {
+                        val newW = (currentWidth + dragAmount.toDp()).coerceIn(50.dp, 450.dp)
+                        onWidthChange(newW)
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val midX = size.width / 2
+            if (isHoveredOrDragging) {
+                val dashEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
+                drawLine(
+                    color = primaryColor,
+                    start = Offset(midX - 2.5.dp.toPx(), 0f),
+                    end = Offset(midX - 2.5.dp.toPx(), size.height),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = dashEffect
+                )
+                drawLine(
+                    color = primaryColor,
+                    start = Offset(midX + 2.5.dp.toPx(), 0f),
+                    end = Offset(midX + 2.5.dp.toPx(), size.height),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = dashEffect
+                )
+                drawLine(
+                    color = primaryColor,
+                    start = Offset(midX, 0f),
+                    end = Offset(midX, size.height),
+                    strokeWidth = 1.5.dp.toPx()
+                )
+            } else {
+                drawLine(
+                    color = borderLineColor,
+                    start = Offset(midX, 0f),
+                    end = Offset(midX, size.height),
+                    strokeWidth = 1.5.dp.toPx()
+                )
+            }
+        }
+
+        if (isHoveredOrDragging) {
+            Surface(
+                shape = RoundedCornerShape(3.dp),
+                color = primaryColor,
+                shadowElevation = 3.dp,
+                modifier = Modifier
+                    .height(18.dp)
+                    .width(26.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "⯇❘⯈",
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -368,7 +458,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     var focusedRowKey by remember { mutableStateOf<Any?>(null) }
 
     val tableHorizontalScrollState = rememberScrollState()
-    val density = LocalDensity.current
 
     LaunchedEffect(tableHorizontalScrollState.value) {
         if (rowSnapBehavior == RowSnapBehavior.ON_FOCUS_OR_SCROLL) {
@@ -493,7 +582,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     // Accurate Total Table Width Calculation so rightmost column (Notes) is 100% visible and accessible
     val totalTableWidth = remember(visibleColumns, columnWidthMap.toMap()) {
         val sumCols = visibleColumns.sumOf { (columnWidthMap[it.id] ?: it.width).value.toDouble() }
-        val sumDividers = visibleColumns.size * 14.0
+        val sumDividers = visibleColumns.size * 8.0
         (sumCols + sumDividers).coerceAtLeast(360.0).dp
     }
 
@@ -754,7 +843,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             ) {
                 Column(modifier = Modifier.width(totalTableWidth)) {
                     // =====================================================
-                    // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Sort Badges)
+                    // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Space-Saving Sort Triggers)
                     // =====================================================
                     Row(
                         modifier = Modifier
@@ -763,19 +852,18 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         visibleColumns.forEachIndexed { colIdx, colDef ->
-                            var showColumnGearMenu by remember { mutableStateOf(false) }
-                            var isBorderHovered by remember { mutableStateOf(false) }
+                            var showColumnSortDropdown by remember { mutableStateOf(false) }
                             val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
                             val priorityRankIndex = sortPriorityColumnIds.indexOf(colDef.id)
                             val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
                             val colWidth = columnWidthMap[colDef.id] ?: colDef.width
 
+                            // Header Cell Body (Clickable to open Column Sort Options)
                             Box(
                                 modifier = Modifier
                                     .width(colWidth)
                                     .heightIn(min = 44.dp)
                                     .drawBehind {
-                                        // Bottom cell border
                                         drawLine(
                                             color = borderLineColor,
                                             start = Offset(0f, size.height),
@@ -783,7 +871,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             strokeWidth = 1.5.dp.toPx()
                                         )
                                     }
-                                    .padding(start = 6.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                                    .clickable { showColumnSortDropdown = true }
+                                    .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 Row(
@@ -805,24 +894,21 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
                                     Spacer(modifier = Modifier.width(2.dp))
 
-                                    // Vertically Stacked Sort Order Badge + Direction Arrow + Column Gear
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
+                                    // Compact Sort Order Badge + Direction Arrow (Integrated dropdown anchor, no separate gear)
+                                    Box {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                                         ) {
                                             Surface(
                                                 shape = CircleShape,
                                                 color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                                modifier = Modifier.size(14.dp)
+                                                modifier = Modifier.size(15.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Text(
                                                         text = rankDisplay,
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
                                                         color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -837,117 +923,68 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 },
                                                 contentDescription = "Sort Direction",
                                                 tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(11.dp)
+                                                modifier = Modifier.size(12.dp)
                                             )
                                         }
 
-                                        Box {
-                                            IconButton(
-                                                onClick = { showColumnGearMenu = true },
-                                                modifier = Modifier.size(18.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Settings,
-                                                    contentDescription = "Column Options",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-
-                                            DropdownMenu(
-                                                expanded = showColumnGearMenu,
-                                                onDismissRequest = { showColumnGearMenu = false }
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Ascending (A → Z / Min → Max)") },
-                                                    leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                                    onClick = {
-                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
-                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
-                                                        showColumnGearMenu = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Descending (Z → A / Max → Min)") },
-                                                    leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                                    onClick = {
-                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
-                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
-                                                        showColumnGearMenu = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Custom Priority (Rank Order)") },
-                                                    leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                                                    onClick = {
-                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
-                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
-                                                        priorityTargetColumnId = colDef.id
-                                                        showCustomPriorityDialog = true
-                                                        showColumnGearMenu = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("Non-Sorting (Off)") },
-                                                    leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
-                                                    onClick = {
-                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
-                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
-                                                        showColumnGearMenu = false
-                                                    }
-                                                )
-                                            }
+                                        DropdownMenu(
+                                            expanded = showColumnSortDropdown,
+                                            onDismissRequest = { showColumnSortDropdown = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Ascending (A → Z / Min → Max)") },
+                                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
+                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
+                                                    showColumnSortDropdown = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Descending (Z → A / Max → Min)") },
+                                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
+                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
+                                                    showColumnSortDropdown = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Custom Priority (Rank Order)") },
+                                                leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
+                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
+                                                    priorityTargetColumnId = colDef.id
+                                                    showCustomPriorityDialog = true
+                                                    showColumnSortDropdown = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Non-Sorting (Off)") },
+                                                leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
+                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
+                                                    showColumnSortDropdown = false
+                                                }
+                                            )
                                         }
                                     }
                                 }
                             }
 
-                            val handleAlpha by animateFloatAsState(targetValue = if (isBorderHovered) 1f else 0f, label = "handleAlpha")
-                            Box(
-                                modifier = Modifier
-                                    .width(14.dp)
-                                    .heightIn(min = 44.dp)
-                                    .pointerInput(colDef.id) {
-                                        detectHorizontalDragGestures(
-                                            onDragStart = { isBorderHovered = true },
-                                            onDragEnd = { isBorderHovered = false },
-                                            onDragCancel = { isBorderHovered = false }
-                                        ) { change, dragAmount ->
-                                            change.consume()
-                                            with(density) {
-                                                val curW = columnWidthMap[colDef.id] ?: colDef.width
-                                                val newW = (curW + dragAmount.toDp()).coerceIn(60.dp, 400.dp)
-                                                columnWidthMap[colDef.id] = newW
-                                                SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
-                                            }
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(1.5.dp)
-                                        .height(44.dp)
-                                        .background(borderLineColor)
-                                )
-
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .alpha(handleAlpha)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(3.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.onPrimary)
-                                        )
-                                    }
-                                }
-                            }
+                            // High-Contrast Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
+                            ColumnBorderResizeHandle(
+                                columnId = colDef.id,
+                                currentWidth = colWidth,
+                                onWidthChange = { newW ->
+                                    columnWidthMap[colDef.id] = newW
+                                    SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
+                                },
+                                height = 44.dp,
+                                borderLineColor = borderLineColor
+                            )
                         }
                     }
 
@@ -1032,29 +1069,27 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 .width(colWidth)
                                                 .heightIn(min = 38.dp, max = 56.dp)
                                                 .padding(horizontal = 6.dp, vertical = 6.dp)
-                                            .clickable {
-                                                focusedRowKey = currentKey
-                                                if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
-                                                else onRowClick?.invoke(item)
-                                            },
+                                                .clickable {
+                                                    focusedRowKey = currentKey
+                                                    if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
+                                                    else onRowClick?.invoke(item)
+                                                },
                                             contentAlignment = Alignment.CenterStart
                                         ) {
                                             colDef.cellContent(item, isSelected, wrapDataLines)
                                         }
 
-                                        Box(
-                                            modifier = Modifier
-                                                .width(14.dp)
-                                                .height(38.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .width(1.5.dp)
-                                                    .height(38.dp)
-                                                    .background(borderLineColor)
-                                            )
-                                        }
+                                        // Column Resize Handle across Data Rows too
+                                        ColumnBorderResizeHandle(
+                                            columnId = colDef.id,
+                                            currentWidth = colWidth,
+                                            onWidthChange = { newW ->
+                                                columnWidthMap[colDef.id] = newW
+                                                SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
+                                            },
+                                            height = 38.dp,
+                                            borderLineColor = borderLineColor
+                                        )
                                     }
                                 }
                             }
