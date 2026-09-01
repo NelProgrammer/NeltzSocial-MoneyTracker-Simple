@@ -163,10 +163,7 @@ fun DashboardScreen(
                     educationTotal = summary.education,
                     investmentSummaries = investmentBreakdown,
                     investmentDetailSummaries = investmentDetailBreakdown,
-                    investmentTotal = summary.investment,
-                    onSliceClick = { category, subCategory ->
-                        onViewAll()
-                    }
+                    investmentTotal = summary.investment
                 )
             }
 

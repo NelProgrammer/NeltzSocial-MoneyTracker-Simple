@@ -126,20 +126,16 @@ data class GridColumnDefinition<T>(
 /**
  * Enterprise Reusable Generic Sortable & Pilled Grid Component
  *
- * Architectural Pillars:
- * 1. Container Structure:
- *    - Table Name Card (Title, Record Count, Primary Grid Gear ⚙)
- *    - Filter Pills Card (Collapsible rows, Combo mechanics, 3-mode sort)
- *    - Unified Table Card (Single card containing Header Row + Data Rows, Cell Borders, Drag-to-Resize, Synchronized Horizontal Scroll)
+ * Fixed Architecture:
+ * 1. Unified Table Container: Single Horizontal Scroll modifier wraps the entire table (Headers + All Rows together).
+ *    Swiping horizontally anywhere (header or rows) moves the entire table smoothly.
+ * 2. Inner Column Border Resize Handle: A visible handle dot located precisely on the column border divider
+ *    detects horizontal drag to resize column width. Does not intercept touches inside the cell.
+ * 3. Container Card Structure:
+ *    - Table Name Card (Title, Total Count Badge, Primary Grid Gear ⚙)
+ *    - Filter Pills Card (1-5 rows stepper, 3-mode sort: Custom Priority, Numerical, A-Z)
+ *    - Unified Table Card (Single card containing Header Row + Data Rows, Cell Borders, Stacked Badges)
  *    - Table Footer Card (Range summary, Page size selector, Navigation, Footer Gear ⚙)
- * 2. Visual Quality:
- *    - Cell borders (vertical dividers + horizontal dividers)
- *    - Drag handle on column right border to resize width
- *    - Vertically stacked Sort Order Badge directly above Sort Direction Arrow
- * 3. Sorting & Visibility:
- *    - Primary Grid Gear houses multi-column sort priority & master column visibility
- *    - Category-filtered Subcategory custom priority reordering with persistent state
- *    - 3-Mode Filter Pills sorting (Custom Priority default, Numerical, A-Z)
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -598,245 +594,271 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             border = BorderStroke(1.dp, borderLineColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(tableHorizontalScrollState)
             ) {
-                // =====================================================
-                // HEADER ROW WITH CELL BORDERS & DRAG-TO-RESIZE
-                // =====================================================
-                Row(
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    visibleColumns.forEachIndexed { colIdx, colDef ->
-                        var showColumnGearMenu by remember { mutableStateOf(false) }
-                        val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
-                        val activePriorityRank = activeSortedColumnIds.indexOf(colDef.id).let { if (it >= 0) it + 1 else null }
-                        val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                Column {
+                    // =====================================================
+                    // HEADER ROW WITH CELL BORDERS & PRECISE BORDER RESIZE HANDLE
+                    // =====================================================
+                    Row(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        visibleColumns.forEachIndexed { colIdx, colDef ->
+                            var showColumnGearMenu by remember { mutableStateOf(false) }
+                            val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
+                            val activePriorityRank = activeSortedColumnIds.indexOf(colDef.id).let { if (it >= 0) it + 1 else null }
+                            val colWidth = columnWidthMap[colDef.id] ?: colDef.width
 
-                        Box(
-                            modifier = Modifier
-                                .width(colWidth)
-                                .heightIn(min = 40.dp)
-                                .drawBehind {
-                                    // Right vertical cell border divider
-                                    drawLine(
-                                        color = borderLineColor,
-                                        start = Offset(size.width, 0f),
-                                        end = Offset(size.width, size.height),
-                                        strokeWidth = 1.dp.toPx()
-                                    )
-                                    // Bottom cell border
-                                    drawLine(
-                                        color = borderLineColor,
-                                        start = Offset(0f, size.height),
-                                        end = Offset(size.width, size.height),
-                                        strokeWidth = 1.dp.toPx()
-                                    )
-                                }
-                                .padding(horizontal = 6.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                // Column Title
-                                Text(
-                                    text = colDef.title,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
-                                    ),
-                                    color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = if (wrapHeaderLines) Int.MAX_VALUE else 1,
-                                    overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                Spacer(modifier = Modifier.width(2.dp))
-
-                                // Vertically Stacked Badge & Direction Arrow + Column Gear
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    // Vertical Stack: Badge directly above Arrow
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        if (activePriorityRank != null) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(13.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "$activePriorityRank",
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
-                                                        color = MaterialTheme.colorScheme.onPrimary
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Icon(
-                                            imageVector = when (currentStrategy) {
-                                                ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                                ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                                ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                                ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                            },
-                                            contentDescription = "Sort Direction",
-                                            tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                                            modifier = Modifier.size(11.dp)
+                            Box(
+                                modifier = Modifier
+                                    .width(colWidth)
+                                    .heightIn(min = 42.dp)
+                                    .drawBehind {
+                                        // Bottom cell border
+                                        drawLine(
+                                            color = borderLineColor,
+                                            start = Offset(0f, size.height),
+                                            end = Offset(size.width, size.height),
+                                            strokeWidth = 1.dp.toPx()
                                         )
                                     }
+                                    .padding(start = 6.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    // Column Title
+                                    Text(
+                                        text = colDef.title,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 11.sp,
+                                            fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
+                                        ),
+                                        color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = if (wrapHeaderLines) Int.MAX_VALUE else 1,
+                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
 
-                                    // Column Gear (⚙)
-                                    Box {
-                                        IconButton(
-                                            onClick = { showColumnGearMenu = true },
-                                            modifier = Modifier.size(18.dp)
+                                    Spacer(modifier = Modifier.width(2.dp))
+
+                                    // Vertically Stacked Badge & Direction Arrow + Column Gear
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        // Vertical Stack: Badge directly above Arrow
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
                                         ) {
+                                            if (activePriorityRank != null) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(13.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text(
+                                                            text = "$activePriorityRank",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                        )
+                                                    }
+                                                }
+                                            }
+
                                             Icon(
-                                                imageVector = Icons.Default.Settings,
-                                                contentDescription = "Column Options",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(12.dp)
+                                                imageVector = when (currentStrategy) {
+                                                    ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                    ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                    ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                                },
+                                                contentDescription = "Sort Direction",
+                                                tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                                modifier = Modifier.size(11.dp)
                                             )
                                         }
 
-                                        DropdownMenu(
-                                            expanded = showColumnGearMenu,
-                                            onDismissRequest = { showColumnGearMenu = false }
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text("Ascending (A → Z / Min → Max)") },
-                                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
-                                                    showColumnGearMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Descending (Z → A / Max → Min)") },
-                                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
-                                                    showColumnGearMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Custom Priority (Rank Order)") },
-                                                leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
-                                                    priorityTargetColumnId = colDef.id
-                                                    showCustomPriorityDialog = true
-                                                    showColumnGearMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Non-Sorting (Off)") },
-                                                leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
-                                                    showColumnGearMenu = false
-                                                }
-                                            )
+                                        // Column Gear (⚙)
+                                        Box {
+                                            IconButton(
+                                                onClick = { showColumnGearMenu = true },
+                                                modifier = Modifier.size(18.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Settings,
+                                                    contentDescription = "Column Options",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+
+                                            DropdownMenu(
+                                                expanded = showColumnGearMenu,
+                                                onDismissRequest = { showColumnGearMenu = false }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Ascending (A → Z / Min → Max)") },
+                                                    leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
+                                                        showColumnGearMenu = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Descending (Z → A / Max → Min)") },
+                                                    leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
+                                                        showColumnGearMenu = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Custom Priority (Rank Order)") },
+                                                    leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
+                                                        priorityTargetColumnId = colDef.id
+                                                        showCustomPriorityDialog = true
+                                                        showColumnGearMenu = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Non-Sorting (Off)") },
+                                                    leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
+                                                        showColumnGearMenu = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
 
-                            // Right Edge Drag-to-Resize Handle
+                            // Precise Inner Column Border with Drag Handle Dot
                             Box(
                                 modifier = Modifier
-                                    .width(8.dp)
-                                    .fillMaxHeight()
-                                    .align(Alignment.CenterEnd)
-                                    .pointerInput(colDef.id) {
-                                        detectHorizontalDragGestures { change, dragAmount ->
-                                            change.consume()
-                                            with(density) {
-                                                val curW = columnWidthMap[colDef.id] ?: colDef.width
-                                                val newW = (curW + dragAmount.toDp()).coerceIn(60.dp, 400.dp)
-                                                columnWidthMap[colDef.id] = newW
-                                            }
-                                        }
-                                    }
-                            )
-                        }
-                    }
-                }
-
-                // =====================================================
-                // DATA ROWS WITH CELL BORDERS
-                // =====================================================
-                if (pagedItems.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = emptyMessage,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    pagedItems.forEachIndexed { rowIdx, item ->
-                        val isSelected = selectedItemKeys.contains(itemKey(item))
-                        Row(
-                            modifier = Modifier
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                    else Color.Transparent
-                                )
-                                .combinedClickable(
-                                    onClick = {
-                                        if (onToggleSelectKey != null) onToggleSelectKey(itemKey(item))
-                                        else onRowClick?.invoke(item)
-                                    },
-                                    onDoubleClick = { onRowDoubleClick?.invoke(item) },
-                                    onLongClick = { onRowLongClick?.invoke(item) }
-                                ),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            visibleColumns.forEach { colDef ->
-                                val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                    .width(10.dp)
+                                    .heightIn(min = 42.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Vertical divider line
                                 Box(
                                     modifier = Modifier
-                                        .width(colWidth)
-                                        .heightIn(min = 36.dp)
-                                        .drawBehind {
-                                            // Right vertical divider
-                                            drawLine(
-                                                color = borderLineColor,
-                                                start = Offset(size.width, 0f),
-                                                end = Offset(size.width, size.height),
-                                                strokeWidth = 1.dp.toPx()
-                                            )
-                                            // Bottom divider
-                                            drawLine(
-                                                color = borderLineColor,
-                                                start = Offset(0f, size.height),
-                                                end = Offset(size.width, size.height),
-                                                strokeWidth = 1.dp.toPx()
-                                            )
+                                        .width(1.dp)
+                                        .fillMaxHeight()
+                                        .background(borderLineColor)
+                                )
+
+                                // Visible Resize Handle Dot right on the border
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .pointerInput(colDef.id) {
+                                            detectHorizontalDragGestures { change, dragAmount ->
+                                                change.consume()
+                                                with(density) {
+                                                    val curW = columnWidthMap[colDef.id] ?: colDef.width
+                                                    val newW = (curW + dragAmount.toDp()).coerceIn(60.dp, 400.dp)
+                                                    columnWidthMap[colDef.id] = newW
+                                                }
+                                            }
                                         }
-                                        .padding(horizontal = 6.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.CenterStart
                                 ) {
-                                    colDef.cellContent(item, isSelected, wrapDataLines)
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // =====================================================
+                    // DATA ROWS WITH CELL BORDERS
+                    // =====================================================
+                    if (pagedItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = emptyMessage,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        pagedItems.forEachIndexed { rowIdx, item ->
+                            val isSelected = selectedItemKeys.contains(itemKey(item))
+                            Row(
+                                modifier = Modifier
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                        else Color.Transparent
+                                    )
+                                    .drawBehind {
+                                        // Bottom row border
+                                        drawLine(
+                                            color = borderLineColor,
+                                            start = Offset(0f, size.height),
+                                            end = Offset(size.width, size.height),
+                                            strokeWidth = 1.dp.toPx()
+                                        )
+                                    },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                visibleColumns.forEach { colDef ->
+                                    val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                    Box(
+                                        modifier = Modifier
+                                            .width(colWidth)
+                                            .heightIn(min = 36.dp)
+                                            .padding(horizontal = 6.dp, vertical = 6.dp)
+                                            .clickable {
+                                                if (onToggleSelectKey != null) onToggleSelectKey(itemKey(item))
+                                                else onRowClick?.invoke(item)
+                                            },
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        colDef.cellContent(item, isSelected, wrapDataLines)
+                                    }
+
+                                    // Right vertical cell border divider
+                                    Box(
+                                        modifier = Modifier
+                                            .width(10.dp)
+                                            .heightIn(min = 36.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(1.dp)
+                                                .fillMaxHeight()
+                                                .background(borderLineColor)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -912,7 +934,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             Text("«", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (currentPage > 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
                         }
 
-                        // Prev Page ◀
+                        // Prev Page ‹
                         IconButton(
                             onClick = { if (currentPage > 1) currentPage-- },
                             enabled = currentPage > 1,
@@ -929,7 +951,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
 
-                        // Next Page ▶
+                        // Next Page ›
                         IconButton(
                             onClick = { if (currentPage < totalPages) currentPage++ },
                             enabled = currentPage < totalPages,
@@ -1069,7 +1091,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                     if (primaryGearActiveTab == 0) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Drag columns up or down to set multi-level sort priority (#1, #2, ...). Tap the badge to cycle strategy.",
+                                text = "Drag columns up or down to set multi-level sort priority (#1, #2, ...). Tap the button to cycle strategy.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

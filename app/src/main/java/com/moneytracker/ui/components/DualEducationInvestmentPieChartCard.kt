@@ -16,6 +16,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -33,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,12 +95,14 @@ enum class ChartPalette(val title: String, val eduColors: List<Color>, val invCo
 /**
  * Unified Dual Education & Investment Analytics Card
  *
- * Highlights:
+ * Self-contained In-Place Drill Down & Slice Filtering:
  * 1. Dual Donut Charts: Education (Left) & Investment (Right).
- * 2. 2x2 Top-4 Visible Legend by default with Expandable Card for remaining items.
- * 3. Color scheme customizer (via palette dropdown selector).
- * 4. Interactive Donut Arc slice clicking (filters transactions/dashboard).
+ * 2. In-Place Center Button / Click: Toggles drill down between Subcategories and Details.
+ * 3. In-Place Slice Selection: Clicking an arc slice or legend filters that section in-place without leaving the card/screen.
+ * 4. 2x2 Top-4 Visible Legend by default with Expandable Card for remaining items.
+ * 5. Color scheme customizer (via palette dropdown selector).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DualEducationInvestmentPieChartCard(
     title: String = "Education & Investment Breakdown",
@@ -106,11 +112,12 @@ fun DualEducationInvestmentPieChartCard(
     investmentSummaries: List<CategorySummary>,
     investmentDetailSummaries: List<CategorySummary> = emptyList(),
     investmentTotal: Double,
-    onSliceClick: ((categoryName: String, subCategoryName: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var eduViewMode by remember { mutableStateOf(PieBreakdownMode.SUBCATEGORY) }
     var invViewMode by remember { mutableStateOf(PieBreakdownMode.SUBCATEGORY) }
+    var selectedEduSlice by remember { mutableStateOf<String?>(null) }
+    var selectedInvSlice by remember { mutableStateOf<String?>(null) }
     var isExpandedLegends by remember { mutableStateOf(false) }
     var selectedPalette by remember { mutableStateOf(ChartPalette.CLASSIC) }
     var showPaletteMenu by remember { mutableStateOf(false) }
@@ -118,8 +125,17 @@ fun DualEducationInvestmentPieChartCard(
     val hasEduDetails = educationDetailSummaries.isNotEmpty()
     val hasInvDetails = investmentDetailSummaries.isNotEmpty()
 
-    val activeEduSummaries = if (eduViewMode == PieBreakdownMode.DETAIL && hasEduDetails) educationDetailSummaries else educationSummaries
-    val activeInvSummaries = if (invViewMode == PieBreakdownMode.DETAIL && hasInvDetails) investmentDetailSummaries else investmentSummaries
+    val rawEduSummaries = if (eduViewMode == PieBreakdownMode.DETAIL && hasEduDetails) educationDetailSummaries else educationSummaries
+    val rawInvSummaries = if (invViewMode == PieBreakdownMode.DETAIL && hasInvDetails) investmentDetailSummaries else investmentSummaries
+
+    // Filtered by selected slice if active
+    val activeEduSummaries = if (selectedEduSlice != null) {
+        rawEduSummaries.filter { it.categoryName.equals(selectedEduSlice, ignoreCase = true) }
+    } else rawEduSummaries
+
+    val activeInvSummaries = if (selectedInvSlice != null) {
+        rawInvSummaries.filter { it.categoryName.equals(selectedInvSlice, ignoreCase = true) }
+    } else rawInvSummaries
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -184,6 +200,33 @@ fun DualEducationInvestmentPieChartCard(
                 }
             }
 
+            // Active Slice Filter Badges (if user clicked an arc slice)
+            if (selectedEduSlice != null || selectedInvSlice != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Filtered:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    if (selectedEduSlice != null) {
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedEduSlice = null },
+                            label = { Text("Edu: $selectedEduSlice", style = MaterialTheme.typography.labelSmall) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(12.dp)) }
+                        )
+                    }
+                    if (selectedInvSlice != null) {
+                        FilterChip(
+                            selected = true,
+                            onClick = { selectedInvSlice = null },
+                            label = { Text("Inv: $selectedInvSlice", style = MaterialTheme.typography.labelSmall) },
+                            trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(12.dp)) }
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             // Dual Donut Charts Row
@@ -209,29 +252,23 @@ fun DualEducationInvestmentPieChartCard(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
-                    InteractiveDonutCanvas(
-                        summaries = activeEduSummaries,
+                    InPlaceDonutCanvas(
+                        summaries = rawEduSummaries,
                         total = educationTotal,
                         palette = selectedPalette.eduColors,
-                        emptyMessage = "No Education Data",
-                        onSliceClick = { sub -> onSliceClick?.invoke("Education", sub) }
-                    )
-
-                    if (hasEduDetails) {
-                        TextButton(
-                            onClick = {
-                                eduViewMode = if (eduViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
-                            },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                        ) {
-                            Text(
-                                text = if (eduViewMode == PieBreakdownMode.SUBCATEGORY) "Show Details" else "Show Subs",
-                                fontSize = 10.sp
-                            )
+                        viewMode = eduViewMode,
+                        hasDetails = hasEduDetails,
+                        selectedSlice = selectedEduSlice,
+                        onToggleViewMode = {
+                            eduViewMode = if (eduViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
+                            selectedEduSlice = null
+                        },
+                        onSliceClick = { sliceName ->
+                            selectedEduSlice = if (selectedEduSlice.equals(sliceName, ignoreCase = true)) null else sliceName
                         }
-                    }
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
@@ -253,29 +290,23 @@ fun DualEducationInvestmentPieChartCard(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
-                    InteractiveDonutCanvas(
-                        summaries = activeInvSummaries,
+                    InPlaceDonutCanvas(
+                        summaries = rawInvSummaries,
                         total = investmentTotal,
                         palette = selectedPalette.invColors,
-                        emptyMessage = "No Investment Data",
-                        onSliceClick = { sub -> onSliceClick?.invoke("Investment", sub) }
-                    )
-
-                    if (hasInvDetails) {
-                        TextButton(
-                            onClick = {
-                                invViewMode = if (invViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
-                            },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                        ) {
-                            Text(
-                                text = if (invViewMode == PieBreakdownMode.SUBCATEGORY) "Show Details" else "Show Subs",
-                                fontSize = 10.sp
-                            )
+                        viewMode = invViewMode,
+                        hasDetails = hasInvDetails,
+                        selectedSlice = selectedInvSlice,
+                        onToggleViewMode = {
+                            invViewMode = if (invViewMode == PieBreakdownMode.SUBCATEGORY) PieBreakdownMode.DETAIL else PieBreakdownMode.SUBCATEGORY
+                            selectedInvSlice = null
+                        },
+                        onSliceClick = { sliceName ->
+                            selectedInvSlice = if (selectedInvSlice.equals(sliceName, ignoreCase = true)) null else sliceName
                         }
-                    }
+                    )
                 }
             }
 
@@ -335,12 +366,16 @@ fun DualEducationInvestmentPieChartCard(
                     } else {
                         eduDisplayList.forEachIndexed { index, summary ->
                             val color = selectedPalette.eduColors[index % selectedPalette.eduColors.size]
+                            val isSelected = selectedEduSlice.equals(summary.categoryName, ignoreCase = true)
                             LegendItemRow(
                                 title = summary.categoryName,
                                 amount = summary.total,
                                 totalAmount = educationTotal,
                                 color = color,
-                                onClick = { onSliceClick?.invoke("Education", summary.categoryName) }
+                                isSelected = isSelected,
+                                onClick = {
+                                    selectedEduSlice = if (selectedEduSlice.equals(summary.categoryName, ignoreCase = true)) null else summary.categoryName
+                                }
                             )
                         }
                     }
@@ -357,12 +392,16 @@ fun DualEducationInvestmentPieChartCard(
                     } else {
                         invDisplayList.forEachIndexed { index, summary ->
                             val color = selectedPalette.invColors[index % selectedPalette.invColors.size]
+                            val isSelected = selectedInvSlice.equals(summary.categoryName, ignoreCase = true)
                             LegendItemRow(
                                 title = summary.categoryName,
                                 amount = summary.total,
                                 totalAmount = investmentTotal,
                                 color = color,
-                                onClick = { onSliceClick?.invoke("Investment", summary.categoryName) }
+                                isSelected = isSelected,
+                                onClick = {
+                                    selectedInvSlice = if (selectedInvSlice.equals(summary.categoryName, ignoreCase = true)) null else summary.categoryName
+                                }
                             )
                         }
                     }
@@ -373,12 +412,15 @@ fun DualEducationInvestmentPieChartCard(
 }
 
 @Composable
-private fun InteractiveDonutCanvas(
+private fun InPlaceDonutCanvas(
     summaries: List<CategorySummary>,
     total: Double,
     palette: List<Color>,
-    emptyMessage: String,
-    onSliceClick: (subCategory: String) -> Unit
+    viewMode: PieBreakdownMode,
+    hasDetails: Boolean,
+    selectedSlice: String?,
+    onToggleViewMode: () -> Unit,
+    onSliceClick: (sliceName: String) -> Unit
 ) {
     if (summaries.isEmpty() || total <= 0) {
         Box(
@@ -409,8 +451,11 @@ private fun InteractiveDonutCanvas(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        // Click defaults to top summary slice if clicked generally
-                        summaries.firstOrNull()?.categoryName?.let { onSliceClick(it) }
+                        if (hasDetails) {
+                            onToggleViewMode()
+                        } else {
+                            summaries.firstOrNull()?.categoryName?.let { onSliceClick(it) }
+                        }
                     }
             ) {
                 var startAngle = -90f
@@ -421,7 +466,9 @@ private fun InteractiveDonutCanvas(
 
                 summaries.forEachIndexed { index, summary ->
                     val sweepAngle = ((summary.total / total) * 360f).toFloat().coerceAtLeast(1f)
-                    val color = palette[index % palette.size]
+                    val baseColor = palette[index % palette.size]
+                    val isSelected = selectedSlice.equals(summary.categoryName, ignoreCase = true)
+                    val color = if (selectedSlice == null || isSelected) baseColor else baseColor.copy(alpha = 0.35f)
 
                     drawArc(
                         color = color,
@@ -430,17 +477,31 @@ private fun InteractiveDonutCanvas(
                         useCenter = false,
                         topLeft = topLeft,
                         size = arcSize,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                        style = Stroke(width = if (isSelected) strokeWidth + 4.dp.toPx() else strokeWidth, cap = StrokeCap.Butt)
                     )
                     startAngle += sweepAngle
                 }
             }
 
-            Text(
-                text = "${summaries.size} Subs",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            // Interactive Center Button for Drill-Down
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    if (hasDetails) onToggleViewMode()
+                }
+            ) {
+                Text(
+                    text = if (viewMode == PieBreakdownMode.DETAIL) "Details" else "${summaries.size} Subs",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -451,6 +512,7 @@ private fun LegendItemRow(
     amount: Double,
     totalAmount: Double,
     color: Color,
+    isSelected: Boolean = false,
     onClick: () -> Unit
 ) {
     val pct = if (totalAmount > 0) (amount / totalAmount).toFloat() else 0f
@@ -460,7 +522,8 @@ private fun LegendItemRow(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = if (isSelected) BorderStroke(1.dp, color) else null
     ) {
         Column(
             modifier = Modifier
@@ -487,7 +550,7 @@ private fun LegendItemRow(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
