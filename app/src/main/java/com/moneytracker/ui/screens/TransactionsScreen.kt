@@ -48,19 +48,14 @@ fun TransactionsScreen(
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
 
     Scaffold(
-    modifier = Modifier,
-    topBar = {
-        AppTopBar(
-            screenTitle = "Transactions",
-            showBack = false
-        )
-    },
-    floatingActionButton = {
-        FloatingActionButton(onClick = onAddTransaction) {
-            Icon(Icons.Default.Add, contentDescription = "Add transaction")
+        modifier = Modifier,
+        topBar = {
+            AppTopBar(
+                screenTitle = "Transactions",
+                showBack = false
+            )
         }
-    }
-) { padding ->
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -75,12 +70,13 @@ fun TransactionsScreen(
                 onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
 
-            // Clean, crisp Grid Table without drag handles
+            // Clean, crisp Grid Table with Add Item button in footer
             TransactionTable(
                 transactions = transactions,
                 secondarySorts = secondarySorts,
                 onHeaderClicked = { viewModel.onHeaderClicked(it) },
                 onHeaderLongPressed = { viewModel.onHeaderLongPressed(it) },
+                onAddItem = onAddTransaction,
                 onEditTransaction = { id -> onEditTransaction(id) },
                 onDeleteTransaction = { viewModel.deleteTransaction(it) }
             )

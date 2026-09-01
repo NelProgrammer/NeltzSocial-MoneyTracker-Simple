@@ -38,6 +38,7 @@ fun TransactionTable(
     onHeaderClicked: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
     onHeaderLongPressed: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    onAddItem: (() -> Unit)? = null,
     onEditTransaction: (Long) -> Unit = {},
     onDeleteTransaction: (TransactionWithCategory) -> Unit = {}
 ) {
@@ -204,6 +205,7 @@ fun TransactionTable(
         tableName = tableName,
         modifier = modifier.padding(contentPadding),
         initialPillColumnId = "category",
+        onAddItem = onAddItem,
         onRowClick = { onEditTransaction(it.id) },
         onRowDoubleClick = { onEditTransaction(it.id) }
     )
