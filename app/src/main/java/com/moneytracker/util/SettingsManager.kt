@@ -112,6 +112,31 @@ object SettingsManager {
         prefs?.edit()?.putString(KEY_THEME_MODE, mode.name)?.apply()
     }
 
+    // Generic Grid Settings Persistence
+    fun saveGridString(gridId: String, key: String, value: String) {
+        prefs?.edit()?.putString("grid_${gridId}_$key", value)?.apply()
+    }
+
+    fun getGridString(gridId: String, key: String, default: String = ""): String {
+        return prefs?.getString("grid_${gridId}_$key", default) ?: default
+    }
+
+    fun saveGridInt(gridId: String, key: String, value: Int) {
+        prefs?.edit()?.putInt("grid_${gridId}_$key", value)?.apply()
+    }
+
+    fun getGridInt(gridId: String, key: String, default: Int): Int {
+        return prefs?.getInt("grid_${gridId}_$key", default) ?: default
+    }
+
+    fun saveGridBoolean(gridId: String, key: String, value: Boolean) {
+        prefs?.edit()?.putBoolean("grid_${gridId}_$key", value)?.apply()
+    }
+
+    fun getGridBoolean(gridId: String, key: String, default: Boolean): Boolean {
+        return prefs?.getBoolean("grid_${gridId}_$key", default) ?: default
+    }
+
     fun getPayDateDay(): Int = _settings.value.payDateDay
     fun getCutoffDay(): Int = _settings.value.cutoffDay
     fun getMorningCutoffHour(): Int = _settings.value.morningCutoffHour

@@ -75,43 +75,6 @@ fun TransactionsScreen(
                 onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
 
-            // Category Filter Chips
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = filterType == null,
-                    onClick = { viewModel.clearFilter() },
-                    label = { Text("All", maxLines = 1) }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = filterType == TransactionType.INCOME,
-                    onClick = { viewModel.setFilter(TransactionType.INCOME) },
-                    label = { Text("Income", maxLines = 1) }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = filterType == TransactionType.INVESTMENT,
-                    onClick = { viewModel.setFilter(TransactionType.INVESTMENT) },
-                    label = { Text("Invest", maxLines = 1) }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = filterType == TransactionType.EDUCATION,
-                    onClick = { viewModel.setFilter(TransactionType.EDUCATION) },
-                    label = { Text("Edu", maxLines = 1) }
-                )
-                FilterChip(
-                    modifier = Modifier.weight(1f),
-                    selected = filterType == TransactionType.EXPENSE,
-                    onClick = { viewModel.setFilter(TransactionType.EXPENSE) },
-                    label = { Text("Expense", maxLines = 1) }
-                )
-            }
-
             // Clean, crisp Grid Table without drag handles
             TransactionTable(
                 transactions = transactions,
