@@ -129,7 +129,7 @@ fun TransactionTable(
             width = 105.dp,
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.DESCENDING,
-            valueExtractor = { it.amount.toString() },
+            valueExtractor = { (if (it.type == TransactionType.INCOME) kotlin.math.abs(it.amount) else -kotlin.math.abs(it.amount)).toString() },
             cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
                     TransactionType.INCOME -> IncomeColor

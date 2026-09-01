@@ -224,7 +224,7 @@ private fun ExpandableSettingsSection(
  * Column Border Resize Handle:
  * Envelopes the column border line with 2 vertical dotted lines,
  * and sandwiches the enveloping vertical line with left and right arrows (⯇❘⯈) at hover/drag.
- * Doubled detection range (18.dp) with responsive mouse-over/touch tracking.
+ * Liberal resize range (25.dp to 800.dp) without limiting Category or SubCategory.
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -234,18 +234,18 @@ private fun ColumnBorderResizeHandle(
     onWidthChange: (Dp) -> Unit,
     height: Dp,
     borderLineColor: Color,
+    isHighlighted: Boolean,
+    onHoverChange: (Boolean) -> Unit,
+    onDragStateChange: (Boolean) -> Unit,
+    showArrowBadge: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    var isHovered by remember { mutableStateOf(false) }
-    var isDragging by remember { mutableStateOf(false) }
-    val isIndicatorActive = isHovered || isDragging
-
     val density = LocalDensity.current
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = modifier
-            .width(18.dp)
+            .width(14.dp)
             .height(height)
             .pointerInput(columnId) {
                 awaitPointerEventScope {
@@ -254,10 +254,10 @@ private fun ColumnBorderResizeHandle(
                         when (event.type) {
                             androidx.compose.ui.input.pointer.PointerEventType.Enter,
                             androidx.compose.ui.input.pointer.PointerEventType.Move -> {
-                                isHovered = true
+                                onHoverChange(true)
                             }
                             androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
-                                isHovered = false
+                                onHoverChange(false)
                             }
                         }
                     }
@@ -266,20 +266,20 @@ private fun ColumnBorderResizeHandle(
             .pointerInput(columnId) {
                 detectHorizontalDragGestures(
                     onDragStart = { 
-                        isDragging = true 
+                        onDragStateChange(true)
                     },
                     onDragEnd = { 
-                        isDragging = false
-                        isHovered = false
+                        onDragStateChange(false)
+                        onHoverChange(false)
                     },
                     onDragCancel = { 
-                        isDragging = false
-                        isHovered = false
+                        onDragStateChange(false)
+                        onHoverChange(false)
                     }
                 ) { change, dragAmount ->
                     change.consume()
                     with(density) {
-                        val newW = (currentWidth + dragAmount.toDp()).coerceIn(50.dp, 450.dp)
+                        val newW = (currentWidth + dragAmount.toDp()).coerceIn(25.dp, 800.dp)
                         onWidthChange(newW)
                     }
                 }
@@ -288,19 +288,19 @@ private fun ColumnBorderResizeHandle(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val midX = size.width / 2
-            if (isIndicatorActive) {
+            if (isHighlighted) {
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
                 drawLine(
                     color = primaryColor,
-                    start = Offset(midX - 3.5.dp.toPx(), 0f),
-                    end = Offset(midX - 3.5.dp.toPx(), size.height),
+                    start = Offset(midX - 3.dp.toPx(), 0f),
+                    end = Offset(midX - 3.dp.toPx(), size.height),
                     strokeWidth = 1.2.dp.toPx(),
                     pathEffect = dashEffect
                 )
                 drawLine(
                     color = primaryColor,
-                    start = Offset(midX + 3.5.dp.toPx(), 0f),
-                    end = Offset(midX + 3.5.dp.toPx(), size.height),
+                    start = Offset(midX + 3.dp.toPx(), 0f),
+                    end = Offset(midX + 3.dp.toPx(), size.height),
                     strokeWidth = 1.2.dp.toPx(),
                     pathEffect = dashEffect
                 )
@@ -320,7 +320,7 @@ private fun ColumnBorderResizeHandle(
             }
         }
 
-        if (isIndicatorActive) {
+        if (isHighlighted && showArrowBadge) {
             Surface(
                 shape = RoundedCornerShape(3.dp),
                 color = primaryColor,
@@ -473,7 +473,11 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     var currentPage by remember { mutableIntStateOf(1) }
     var showFooterSettingsDialog by remember { mutableStateOf(false) }
 
-    // 7. Modals State
+    // 7. Unified Table-Level Border Resize State
+    var activeResizingColumnId by remember { mutableStateOf<String?>(null) }
+    var hoveredBorderColumnId by remember { mutableStateOf<String?>(null) }
+
+    // 8. Modals State
     var showPrimaryGridGearDialog by remember { mutableStateOf(false) }
     var primaryGearActiveTab by remember { mutableIntStateOf(0) }
     var showCustomPriorityDialog by remember { mutableStateOf(false) }
@@ -546,7 +550,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns) {
+    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns, masterCategoryNames) {
         if (activeSortedColumnIds.isEmpty()) {
             filteredItems
         } else {
@@ -555,6 +559,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 for (colId in activeSortedColumnIds) {
                     val colDef = columns.find { it.id == colId } ?: continue
                     val strat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
+                    if (strat == ColumnSortStrategy.NON_SORTING) continue
+
                     val valA = colDef.valueExtractor(a).trim()
                     val valB = colDef.valueExtractor(b).trim()
 
@@ -562,18 +568,30 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         ColumnSortStrategy.ASCENDING -> {
                             val numA = valA.toDoubleOrNull()
                             val numB = valB.toDoubleOrNull()
-                            if (numA != null && numB != null) numA.compareTo(numB) else valA.compareTo(valB, ignoreCase = true)
+                            if (numA != null && numB != null) {
+                                numA.compareTo(numB)
+                            } else {
+                                valA.compareTo(valB, ignoreCase = true)
+                            }
                         }
                         ColumnSortStrategy.DESCENDING -> {
                             val numA = valA.toDoubleOrNull()
                             val numB = valB.toDoubleOrNull()
-                            if (numA != null && numB != null) numB.compareTo(numA) else valB.compareTo(valA, ignoreCase = true)
+                            if (numA != null && numB != null) {
+                                numB.compareTo(numA)
+                            } else {
+                                valB.compareTo(valA, ignoreCase = true)
+                            }
                         }
                         ColumnSortStrategy.CUSTOM_PRIORITY -> {
-                            val order = localPriorityOrders[colId] ?: emptyList()
+                            val order = localPriorityOrders[colId] ?: (if (colId == "category") masterCategoryNames else emptyList())
                             val idxA = order.indexOfFirst { it.equals(valA, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             val idxB = order.indexOfFirst { it.equals(valB, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
-                            idxA.compareTo(idxB)
+                            if (idxA != idxB) {
+                                idxA.compareTo(idxB)
+                            } else {
+                                valA.compareTo(valB, ignoreCase = true)
+                            }
                         }
                         ColumnSortStrategy.NON_SORTING -> 0
                     }
@@ -606,7 +624,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         else {
             val from = (currentPage - 1) * pageSize
             val to = kotlin.math.min(from + pageSize, sortedFilteredItems.size)
-            if (from < sortedFilteredItems.size) sortedFilteredItems.subList(from, to) else emptyList()
+            if (from in 0 until sortedFilteredItems.size) sortedFilteredItems.subList(from, to) else emptyList()
         }
     }
 
@@ -616,7 +634,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     // Accurate Total Table Width Calculation so rightmost column (Notes) is 100% visible and accessible
     val totalTableWidth = remember(visibleColumns, columnWidthMap.toMap()) {
         val sumCols = visibleColumns.sumOf { (columnWidthMap[it.id] ?: it.width).value.toDouble() }
-        val sumDividers = visibleColumns.size * 18.0
+        val sumDividers = visibleColumns.size * 14.0
         (sumCols + sumDividers).coerceAtLeast(360.0).dp
     }
 
@@ -894,6 +912,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 } else -1
                                 val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
                                 val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                val isColHighlighted = (activeResizingColumnId == colDef.id || hoveredBorderColumnId == colDef.id)
 
                                 // Header Cell Body (Non-clickable container so dragging is preserved)
                                 Box(
@@ -1017,7 +1036,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     }
                                 }
 
-                                // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag (Doubled 18dp Detection)
+                                // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
                                 ColumnBorderResizeHandle(
                                     columnId = colDef.id,
                                     currentWidth = colWidth,
@@ -1026,7 +1045,18 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
                                     },
                                     height = 44.dp,
-                                    borderLineColor = borderLineColor
+                                    borderLineColor = borderLineColor,
+                                    isHighlighted = isColHighlighted,
+                                    showArrowBadge = true,
+                                    onHoverChange = { isHov ->
+                                        if (activeResizingColumnId == null) {
+                                            hoveredBorderColumnId = if (isHov) colDef.id else null
+                                        }
+                                    },
+                                    onDragStateChange = { isDragging ->
+                                        activeResizingColumnId = if (isDragging) colDef.id else null
+                                        hoveredBorderColumnId = if (isDragging) colDef.id else null
+                                    }
                                 )
                             }
                         }
@@ -1107,6 +1137,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     ) {
                                         visibleColumns.forEach { colDef ->
                                             val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                            val isColHighlighted = (activeResizingColumnId == colDef.id || hoveredBorderColumnId == colDef.id)
+
                                             Box(
                                                 modifier = Modifier
                                                     .width(colWidth)
@@ -1122,7 +1154,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 colDef.cellContent(item, isSelected, wrapDataLines)
                                             }
 
-                                            // Column Resize Handle across Data Rows too
+                                            // Column Resize Handle across Data Rows
                                             ColumnBorderResizeHandle(
                                                 columnId = colDef.id,
                                                 currentWidth = colWidth,
@@ -1131,7 +1163,18 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                     SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
                                                 },
                                                 height = 38.dp,
-                                                borderLineColor = borderLineColor
+                                                borderLineColor = borderLineColor,
+                                                isHighlighted = isColHighlighted,
+                                                showArrowBadge = false,
+                                                onHoverChange = { isHov ->
+                                                    if (activeResizingColumnId == null) {
+                                                        hoveredBorderColumnId = if (isHov) colDef.id else null
+                                                    }
+                                                },
+                                                onDragStateChange = { isDragging ->
+                                                    activeResizingColumnId = if (isDragging) colDef.id else null
+                                                    hoveredBorderColumnId = if (isDragging) colDef.id else null
+                                                }
                                             )
                                         }
                                     }
