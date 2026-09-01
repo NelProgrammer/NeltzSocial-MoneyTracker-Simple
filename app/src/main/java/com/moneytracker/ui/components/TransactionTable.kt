@@ -27,6 +27,7 @@ import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
 import com.moneytracker.ui.theme.InvestmentColor
 import com.moneytracker.util.CurrencyUtils
+import com.moneytracker.util.DateUtils
 
 @Composable
 fun TransactionTable(
@@ -42,11 +43,28 @@ fun TransactionTable(
 ) {
     val columns = listOf(
         GridColumnDefinition<TransactionWithCategory>(
+            id = "date",
+            title = "Date",
+            width = 85.dp,
+            isSortable = true,
+            defaultStrategy = ColumnSortStrategy.ASCENDING,
+            valueExtractor = { DateUtils.toLocalDate(it.date).toString() },
+            cellContent = { item, _, wrapText ->
+                Text(
+                    text = DateUtils.toLocalDate(item.date).toString(),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        ),
+        GridColumnDefinition<TransactionWithCategory>(
             id = "category",
             title = "Category",
             width = 105.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.ASCENDING,
+            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
             valueExtractor = { it.categoryName },
             cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
@@ -65,7 +83,7 @@ fun TransactionTable(
                         color = categoryColor,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         textAlign = TextAlign.Start,
-                        maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                        maxLines = if (wrapText) 2 else 1,
                         overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                     )
                 }
@@ -76,13 +94,13 @@ fun TransactionTable(
             title = "SubCategory",
             width = 120.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.NON_SORTING,
+            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
             valueExtractor = { it.subCategory },
             cellContent = { item, _, wrapText ->
                 Text(
                     text = item.subCategory,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, fontSize = 11.sp),
-                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    maxLines = if (wrapText) 2 else 1,
                     overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
@@ -92,14 +110,14 @@ fun TransactionTable(
             title = "Detail",
             width = 120.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.NON_SORTING,
+            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
             valueExtractor = { it.detail },
             cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.detail.isNotBlank()) item.detail else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = if (item.detail.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    maxLines = if (wrapText) 2 else 1,
                     overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
@@ -155,14 +173,14 @@ fun TransactionTable(
             title = "Note",
             width = 130.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.NON_SORTING,
+            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
             valueExtractor = { item -> item.note },
             cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.note.isNotBlank()) item.note else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                     color = if (item.note.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    maxLines = if (wrapText) 2 else 1,
                     overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
@@ -177,7 +195,6 @@ fun TransactionTable(
         modifier = modifier.padding(contentPadding),
         initialPillColumnId = "category",
         onRowClick = { onEditTransaction(it.id) },
-        onRowDoubleClick = { onEditTransaction(it.id) },
-        onRowLongClick = null
+        onRowDoubleClick = { onEditTransaction(it.id) }
     )
 }
