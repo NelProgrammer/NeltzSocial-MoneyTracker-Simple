@@ -424,10 +424,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 addAll(savedCols)
                 columns.filter { !savedCols.contains(it.id) }.forEach { add(it.id) }
             } else {
-                val preferredOrder = listOf("category", "subCategory", "amount", "detail", "date", "note")
-                val orderedIds = preferredOrder.filter { id -> columns.any { it.id == id } }
-                addAll(orderedIds)
-                columns.filter { !orderedIds.contains(it.id) }.forEach { add(it.id) }
+                addAll(columns.map { it.id })
             }
         }
     }
@@ -531,7 +528,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
     val activePillColumn = columns.find { it.id == activePillColumnId }
 
-    val distinctPillValues = remember(items, activePillColumn, pillSortMode, localPriorityOrders.toMap(), masterCategoryNames) {
+    val distinctPillValues = remember(items, activePillColumn, pillSortMode, localPriorityOrders.toMap()) {
         if (activePillColumn != null) {
             val list = items.map { activePillColumn.valueExtractor(it).trim() }
                 .filter { it.isNotBlank() }
@@ -539,7 +536,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
             when (pillSortMode) {
                 PillSortMode.CUSTOM_PRIORITY -> {
-                    val customOrder = localPriorityOrders[activePillColumn.id] ?: masterCategoryNames
+                    val customOrder = localPriorityOrders[activePillColumn.id] ?: emptyList()
                     list.sortedWith { a, b ->
                         val idxA = customOrder.indexOfFirst { it.equals(a, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                         val idxB = customOrder.indexOfFirst { it.equals(b, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
@@ -576,7 +573,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns, masterCategoryNames) {
+    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns) {
         if (activeSortedColumnIds.isEmpty()) {
             filteredItems
         } else {
@@ -610,11 +607,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             }
                         }
                         ColumnSortStrategy.CUSTOM_PRIORITY -> {
-                            val defaultIncomeFirstCategories = listOf(
-                                "Income", "Salary", "Bonus", "Freelance", "Dividends", "Interest", "Investments", "Rental Income", "Gifts", "Refunds", "Other Income",
-                                "Food & Dining", "Groceries", "Restaurants", "Transportation", "Fuel", "Public Transit", "Housing", "Rent", "Mortgage", "Utilities", "Electricity", "Water", "Internet", "Entertainment", "Shopping", "Healthcare", "Personal Care", "Education", "Miscellaneous", "Debt Payments"
-                            )
-                            val order = localPriorityOrders[colId] ?: (if (colId == "category") (masterCategoryNames.ifEmpty { defaultIncomeFirstCategories }) else emptyList())
+                            val order = localPriorityOrders[colId] ?: emptyList()
                             val idxA = order.indexOfFirst { it.equals(valA, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             val idxB = order.indexOfFirst { it.equals(valB, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             if (idxA != idxB) {
@@ -2080,22 +2073,11 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     // =================================================================
     if (showCustomPriorityDialog) {
         val targetColDef = columns.find { it.id == priorityTargetColumnId } ?: columns.first()
-        var selectedParentCategory by remember { mutableStateOf<String?>(masterCategoryNames.firstOrNull()) }
 
-        val distinctValues = remember(items, targetColDef, selectedParentCategory, masterSubcategoriesByCategory) {
-            if (targetColDef.id == "subCategory" && selectedParentCategory != null) {
-                val masterSub = masterSubcategoriesByCategory[selectedParentCategory] ?: emptyList()
-                val itemSub = items.filter { (it as? com.moneytracker.data.local.entity.TransactionWithCategory)?.categoryName.equals(selectedParentCategory, ignoreCase = true) }
-                    .map { targetColDef.valueExtractor(it).trim() }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                (masterSub + itemSub).distinct()
-            } else {
-                val list = items.map { targetColDef.valueExtractor(it).trim() }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                (if (masterCategoryNames.isNotEmpty()) masterCategoryNames + list else list).distinct()
-            }
+        val distinctValues = remember(items, targetColDef) {
+            items.map { targetColDef.valueExtractor(it).trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
         }
 
         var editableList by remember(distinctValues) {
@@ -2139,26 +2121,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         }
                         IconButton(onClick = { showCustomPriorityDialog = false }) {
                             Icon(Icons.Default.Close, contentDescription = "Close")
-                        }
-                    }
-
-                    if (targetColDef.id == "subCategory" && masterCategoryNames.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Category:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                            masterCategoryNames.forEach { cat ->
-                                FilterChip(
-                                    selected = selectedParentCategory == cat,
-                                    onClick = { selectedParentCategory = cat },
-                                    label = { Text(cat, style = MaterialTheme.typography.labelSmall) }
-                                )
-                            }
                         }
                     }
 
