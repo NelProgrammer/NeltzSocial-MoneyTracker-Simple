@@ -175,7 +175,7 @@ fun SortableTransactionTable(
             title = "Note",
             width = 130.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
+            defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { item -> item.note },
             cellContent = { item, _, wrapText ->
                 Text(
@@ -194,7 +194,7 @@ fun SortableTransactionTable(
         columns = columns,
         itemKey = { it.id },
         tableName = tableName,
-        modifier = Modifier.padding(contentPadding),
+        modifier = modifier.padding(contentPadding),
         initialPillColumnId = "category",
         onRowClick = { onEditTransaction(it.id) },
         onRowDoubleClick = { onEditTransaction(it.id) }

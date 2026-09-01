@@ -141,17 +141,91 @@ data class GridColumnDefinition<T>(
 )
 
 /**
+ * Expandable Settings Section component for clean, collapsible gear dialogs.
+ */
+@Composable
+private fun ExpandableSettingsSection(
+    title: String,
+    subtitle: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    initiallyExpanded: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(initiallyExpanded) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Column {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (subtitle != null) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 2.dp)
+                ) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    content()
+                }
+            }
+        }
+    }
+}
+
+/**
  * Enterprise Reusable Generic Sortable & Pilled Grid Component
- *
- * Full Specification Implementation:
- * 1. Global Table Sync: Wrapping Header and Data Rows in a shared horizontal scroll so swiping the Header
- *    scrolls the ENTIRE table in unison across all columns.
- * 2. Individual Data Row Swipe: Swiping a data row translates only that individual row with configurable snap-back.
- * 3. High-Contrast Crisp Cell Borders: Unambiguous, sharp borders around every cell boundary (top, bottom, left, right).
- * 4. Sort Order Badges for ALL active columns (#1, #2, #3, ...) with directional indicators and priority ranks.
- * 5. Full Persistence: Every setting (widths, visibility, sort priorities, strategies, pill display, line wrap, snap mode)
- *    is saved and loaded via SettingsManager.
- * 6. Sticky Header & Footer: The table is bounded; only data rows scroll vertically.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -185,8 +259,10 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     fun inferDefaultStrategy(col: GridColumnDefinition<T>): ColumnSortStrategy {
         if (col.defaultStrategy != null) return col.defaultStrategy
         val id = col.id.lowercase()
+        val title = col.title.lowercase()
         return when {
-            id.contains("date") || id.contains("time") -> ColumnSortStrategy.ASCENDING
+            id.contains("note") || id.contains("comment") || title.contains("note") || title.contains("comment") -> ColumnSortStrategy.NON_SORTING
+            id.contains("date") || id.contains("time") || title.contains("date") -> ColumnSortStrategy.ASCENDING
             id.contains("amount") || id.contains("spent") || id.contains("balance") || id.contains("cost") || id.contains("units") || id.contains("count") -> ColumnSortStrategy.DESCENDING
             else -> ColumnSortStrategy.CUSTOM_PRIORITY
         }
@@ -283,36 +359,29 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     var showCustomPriorityDialog by remember { mutableStateOf(false) }
     var priorityTargetColumnId by remember { mutableStateOf("category") }
 
-    // Custom Priority Ranks Map
     val localPriorityOrders = remember {
         mutableStateMapOf<String, List<String>>().apply {
             putAll(customPriorityOrders)
         }
     }
 
-    // Focused row for snap behavior
     var focusedRowKey by remember { mutableStateOf<Any?>(null) }
 
-    // Shared Table Horizontal Scroll State (Synchronizes entire Header + Data Rows)
     val tableHorizontalScrollState = rememberScrollState()
     val density = LocalDensity.current
 
-    // Reset focused row offsets when table is scrolled horizontally
     LaunchedEffect(tableHorizontalScrollState.value) {
         if (rowSnapBehavior == RowSnapBehavior.ON_FOCUS_OR_SCROLL) {
             focusedRowKey = null
         }
     }
 
-    // Visible columns list based on master definitions
     val visibleColumns = remember(columns, columnVisibilityMap.toMap()) {
         columns.filter { columnVisibilityMap[it.id] != false }
     }
 
-    // Active pill column definition
     val activePillColumn = columns.find { it.id == activePillColumnId }
 
-    // Extract unique values for active pill column using 3-mode sorting
     val distinctPillValues = remember(items, activePillColumn, pillSortMode, localPriorityOrders.toMap(), masterCategoryNames) {
         if (activePillColumn != null) {
             val list = items.map { activePillColumn.valueExtractor(it).trim() }
@@ -342,7 +411,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // Filter Items by Selected Pill
     val filteredItems = remember(items, activePillColumn, selectedPillValue) {
         if (activePillColumn == null || selectedPillValue == null) {
             items
@@ -351,12 +419,10 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // Active sorted column IDs
     val activeSortedColumnIds = remember(sortPriorityColumnIds.toList(), columnSortStrategies.toMap()) {
         sortPriorityColumnIds.filter { (columnSortStrategies[it] ?: ColumnSortStrategy.NON_SORTING) != ColumnSortStrategy.NON_SORTING }
     }
 
-    // Multi-Column Sorted Filtered Items
     val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns) {
         if (activeSortedColumnIds.isEmpty()) {
             filteredItems
@@ -398,7 +464,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // Total Count and Pages Calculation
     val totalCount = sortedFilteredItems.size
     val totalPages = remember(totalCount, pageSize, isPaginationEnabled) {
         if (!isPaginationEnabled || pageSize <= 0 || totalCount == 0) 1
@@ -413,7 +478,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     val startItemIdx = if (totalCount == 0) 0 else if (!isPaginationEnabled || pageSize <= 0) 1 else (currentPage - 1) * pageSize + 1
     val endItemIdx = if (totalCount == 0) 0 else if (!isPaginationEnabled || pageSize <= 0) totalCount else kotlin.math.min(currentPage * pageSize, totalCount)
 
-    // Paged Items slice
     val pagedItems = remember(sortedFilteredItems, currentPage, pageSize, isPaginationEnabled) {
         if (!isPaginationEnabled || pageSize <= 0 || totalCount == 0) sortedFilteredItems
         else {
@@ -425,6 +489,13 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
     // High-Contrast Solid Border Color
     val borderLineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
+
+    // Accurate Total Table Width Calculation so rightmost column (Notes) is 100% visible and accessible
+    val totalTableWidth = remember(visibleColumns, columnWidthMap.toMap()) {
+        val sumCols = visibleColumns.sumOf { (columnWidthMap[it.id] ?: it.width).value.toDouble() }
+        val sumDividers = visibleColumns.size * 14.0
+        (sumCols + sumDividers).coerceAtLeast(360.0).dp
+    }
 
     // =================================================================
     // OVERARCHING BOUNDED GRID CONTAINER
@@ -681,12 +752,13 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                     .fillMaxWidth()
                     .horizontalScroll(tableHorizontalScrollState)
             ) {
-                Column {
+                Column(modifier = Modifier.width(totalTableWidth)) {
                     // =====================================================
                     // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Sort Badges)
                     // =====================================================
                     Row(
                         modifier = Modifier
+                            .width(totalTableWidth)
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -698,7 +770,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
                             val colWidth = columnWidthMap[colDef.id] ?: colDef.width
 
-                            // High Contrast Box with distinct border outline
                             Box(
                                 modifier = Modifier
                                     .width(colWidth)
@@ -743,7 +814,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
-                                            // Sort Priority Rank Badge (e.g. #1, #2, #3, ...)
                                             Surface(
                                                 shape = CircleShape,
                                                 color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
@@ -758,7 +828,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 }
                                             }
 
-                                            // Sort Direction Indicator Icon
                                             Icon(
                                                 imageVector = when (currentStrategy) {
                                                     ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
@@ -772,7 +841,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             )
                                         }
 
-                                        // Column Options Gear (⚙)
                                         Box {
                                             IconButton(
                                                 onClick = { showColumnGearMenu = true },
@@ -834,11 +902,10 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 }
                             }
 
-                            // High Contrast Inner Column Border with Drag Handle Dot
                             val handleAlpha by animateFloatAsState(targetValue = if (isBorderHovered) 1f else 0f, label = "handleAlpha")
                             Box(
                                 modifier = Modifier
-                                    .width(12.dp)
+                                    .width(14.dp)
                                     .heightIn(min = 44.dp)
                                     .pointerInput(colDef.id) {
                                         detectHorizontalDragGestures(
@@ -857,7 +924,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                // Vertical Border Line (High contrast solid 1.5.dp)
                                 Box(
                                     modifier = Modifier
                                         .width(1.5.dp)
@@ -865,7 +931,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         .background(borderLineColor)
                                 )
 
-                                // Silent Resize Handle Dot: Visible ONLY on hover/drag
                                 Surface(
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.primary,
@@ -891,13 +956,14 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                     // =====================================================
                     Column(
                         modifier = Modifier
+                            .width(totalTableWidth)
                             .heightIn(max = 420.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
                         if (pagedItems.isEmpty()) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .width(totalTableWidth)
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -921,13 +987,13 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
                                 Row(
                                     modifier = Modifier
+                                        .width(totalTableWidth)
                                         .offset { IntOffset(rowScrollOffset.value.roundToInt(), 0) }
                                         .background(
                                             if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                                             else Color.Transparent
                                         )
                                         .drawBehind {
-                                            // High-contrast bottom horizontal cell border
                                             drawLine(
                                                 color = borderLineColor,
                                                 start = Offset(0f, size.height),
@@ -966,20 +1032,19 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 .width(colWidth)
                                                 .heightIn(min = 38.dp, max = 56.dp)
                                                 .padding(horizontal = 6.dp, vertical = 6.dp)
-                                                .clickable {
-                                                    focusedRowKey = currentKey
-                                                    if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
-                                                    else onRowClick?.invoke(item)
-                                                },
+                                            .clickable {
+                                                focusedRowKey = currentKey
+                                                if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
+                                                else onRowClick?.invoke(item)
+                                            },
                                             contentAlignment = Alignment.CenterStart
                                         ) {
                                             colDef.cellContent(item, isSelected, wrapDataLines)
                                         }
 
-                                        // High-contrast vertical cell divider line
                                         Box(
                                             modifier = Modifier
-                                                .width(12.dp)
+                                                .width(14.dp)
                                                 .height(38.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -1139,7 +1204,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     }
 
     // =================================================================
-    // PRIMARY GRID GEAR SETTINGS DIALOG
+    // PRIMARY GRID GEAR SETTINGS DIALOG (Expandable / Collapsed by Default)
     // =================================================================
     if (showPrimaryGridGearDialog) {
         Dialog(
@@ -1209,44 +1274,48 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // TAB 0: MULTI-COLUMN SORT PRIORITY
+                    // TAB 0: MULTI-COLUMN SORT PRIORITY (Expandable Section)
                     if (primaryGearActiveTab == 0) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Drag columns up or down to set multi-level sort priority (#1, #2, ...). Tap the button to cycle strategy.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            val lazyListState = rememberLazyListState()
-                            val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                                val item = sortPriorityColumnIds.removeAt(from.index)
-                                sortPriorityColumnIds.add(to.index, item)
-                                SettingsManager.saveGridString(gridId, "sort_order", sortPriorityColumnIds.joinToString(","))
-                            }
-
-                            LazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ExpandableSettingsSection(
+                                title = "Multi-Column Sort Priority Order",
+                                subtitle = "Drag items up/down to configure hierarchical sort ranking",
+                                icon = Icons.Default.FormatListNumbered,
+                                initiallyExpanded = false
                             ) {
-                                itemsIndexed(sortPriorityColumnIds, key = { _, colId -> colId }) { index, colId ->
-                                    val colDef = columns.find { it.id == colId }
-                                    val currentStrat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
-                                    val isVisible = columnVisibilityMap[colId] != false
+                                val lazyListState = rememberLazyListState()
+                                val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                                    val item = sortPriorityColumnIds.removeAt(from.index)
+                                    sortPriorityColumnIds.add(to.index, item)
+                                    SettingsManager.saveGridString(gridId, "sort_order", sortPriorityColumnIds.joinToString(","))
+                                }
 
-                                    if (colDef != null && isVisible) {
-                                        ReorderableItem(reorderableLazyColumnState, key = colId) { isDragging ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 320.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    sortPriorityColumnIds.forEachIndexed { index, colId ->
+                                        val colDef = columns.find { it.id == colId }
+                                        val currentStrat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
+                                        val isVisible = columnVisibilityMap[colId] != false
+
+                                        if (colDef != null && isVisible) {
                                             Surface(
                                                 shape = RoundedCornerShape(8.dp),
-                                                color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
@@ -1298,19 +1367,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                                 fontSize = 11.sp
                                                             )
                                                         }
-
-                                                        Spacer(modifier = Modifier.width(6.dp))
-
-                                                        IconButton(
-                                                            onClick = {},
-                                                            modifier = Modifier.draggableHandle()
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.DragHandle,
-                                                                contentDescription = "Drag to reorder",
-                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                        }
                                                     }
                                                 }
                                             }
@@ -1321,47 +1377,194 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         }
                     }
 
-                    // TAB 1: COLUMN VISIBILITY
+                    // TAB 1: COLUMN VISIBILITY (Expandable Section)
                     if (primaryGearActiveTab == 1) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Select which columns are visible in the grid table:",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ExpandableSettingsSection(
+                                title = "Master Column Visibility",
+                                subtitle = "Enable or hide individual columns in the grid",
+                                icon = Icons.Default.Visibility,
+                                initiallyExpanded = false
                             ) {
-                                itemsIndexed(columns, key = { _, col -> col.id }) { _, col ->
-                                    val isVisible = columnVisibilityMap[col.id] != false
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                        modifier = Modifier.fillMaxWidth()
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    columns.forEach { col ->
+                                        val isVisible = columnVisibilityMap[col.id] != false
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        val newVis = !isVisible
+                                                        columnVisibilityMap[col.id] = newVis
+                                                        SettingsManager.saveGridBoolean(gridId, "vis_${col.id}", newVis)
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(col.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                                Switch(
+                                                    checked = isVisible,
+                                                    onCheckedChange = {
+                                                        columnVisibilityMap[col.id] = it
+                                                        SettingsManager.saveGridBoolean(gridId, "vis_${col.id}", it)
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 2: FILTER PILLS (Expandable Sections)
+                    if (primaryGearActiveTab == 2) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ExpandableSettingsSection(
+                                title = "Pill Display Rows",
+                                subtitle = if (maxPillRows == 1) "1 Row (Horizontal Scroll)" else "$maxPillRows Rows (Multi-line Wrap)",
+                                icon = Icons.Default.ViewColumn,
+                                initiallyExpanded = false
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Row Count (1-5):", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (maxPillRows > 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.size(32.dp),
+                                            onClick = {
+                                                if (maxPillRows > 1) {
+                                                    maxPillRows--
+                                                    SettingsManager.saveGridInt(gridId, "max_pill_rows", maxPillRows)
+                                                }
+                                            }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Decrement", modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.width(36.dp).height(32.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text("$maxPillRows", fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (maxPillRows < 5) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                            modifier = Modifier.size(32.dp),
+                                            onClick = {
+                                                if (maxPillRows < 5) {
+                                                    maxPillRows++
+                                                    SettingsManager.saveGridInt(gridId, "max_pill_rows", maxPillRows)
+                                                }
+                                            }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(Icons.Default.Add, contentDescription = "Increment", modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            ExpandableSettingsSection(
+                                title = "Pills Sorting Order (3 Modes)",
+                                subtitle = when (pillSortMode) {
+                                    PillSortMode.CUSTOM_PRIORITY -> "Custom Priority (Default)"
+                                    PillSortMode.NUMERICAL -> "Numerical (Highest to Lowest Count)"
+                                    PillSortMode.ALPHABETICAL -> "Alphabetical (A → Z)"
+                                },
+                                icon = Icons.Default.FilterList,
+                                initiallyExpanded = false
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    listOf(
+                                        PillSortMode.CUSTOM_PRIORITY to "Custom Priority (Default)",
+                                        PillSortMode.NUMERICAL to "Numerical (Highest to Lowest Count)",
+                                        PillSortMode.ALPHABETICAL to "Alphabetical (A → Z)"
+                                    ).forEach { (mode, label) ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
                                                 .clickable {
-                                                    val newVis = !isVisible
-                                                    columnVisibilityMap[col.id] = newVis
-                                                    SettingsManager.saveGridBoolean(gridId, "vis_${col.id}", newVis)
+                                                    pillSortMode = mode
+                                                    SettingsManager.saveGridString(gridId, "pill_sort_mode", mode.name)
                                                 }
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(col.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                            Switch(
-                                                checked = isVisible,
-                                                onCheckedChange = {
-                                                    columnVisibilityMap[col.id] = it
-                                                    SettingsManager.saveGridBoolean(gridId, "vis_${col.id}", it)
+                                            RadioButton(
+                                                selected = pillSortMode == mode,
+                                                onClick = {
+                                                    pillSortMode = mode
+                                                    SettingsManager.saveGridString(gridId, "pill_sort_mode", mode.name)
                                                 }
                                             )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(label, style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+
+                            ExpandableSettingsSection(
+                                title = "Filter Source Column",
+                                subtitle = "Active source: ${activePillColumn?.title ?: "None"}",
+                                icon = Icons.Default.TableChart,
+                                initiallyExpanded = false
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    columns.forEach { col ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    activePillColumnId = col.id
+                                                    selectedPillValue = null
+                                                    SettingsManager.saveGridString(gridId, "pill_col", col.id)
+                                                }
+                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            RadioButton(
+                                                selected = activePillColumnId == col.id,
+                                                onClick = {
+                                                    activePillColumnId = col.id
+                                                    selectedPillValue = null
+                                                    SettingsManager.saveGridString(gridId, "pill_col", col.id)
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(col.title, style = MaterialTheme.typography.bodySmall)
                                         }
                                     }
                                 }
@@ -1369,269 +1572,144 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         }
                     }
 
-                    // TAB 2: FILTER PILLS
-                    if (primaryGearActiveTab == 2) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Pill Display Rows", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        text = if (maxPillRows == 1) "1 Row (Horizontal Scroll)" else "$maxPillRows Rows (Multi-line Wrap)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (maxPillRows > 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.size(32.dp),
-                                        onClick = {
-                                            if (maxPillRows > 1) {
-                                                maxPillRows--
-                                                SettingsManager.saveGridInt(gridId, "max_pill_rows", maxPillRows)
-                                            }
-                                        }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Decrement", modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        modifier = Modifier.width(36.dp).height(32.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text("$maxPillRows", fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (maxPillRows < 5) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.size(32.dp),
-                                        onClick = {
-                                            if (maxPillRows < 5) {
-                                                maxPillRows++
-                                                SettingsManager.saveGridInt(gridId, "max_pill_rows", maxPillRows)
-                                            }
-                                        }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Add, contentDescription = "Increment", modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            Text("Pills Sorting Order:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                listOf(
-                                    PillSortMode.CUSTOM_PRIORITY to "Custom Priority (Default)",
-                                    PillSortMode.NUMERICAL to "Numerical (Highest to Lowest Count)",
-                                    PillSortMode.ALPHABETICAL to "Alphabetical (A → Z)"
-                                ).forEach { (mode, label) ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                pillSortMode = mode
-                                                SettingsManager.saveGridString(gridId, "pill_sort_mode", mode.name)
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = pillSortMode == mode,
-                                            onClick = {
-                                                pillSortMode = mode
-                                                SettingsManager.saveGridString(gridId, "pill_sort_mode", mode.name)
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(label, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            Text("Pills Source Column:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                itemsIndexed(columns) { _, col ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                activePillColumnId = col.id
-                                                selectedPillValue = null
-                                                SettingsManager.saveGridString(gridId, "pill_col", col.id)
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = activePillColumnId == col.id,
-                                            onClick = {
-                                                activePillColumnId = col.id
-                                                selectedPillValue = null
-                                                SettingsManager.saveGridString(gridId, "pill_col", col.id)
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(col.title, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TAB 3: LAYOUT & SNAP BEHAVIOR
+                    // TAB 3: LAYOUT & SNAP (Expandable Sections)
                     if (primaryGearActiveTab == 3) {
                         Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text("Row Swipe Snap Back Behavior:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            rowSnapBehavior = RowSnapBehavior.ON_RELEASE
-                                            SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_RELEASE.name)
+                            ExpandableSettingsSection(
+                                title = "Row Swipe Snap Back Behavior",
+                                subtitle = if (rowSnapBehavior == RowSnapBehavior.ON_RELEASE) "Snap on Release (Default)" else "Snap on Focus Shift or Scroll",
+                                icon = Icons.Default.DragHandle,
+                                initiallyExpanded = false
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                rowSnapBehavior = RowSnapBehavior.ON_RELEASE
+                                                SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_RELEASE.name)
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = rowSnapBehavior == RowSnapBehavior.ON_RELEASE,
+                                            onClick = {
+                                                rowSnapBehavior = RowSnapBehavior.ON_RELEASE
+                                                SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_RELEASE.name)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text("Snap on Release (Default)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                            Text("Snaps back immediately when drag gesture is released", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
-                                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                rowSnapBehavior = RowSnapBehavior.ON_FOCUS_OR_SCROLL
+                                                SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_FOCUS_OR_SCROLL.name)
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = rowSnapBehavior == RowSnapBehavior.ON_FOCUS_OR_SCROLL,
+                                            onClick = {
+                                                rowSnapBehavior = RowSnapBehavior.ON_FOCUS_OR_SCROLL
+                                                SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_FOCUS_OR_SCROLL.name)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text("Snap on Focus Shift or Table Scroll", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                            Text("Holds position until another row is tapped or table is scrolled", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
+
+                            ExpandableSettingsSection(
+                                title = "Text Line Wrapping",
+                                subtitle = "Header & Data cell wrapping controls",
+                                icon = Icons.Default.ViewColumn,
+                                initiallyExpanded = false
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Wrap Header Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                            Text("Headers wrap up to 2 lines", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(
+                                            checked = wrapHeaderLines,
+                                            onCheckedChange = {
+                                                wrapHeaderLines = it
+                                                SettingsManager.saveGridBoolean(gridId, "wrap_header", it)
+                                            }
+                                        )
+                                    }
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Wrap Data Cell Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                            Text("Cell text wraps up to 2 lines max", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(
+                                            checked = wrapDataLines,
+                                            onCheckedChange = {
+                                                wrapDataLines = it
+                                                SettingsManager.saveGridBoolean(gridId, "wrap_data", it)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            ExpandableSettingsSection(
+                                title = "Column Widths Reset",
+                                subtitle = "Restore all columns to default width",
+                                icon = Icons.Default.RestartAlt,
+                                initiallyExpanded = false
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    RadioButton(
-                                        selected = rowSnapBehavior == RowSnapBehavior.ON_RELEASE,
+                                    Text("Restore original column dimensions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    OutlinedButton(
                                         onClick = {
-                                            rowSnapBehavior = RowSnapBehavior.ON_RELEASE
-                                            SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_RELEASE.name)
+                                            columns.forEach {
+                                                columnWidthMap[it.id] = it.width
+                                                SettingsManager.saveGridInt(gridId, "width_${it.id}", it.width.value.roundToInt())
+                                            }
                                         }
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text("Snap on Release (Default)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                                        Text("Snaps back immediately when drag gesture is released", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    ) {
+                                        Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Reset")
                                     }
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            rowSnapBehavior = RowSnapBehavior.ON_FOCUS_OR_SCROLL
-                                            SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_FOCUS_OR_SCROLL.name)
-                                        }
-                                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = rowSnapBehavior == RowSnapBehavior.ON_FOCUS_OR_SCROLL,
-                                        onClick = {
-                                            rowSnapBehavior = RowSnapBehavior.ON_FOCUS_OR_SCROLL
-                                            SettingsManager.saveGridString(gridId, "snap_behavior", RowSnapBehavior.ON_FOCUS_OR_SCROLL.name)
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text("Snap on Focus Shift or Table Scroll", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                                        Text("Holds position until another row is tapped or table is scrolled", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Wrap Header Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        text = if (wrapHeaderLines) "Headers wrap up to 2 lines" else "Headers stay single-line with ellipsis",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Switch(
-                                    checked = wrapHeaderLines,
-                                    onCheckedChange = {
-                                        wrapHeaderLines = it
-                                        SettingsManager.saveGridBoolean(gridId, "wrap_header", it)
-                                    }
-                                )
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Wrap Data Cell Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        text = if (wrapDataLines) "Cell text wraps up to 2 lines max" else "Cell text is truncated with ellipsis",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Switch(
-                                    checked = wrapDataLines,
-                                    onCheckedChange = {
-                                        wrapDataLines = it
-                                        SettingsManager.saveGridBoolean(gridId, "wrap_data", it)
-                                    }
-                                )
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Reset Column Widths", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text("Restore default widths for all columns", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        columns.forEach {
-                                            columnWidthMap[it.id] = it.width
-                                            SettingsManager.saveGridInt(gridId, "width_${it.id}", it.width.value.roundToInt())
-                                        }
-                                    }
-                                ) {
-                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Reset")
                                 }
                             }
                         }
@@ -1655,7 +1733,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     }
 
     // =================================================================
-    // CUSTOM PRIORITY MODAL DIALOG (With Parent Category Filter)
+    // CUSTOM PRIORITY MODAL DIALOG
     // =================================================================
     if (showCustomPriorityDialog) {
         val targetColDef = columns.find { it.id == priorityTargetColumnId } ?: columns.first()
@@ -1839,7 +1917,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     }
 
     // =================================================================
-    // FOOTER SETTINGS DIALOG (Pagination vs Continuous Scroll)
+    // FOOTER SETTINGS DIALOG
     // =================================================================
     if (showFooterSettingsDialog) {
         AlertDialog(

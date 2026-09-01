@@ -173,7 +173,7 @@ fun TransactionTable(
             title = "Note",
             width = 130.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
+            defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { item -> item.note },
             cellContent = { item, _, wrapText ->
                 Text(
