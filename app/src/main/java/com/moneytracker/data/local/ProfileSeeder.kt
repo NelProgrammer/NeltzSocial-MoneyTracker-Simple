@@ -95,10 +95,16 @@ object ProfileSeeder {
         isGuest: Boolean,
         forceReseed: Boolean = false
     ) {
+        val prefs = context.getSharedPreferences("money_tracker_seeding_prefs", Context.MODE_PRIVATE)
+        val isAlreadySeeded = prefs.getBoolean("is_seeded_profile_$profileId", false)
         val count = database.transactionDao().countForProfile(profileId)
-        val needsReseed = forceReseed || count == 0
 
-        if (!needsReseed) return // Already seeded!
+        if (!forceReseed && (isAlreadySeeded || count > 0)) {
+            if (!isAlreadySeeded && count > 0) {
+                prefs.edit().putBoolean("is_seeded_profile_$profileId", true).apply()
+            }
+            return // Already seeded or has data! Never re-seed automatically!
+        }
 
         // Clear existing transactions, categories, subcategories, and details for this profile if re-seeding
         if (count > 0) {
@@ -191,6 +197,7 @@ object ProfileSeeder {
                 }
             }
         }
+        prefs.edit().putBoolean("is_seeded_profile_$profileId", true).apply()
     }
 
     private fun transformGuestAmount(baseAmount: Double): Double {

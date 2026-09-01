@@ -515,6 +515,16 @@ fun AddEditTransactionsScreen(
             }
         }
 
+        if (state.duplicateCandidate != null && state.pendingNewItem != null) {
+            com.moneytracker.ui.components.DuplicateResolutionDialog(
+                existingItem = state.duplicateCandidate!!,
+                newItem = state.pendingNewItem!!,
+                onKeepNew = { viewModel.save(onNavigateBack, forceSave = true) },
+                onSwapToExisting = { viewModel.swapToExistingDuplicate() },
+                onDismiss = { viewModel.dismissDuplicateDialog() }
+            )
+        }
+
         if (showDeleteTxnDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteTxnDialog = false },

@@ -1,31 +1,47 @@
 package com.moneytracker.ui.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,48 +49,103 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import com.moneytracker.ui.components.AppTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.FilterChip
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import com.moneytracker.util.AppThemeMode
-import com.moneytracker.util.AppThemePalette
+import com.moneytracker.data.repository.TransactionRepository
+import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.ProfileManagementDialog
 import com.moneytracker.ui.viewmodel.ProfileViewModel
 import com.moneytracker.ui.viewmodel.SettingsViewModel
+import com.moneytracker.util.AppThemeMode
+import com.moneytracker.util.AppThemePalette
+import com.moneytracker.util.DataExportImportManager
+import com.moneytracker.util.ExportFormat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     profileViewModel: ProfileViewModel,
+    repository: TransactionRepository,
     contentPadding: PaddingValues,
     onNavigateBack: () -> Unit,
     onSwitchProfile: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val settings by viewModel.settings.collectAsState()
     val activeProfile by profileViewModel.activeProfile.collectAsState()
     var showProfileDialog by remember { mutableStateOf(false) }
+
+    // Multi-Format Export/Import State
+    var selectedExportFormat by remember { mutableStateOf(ExportFormat.EXCEL) }
+    var isExporting by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
+
+    // SAF Document Launchers
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(selectedExportFormat.mimeType)
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isExporting = true
+                try {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            DataExportImportManager.exportData(repository, selectedExportFormat, outputStream)
+                        }
+                    }
+                    Toast.makeText(context, "Export completed successfully (${selectedExportFormat.extension.uppercase()})", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Export error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isExporting = false
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isImporting = true
+                try {
+                    val result = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            DataExportImportManager.importData(repository, selectedExportFormat, inputStream)
+                        }
+                    }
+                    if (result != null && result.success) {
+                        Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(context, result?.message ?: "Import failed", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Import error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isImporting = false
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -156,7 +227,112 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Appearance & Themes Card
+            // 2. Data Backup, Export & Import Card (Multi-Format: JSON, XML, CSV, Excel)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storage,
+                            contentDescription = "Data Backup & Export",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Data Backup, Export & Import",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "Export or import your complete financial data (Transactions, Groceries, Shopping Lists, Categories) in multiple standard formats.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Format Selection Chips
+                    Text(
+                        text = "Select Format:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        ExportFormat.values().forEach { fmt ->
+                            FilterChip(
+                                selected = selectedExportFormat == fmt,
+                                onClick = { selectedExportFormat = fmt },
+                                label = {
+                                    Text(
+                                        text = fmt.extension.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (selectedExportFormat == fmt) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // Export / Import Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val timestamp = java.time.LocalDate.now().toString()
+                                val defaultName = "MoneyTracker_Backup_${timestamp}.${selectedExportFormat.extension}"
+                                exportLauncher.launch(defaultName)
+                            },
+                            enabled = !isExporting && !isImporting,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            if (isExporting) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Export")
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                importLauncher.launch(arrayOf(selectedExportFormat.mimeType, "*/*"))
+                            },
+                            enabled = !isExporting && !isImporting,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isImporting) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Import")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Appearance & Themes Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -284,7 +460,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Testing Controls Section Card (Hide Ryu Toggle)
+            // 4. Testing Controls Section Card (Hide Ryu Toggle)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -336,7 +512,7 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            // 3. PayDate Day Setting Card
+            // 5. PayDate Day Setting Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -386,7 +562,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. Calculation Cutoff Day Setting Card
+            // 6. Calculation Cutoff Day Setting Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -451,7 +627,7 @@ fun SettingsScreen(
                     newPasswordInput = password,
                     onSuccess = { showProfileDialog = false },
                     onError = { error ->
-                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                     }
                 )
             },
@@ -463,7 +639,7 @@ fun SettingsScreen(
                     passwordInput = password,
                     onSuccess = { showProfileDialog = false },
                     onError = { error ->
-                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                     }
                 )
             }

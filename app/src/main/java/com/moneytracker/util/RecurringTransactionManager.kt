@@ -65,6 +65,9 @@ object RecurringTransactionManager {
             val nextStartMillis = DateUtils.startOfPayMonth(nextPayMonthStart, payDateDay)
             val nextEndMillis = DateUtils.startOfNextPayMonth(nextPayMonthStart, payDateDay)
 
+            val currentPayMonthStartMillis = DateUtils.startOfPayMonth(currentPayMonthStart, payDateDay)
+            val minEligibleParentDate = DateUtils.startOfPayMonth(currentPayMonthStart.minusMonths(1), payDateDay)
+
             val profiles = repository.getAllProfileEntities()
             val profileIds = if (profiles.isNotEmpty()) profiles.map { it.id }.distinct() else listOf(repository.activeProfileId)
 
@@ -78,9 +81,27 @@ object RecurringTransactionManager {
 
                     val allEntities = repository.getAllEntitiesForProfile(pid).toMutableList()
 
-                    // Distinct active recurring parent templates: pick the latest date for each unique (categoryId, subCategory, detail)
+                    // Advance floating PLAN_FUTURE roadmap items from past months forward to the current month if not realised
+                    val pastPlans = allEntities.filter {
+                        it.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE &&
+                        it.date < currentPayMonthStartMillis
+                    }
+                    for (plan in pastPlans) {
+                        val updatedPlan = plan.copy(
+                            date = currentPayMonthStartMillis,
+                            isRecurring = true,
+                            recurrenceFrequency = RecurrenceFrequency.PLAN_FUTURE,
+                            isRecurred = false,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        repository.saveTransactionDirect(updatedPlan)
+                        val idx = allEntities.indexOfFirst { it.id == plan.id }
+                        if (idx >= 0) allEntities[idx] = updatedPlan
+                    }
+
+                    // Distinct active recurring parent templates from active timeline edge (current or previous pay cycle)
                     val recurringTemplates = allEntities
-                        .filter { it.isRecurring }
+                        .filter { it.isRecurring && it.date >= minEligibleParentDate }
                         .groupBy { "${it.categoryId}|||${it.subCategory.trim().lowercase()}|||${it.detail.trim().lowercase()}" }
                         .mapValues { (_, list) -> list.maxByOrNull { it.date }!! }
                         .values
@@ -190,18 +211,22 @@ object RecurringTransactionManager {
         val remainingCount = parent.recurCount?.let { (it - 1).coerceAtLeast(0) }
 
         val nextIsRecurring = when {
+            isPlanFuture -> true
             isBeforeCutoff -> false // Before cutoff: tentative forecast
             isContinuous -> true
-            isPlanFuture -> true
             remainingCount != null && remainingCount <= 1 -> false
             maxTillDate != null && candidateDate.isEqual(maxTillDate) -> false
             else -> parent.isRecurring
         }
 
-        val nextRecurrenceFrequency = if (isBeforeCutoff) RecurrenceFrequency.TENTATIVE_FORECAST else parent.recurrenceFrequency
-        val nextRecurTillDate = if (isBeforeCutoff) null else parent.recurTillDate
-        val nextRecurCount = if (isBeforeCutoff) null else remainingCount
-        val nextIsRecurred = if (isBeforeCutoff) false else !nextIsRecurring
+        val nextRecurrenceFrequency = when {
+            isPlanFuture -> RecurrenceFrequency.PLAN_FUTURE // Preserve PLAN_FUTURE identity across months
+            isBeforeCutoff -> RecurrenceFrequency.TENTATIVE_FORECAST
+            else -> parent.recurrenceFrequency
+        }
+        val nextRecurTillDate = if (isBeforeCutoff && !isPlanFuture) null else parent.recurTillDate
+        val nextRecurCount = if (isBeforeCutoff && !isPlanFuture) null else remainingCount
+        val nextIsRecurred = if (isPlanFuture) false else (if (isBeforeCutoff) false else !nextIsRecurring)
 
         if (existingChild != null) {
             val shouldPropagateParent = parent.updatedAt > existingChild.updatedAt
@@ -246,7 +271,7 @@ object RecurringTransactionManager {
             allTransactions.add(newChild.copy(id = insertedId))
 
             // Only mark current parent as recurred if cutoff milestone has been reached
-            if (!isBeforeCutoff && !parent.isRecurred) {
+            if (!isBeforeCutoff && !isPlanFuture && !parent.isRecurred) {
                 repository.saveTransaction(parent.copy(isRecurred = true))
             }
             return true

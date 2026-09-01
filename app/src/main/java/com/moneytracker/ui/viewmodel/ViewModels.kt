@@ -643,22 +643,26 @@ data class AddEditUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val duplicateCandidate: com.moneytracker.ui.components.DuplicateComparisonData? = null,
+    val pendingNewItem: com.moneytracker.ui.components.DuplicateComparisonData? = null,
+    val duplicateCandidateEntity: TransactionEntity? = null
 )
 
 // Add/Edit ViewModel
 class AddEditViewModel(
     private val repository: TransactionRepository,
-    private val transactionId: Long?
+    private val initialTransactionId: Long?
 ) : ViewModel() {
+    private var currentTransactionId: Long? = initialTransactionId
     private val _uiState = MutableStateFlow(AddEditUiState())
     val uiState: StateFlow<AddEditUiState> = _uiState.asStateFlow()
     private var existingSortOrder: Int = 0
 
     init {
         viewModelScope.launch {
-            if (transactionId != null) {
-                val transaction = repository.getTransaction(transactionId)
+            if (initialTransactionId != null) {
+                val transaction = repository.getTransaction(initialTransactionId)
                 if (transaction != null) {
                     existingSortOrder = transaction.sortOrder
                     val absAmt = kotlin.math.abs(transaction.amount)
@@ -795,7 +799,42 @@ class AddEditViewModel(
         }
     }
 
-    fun save(onSuccess: () -> Unit) {
+    fun dismissDuplicateDialog() {
+        _uiState.value = _uiState.value.copy(
+            duplicateCandidate = null,
+            pendingNewItem = null,
+            duplicateCandidateEntity = null
+        )
+    }
+
+    fun swapToExistingDuplicate() {
+        val existing = _uiState.value.duplicateCandidateEntity ?: return
+        val absAmt = kotlin.math.abs(existing.amount)
+        val formattedAmt = if (absAmt == absAmt.toLong().toDouble()) absAmt.toLong().toString() else absAmt.toString()
+        val initialFreq = existing.recurrenceFrequency ?: (if (existing.isRecurring) RecurrenceFrequency.MONTHLY else RecurrenceFrequency.ONCE_OFF)
+        val normalizedFreq = if (initialFreq == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else initialFreq
+        _uiState.value = _uiState.value.copy(
+            amount = formattedAmt,
+            type = existing.type,
+            categoryId = existing.categoryId,
+            date = DateUtils.toLocalDate(existing.date),
+            note = existing.note,
+            subCategory = existing.subCategory,
+            detail = existing.detail,
+            isRecurring = existing.isRecurring,
+            recurrenceFrequency = normalizedFreq,
+            recurTillDate = existing.recurTillDate?.let { DateUtils.toLocalDate(it) },
+            recurCount = existing.recurCount?.toString() ?: "",
+            updatedAt = existing.updatedAt,
+            duplicateCandidate = null,
+            pendingNewItem = null,
+            duplicateCandidateEntity = null
+        )
+        existingSortOrder = existing.sortOrder
+        currentTransactionId = existing.id
+    }
+
+    fun save(onSuccess: () -> Unit, forceSave: Boolean = false) {
         val state = _uiState.value
         val amount = state.amount.toDoubleOrNull()
         val categoryId = state.categoryId
@@ -815,14 +854,69 @@ class AddEditViewModel(
         val isPlanFuture = state.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE
 
         viewModelScope.launch {
-            _uiState.value = state.copy(isSaving = true, errorMessage = null)
+            // Check 3-point duplicate (Category + SubCategory + Detail) for active entities
+            if (!forceSave && (currentTransactionId == null || currentTransactionId == 0L)) {
+                val payDateDay = com.moneytracker.util.SettingsManager.getPayDateDay()
+                val currentPayMonthStartMillis = DateUtils.startOfPayMonth(DateUtils.currentPayMonthLocalDate(LocalDate.now(), payDateDay), payDateDay)
+                val allTxns = repository.getAllEntitiesForProfile(repository.activeProfileId)
+                val matchingDuplicate = allTxns.firstOrNull { existing ->
+                    existing.id != (currentTransactionId ?: 0L) &&
+                    existing.categoryId == categoryId &&
+                    existing.subCategory.trim().equals(state.subCategory.trim(), ignoreCase = true) &&
+                    existing.detail.trim().equals(state.detail.trim(), ignoreCase = true) &&
+                    // Exclude ended recurrences and past once-offs
+                    !(existing.isRecurred && !existing.isRecurring) &&
+                    !(existing.date < currentPayMonthStartMillis && !existing.isRecurring)
+                }
+
+                if (matchingDuplicate != null) {
+                    val catName = state.categories.find { it.id == categoryId }?.name ?: "Category"
+                    val existCatName = state.categories.find { it.id == matchingDuplicate.categoryId }?.name ?: catName
+                    val existingData = com.moneytracker.ui.components.DuplicateComparisonData(
+                        categoryName = existCatName,
+                        subCategory = matchingDuplicate.subCategory,
+                        detail = matchingDuplicate.detail,
+                        amount = matchingDuplicate.amount,
+                        dateMillis = matchingDuplicate.date,
+                        typeName = matchingDuplicate.type.name,
+                        isRecurring = matchingDuplicate.isRecurring,
+                        recurrenceFreqName = matchingDuplicate.recurrenceFrequency?.name ?: "ONCE_OFF",
+                        note = matchingDuplicate.note
+                    )
+                    val newData = com.moneytracker.ui.components.DuplicateComparisonData(
+                        categoryName = catName,
+                        subCategory = state.subCategory,
+                        detail = state.detail,
+                        amount = absAmount,
+                        dateMillis = DateUtils.toEpochMillis(state.date),
+                        typeName = state.type.name,
+                        isRecurring = state.isRecurring,
+                        recurrenceFreqName = state.recurrenceFrequency.name,
+                        note = state.note
+                    )
+                    _uiState.value = state.copy(
+                        duplicateCandidate = existingData,
+                        pendingNewItem = newData,
+                        duplicateCandidateEntity = matchingDuplicate
+                    )
+                    return@launch
+                }
+            }
+
+            _uiState.value = state.copy(
+                isSaving = true,
+                errorMessage = null,
+                duplicateCandidate = null,
+                pendingNewItem = null,
+                duplicateCandidateEntity = null
+            )
             val finalFreq = if (state.isRecurring) {
                 if (state.recurrenceFrequency == RecurrenceFrequency.ONCE_OFF) RecurrenceFrequency.MONTHLY else state.recurrenceFrequency
             } else {
                 RecurrenceFrequency.ONCE_OFF
             }
             val entityToSave = TransactionEntity(
-                id = transactionId ?: 0L,
+                id = currentTransactionId ?: 0L,
                 amount = absAmount,
                 type = state.type,
                 categoryId = categoryId,
@@ -856,10 +950,11 @@ class AddEditViewModel(
     }
 
     fun delete(onSuccess: () -> Unit) {
-        if (transactionId == null || transactionId == 0L) return
+        val idToDelete = currentTransactionId ?: return
+        if (idToDelete == 0L) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true)
-            val transaction = repository.getTransaction(transactionId)
+            val transaction = repository.getTransaction(idToDelete)
             if (transaction != null) {
                 repository.deleteTransaction(transaction)
             }

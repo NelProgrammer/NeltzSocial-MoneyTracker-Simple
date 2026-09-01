@@ -206,12 +206,25 @@ class TransactionRepository(
 
     suspend fun deleteTransaction(transaction: TransactionEntity) {
         transactionDao.delete(transaction)
+        val pid = if (transaction.profileId > 0L) transaction.profileId else activeProfileId
+        val allTxns = transactionDao.getAllEntities(pid)
+        val matchingParents = allTxns.filter {
+            it.id != transaction.id &&
+            it.date < transaction.date &&
+            it.isRecurring &&
+            it.categoryId == transaction.categoryId &&
+            it.subCategory.equals(transaction.subCategory, ignoreCase = true) &&
+            it.detail.equals(transaction.detail, ignoreCase = true)
+        }
+        matchingParents.forEach { parent ->
+            transactionDao.update(parent.copy(isRecurring = false, isRecurred = true))
+        }
     }
 
     suspend fun deleteTransaction(transaction: TransactionWithCategory) {
         val entity = transactionDao.getById(transaction.id)
         if (entity != null) {
-            transactionDao.delete(entity)
+            deleteTransaction(entity)
         }
     }
 
@@ -692,6 +705,15 @@ class TransactionRepository(
             )
         )
     }
+
+    suspend fun getAllCategoryEntities(profileId: Long = activeProfileId): List<CategoryEntity> =
+        categoryDao.getAllCategories(profileId)
+
+    suspend fun getAllSubCategoryEntities(profileId: Long = activeProfileId): List<SubCategoryEntity> =
+        subCategoryDao.observeAll(profileId).firstOrNull() ?: emptyList()
+
+    suspend fun getAllDetailEntities(profileId: Long = activeProfileId): List<DetailEntity> =
+        detailDao.observeAll(profileId).firstOrNull() ?: emptyList()
 
     suspend fun getShoppingListById(shoppingListId: Long): ShoppingListEntity? =
         shoppingListDao?.getById(shoppingListId)

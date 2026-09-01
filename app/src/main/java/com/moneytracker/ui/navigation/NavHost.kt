@@ -263,6 +263,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     SettingsScreen(
                         viewModel = viewModel,
                         profileViewModel = profileViewModel,
+                        repository = repository,
                         contentPadding = innerPadding,
                         onNavigateBack = { navController.popBackStack() },
                         onSwitchProfile = {

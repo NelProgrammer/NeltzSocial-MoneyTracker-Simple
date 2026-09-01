@@ -139,32 +139,11 @@ fun AddEditGroceriesScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Month Selector Bar
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { viewModel.setPayMonth(selectedPayMonthDate.minusMonths(1)) }) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Month")
-                    }
-                    Text(
-                        text = formattedMonth,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = { viewModel.setPayMonth(selectedPayMonthDate.plusMonths(1)) }) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Month")
-                    }
-                }
-            }
+            // Unified PayMonth Filter Header
+            com.moneytracker.ui.components.PayMonthFilterHeader(
+                selectedPayMonthDate = selectedPayMonthDate,
+                onPayMonthSelected = { viewModel.setPayMonth(it) }
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
