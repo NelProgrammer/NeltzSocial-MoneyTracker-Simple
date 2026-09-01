@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -223,7 +224,7 @@ private fun ExpandableSettingsSection(
  * Column Border Resize Handle:
  * Envelopes the column border line with 2 vertical dotted lines,
  * and sandwiches the enveloping vertical line with left and right arrows (⯇❘⯈) at hover/drag.
- * Doubled detection range (18.dp) with mouse-over/touch tracking.
+ * Doubled detection range (18.dp) with responsive mouse-over/touch tracking.
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
@@ -235,7 +236,10 @@ private fun ColumnBorderResizeHandle(
     borderLineColor: Color,
     modifier: Modifier = Modifier
 ) {
-    var isHoveredOrDragging by remember { mutableStateOf(false) }
+    var isHovered by remember { mutableStateOf(false) }
+    var isDragging by remember { mutableStateOf(false) }
+    val isIndicatorActive = isHovered || isDragging
+
     val density = LocalDensity.current
     val primaryColor = MaterialTheme.colorScheme.primary
 
@@ -250,10 +254,10 @@ private fun ColumnBorderResizeHandle(
                         when (event.type) {
                             androidx.compose.ui.input.pointer.PointerEventType.Enter,
                             androidx.compose.ui.input.pointer.PointerEventType.Move -> {
-                                isHoveredOrDragging = true
+                                isHovered = true
                             }
                             androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
-                                isHoveredOrDragging = false
+                                isHovered = false
                             }
                         }
                     }
@@ -261,9 +265,17 @@ private fun ColumnBorderResizeHandle(
             }
             .pointerInput(columnId) {
                 detectHorizontalDragGestures(
-                    onDragStart = { isHoveredOrDragging = true },
-                    onDragEnd = { isHoveredOrDragging = false },
-                    onDragCancel = { isHoveredOrDragging = false }
+                    onDragStart = { 
+                        isDragging = true 
+                    },
+                    onDragEnd = { 
+                        isDragging = false
+                        isHovered = false
+                    },
+                    onDragCancel = { 
+                        isDragging = false
+                        isHovered = false
+                    }
                 ) { change, dragAmount ->
                     change.consume()
                     with(density) {
@@ -276,7 +288,7 @@ private fun ColumnBorderResizeHandle(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val midX = size.width / 2
-            if (isHoveredOrDragging) {
+            if (isIndicatorActive) {
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
                 drawLine(
                     color = primaryColor,
@@ -308,11 +320,11 @@ private fun ColumnBorderResizeHandle(
             }
         }
 
-        if (isHoveredOrDragging) {
+        if (isIndicatorActive) {
             Surface(
                 shape = RoundedCornerShape(3.dp),
                 color = primaryColor,
-                shadowElevation = 3.dp,
+                shadowElevation = 4.dp,
                 modifier = Modifier
                     .height(18.dp)
                     .width(26.dp)
@@ -525,8 +537,12 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    val activeSortedColumnIds = remember(sortPriorityColumnIds.toList(), columnSortStrategies.toMap()) {
-        sortPriorityColumnIds.filter { (columnSortStrategies[it] ?: ColumnSortStrategy.NON_SORTING) != ColumnSortStrategy.NON_SORTING }
+    // Only visible columns that have an active sorting strategy (not NON_SORTING) participate in sort priority
+    val activeSortedColumnIds = remember(sortPriorityColumnIds.toList(), columnSortStrategies.toMap(), columnVisibilityMap.toMap()) {
+        sortPriorityColumnIds.filter { colId ->
+            (columnVisibilityMap[colId] != false) &&
+            (columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING) != ColumnSortStrategy.NON_SORTING
+        }
     }
 
     val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns) {
@@ -599,7 +615,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     // Accurate Total Table Width Calculation so rightmost column (Notes) is 100% visible and accessible
     val totalTableWidth = remember(visibleColumns, columnWidthMap.toMap()) {
         val sumCols = visibleColumns.sumOf { (columnWidthMap[it.id] ?: it.width).value.toDouble() }
-        val sumDividers = visibleColumns.size * 8.0
+        val sumDividers = visibleColumns.size * 18.0
         (sumCols + sumDividers).coerceAtLeast(360.0).dp
     }
 
@@ -843,7 +859,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
 
         // -------------------------------------------------------------
-        // CONTAINER 3: BOUNDED TABLE CARD (Synced Header + Scrollable Data Area)
+        // CONTAINER 3: BOUNDED TABLE CARD (SelectionContainer + Synced Header + Scrollable Data Area)
         // -------------------------------------------------------------
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -852,205 +868,37 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             border = BorderStroke(1.2.dp, borderLineColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            // UNIFIED HORIZONTAL CONTAINER: Swiping Header or Table scrolls the entire table horizontally
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(tableHorizontalScrollState)
-            ) {
-                Column(modifier = Modifier.width(totalTableWidth)) {
-                    // =====================================================
-                    // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Space-Saving Sort Triggers)
-                    // =====================================================
-                    Row(
-                        modifier = Modifier
-                            .width(totalTableWidth)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        visibleColumns.forEachIndexed { colIdx, colDef ->
-                            var showColumnSortDropdown by remember { mutableStateOf(false) }
-                            val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
-                            val priorityRankIndex = sortPriorityColumnIds.indexOf(colDef.id)
-                            val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
-                            val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+            SelectionContainer {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(tableHorizontalScrollState)
+                ) {
+                    Column(modifier = Modifier.width(totalTableWidth)) {
+                        // =====================================================
+                        // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Inline Sort Triggers)
+                        // =====================================================
+                        Row(
+                            modifier = Modifier
+                                .width(totalTableWidth)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            visibleColumns.forEachIndexed { colIdx, colDef ->
+                                var showColumnSortDropdown by remember { mutableStateOf(false) }
+                                val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
+                                val isVisible = columnVisibilityMap[colDef.id] != false
+                                val priorityRankIndex = if (isVisible && currentStrategy != ColumnSortStrategy.NON_SORTING) {
+                                    activeSortedColumnIds.indexOf(colDef.id)
+                                } else -1
+                                val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
+                                val colWidth = columnWidthMap[colDef.id] ?: colDef.width
 
-                            // Header Cell Body (Non-clickable container so dragging is preserved)
-                            Box(
-                                modifier = Modifier
-                                    .width(colWidth)
-                                    .heightIn(min = 44.dp)
-                                    .drawBehind {
-                                        drawLine(
-                                            color = borderLineColor,
-                                            start = Offset(0f, size.height),
-                                            end = Offset(size.width, size.height),
-                                            strokeWidth = 1.5.dp.toPx()
-                                        )
-                                    }
-                                    .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Start
-                                ) {
-                                    Text(
-                                        text = colDef.title,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
-                                        ),
-                                        color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        softWrap = true,
-                                        maxLines = if (wrapHeaderLines) 3 else 1,
-                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-
-                                    Spacer(modifier = Modifier.width(3.dp))
-
-                                    // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
-                                    Box {
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .clickable { showColumnSortDropdown = true }
-                                                .padding(horizontal = 2.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(2.5.dp)
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                                modifier = Modifier.size(15.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = rankDisplay,
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
-                                                        color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-
-                                            Icon(
-                                                imageVector = when (currentStrategy) {
-                                                    ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                                    ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                                    ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                                },
-                                                contentDescription = "Sort Direction",
-                                                tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        }
-
-                                        DropdownMenu(
-                                            expanded = showColumnSortDropdown,
-                                            onDismissRequest = { showColumnSortDropdown = false }
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text("Ascending (A → Z / Min → Max)") },
-                                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
-                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
-                                                    showColumnSortDropdown = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Descending (Z → A / Max → Min)") },
-                                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
-                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
-                                                    showColumnSortDropdown = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Custom Priority (Rank Order)") },
-                                                leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
-                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
-                                                    priorityTargetColumnId = colDef.id
-                                                    showCustomPriorityDialog = true
-                                                    showColumnSortDropdown = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("Non-Sorting (Off)") },
-                                                leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
-                                                onClick = {
-                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
-                                                    SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
-                                                    showColumnSortDropdown = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // High-Contrast Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
-                            ColumnBorderResizeHandle(
-                                columnId = colDef.id,
-                                currentWidth = colWidth,
-                                onWidthChange = { newW ->
-                                    columnWidthMap[colDef.id] = newW
-                                    SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
-                                },
-                                height = 44.dp,
-                                borderLineColor = borderLineColor
-                            )
-                        }
-                    }
-
-                    // =====================================================
-                    // 2. BOUNDED SCROLLABLE DATA ROWS AREA
-                    // =====================================================
-                    Column(
-                        modifier = Modifier
-                            .width(totalTableWidth)
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        if (pagedItems.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .width(totalTableWidth)
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = emptyMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        } else {
-                            pagedItems.forEachIndexed { rowIdx, item ->
-                                val currentKey = itemKey(item)
-                                val isSelected = selectedItemKeys.contains(currentKey)
-                                val rowScrollOffset = remember { Animatable(0f) }
-
-                                LaunchedEffect(focusedRowKey) {
-                                    if (focusedRowKey != currentKey && rowScrollOffset.value != 0f) {
-                                        rowScrollOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-                                    }
-                                }
-
-                                Row(
+                                // Header Cell Body (Non-clickable container so dragging is preserved)
+                                Box(
                                     modifier = Modifier
-                                        .width(totalTableWidth)
-                                        .offset { IntOffset(rowScrollOffset.value.roundToInt(), 0) }
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                            else Color.Transparent
-                                        )
+                                        .width(colWidth)
+                                        .heightIn(min = 44.dp)
                                         .drawBehind {
                                             drawLine(
                                                 color = borderLineColor,
@@ -1059,58 +907,232 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                                 strokeWidth = 1.5.dp.toPx()
                                             )
                                         }
-                                        .pointerInput(currentKey) {
-                                            detectHorizontalDragGestures(
-                                                onDragStart = { focusedRowKey = currentKey },
-                                                onDragEnd = {
-                                                    if (rowSnapBehavior == RowSnapBehavior.ON_RELEASE) {
+                                        .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Start
+                                    ) {
+                                        Text(
+                                            text = colDef.title,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.sp,
+                                                fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
+                                            ),
+                                            color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            softWrap = true,
+                                            maxLines = if (wrapHeaderLines) 3 else 1,
+                                            overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+
+                                        Spacer(modifier = Modifier.width(3.dp))
+
+                                        // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
+                                        Box {
+                                            Row(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .clickable { showColumnSortDropdown = true }
+                                                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                                            ) {
+                                                if (rankDisplay.isNotEmpty()) {
+                                                    Surface(
+                                                        shape = CircleShape,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(15.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text(
+                                                                text = rankDisplay,
+                                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
+                                                                color = MaterialTheme.colorScheme.onPrimary
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Icon(
+                                                    imageVector = when (currentStrategy) {
+                                                        ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                        ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                        ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                                    },
+                                                    contentDescription = "Sort Direction",
+                                                    tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+
+                                            DropdownMenu(
+                                                expanded = showColumnSortDropdown,
+                                                onDismissRequest = { showColumnSortDropdown = false }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Ascending (A → Z / Min → Max)") },
+                                                    leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
+                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
+                                                        showColumnSortDropdown = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Descending (Z → A / Max → Min)") },
+                                                    leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
+                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
+                                                        showColumnSortDropdown = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Custom Priority (Rank Order)") },
+                                                    leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
+                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
+                                                        priorityTargetColumnId = colDef.id
+                                                        showCustomPriorityDialog = true
+                                                        showColumnSortDropdown = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Non-Sorting (Off)") },
+                                                    leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
+                                                    onClick = {
+                                                        columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
+                                                        SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
+                                                        showColumnSortDropdown = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag (Doubled 18dp Detection)
+                                ColumnBorderResizeHandle(
+                                    columnId = colDef.id,
+                                    currentWidth = colWidth,
+                                    onWidthChange = { newW ->
+                                        columnWidthMap[colDef.id] = newW
+                                        SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
+                                    },
+                                    height = 44.dp,
+                                    borderLineColor = borderLineColor
+                                )
+                            }
+                        }
+
+                        // =====================================================
+                        // 2. BOUNDED SCROLLABLE DATA ROWS AREA
+                        // =====================================================
+                        Column(
+                            modifier = Modifier
+                                .width(totalTableWidth)
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            if (pagedItems.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(totalTableWidth)
+                                        .padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = emptyMessage,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                pagedItems.forEachIndexed { rowIdx, item ->
+                                    val currentKey = itemKey(item)
+                                    val isSelected = selectedItemKeys.contains(currentKey)
+                                    val rowScrollOffset = remember { Animatable(0f) }
+
+                                    LaunchedEffect(focusedRowKey) {
+                                        if (focusedRowKey != currentKey && rowScrollOffset.value != 0f) {
+                                            rowScrollOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .width(totalTableWidth)
+                                            .offset { IntOffset(rowScrollOffset.value.roundToInt(), 0) }
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                                else Color.Transparent
+                                            )
+                                            .drawBehind {
+                                                drawLine(
+                                                    color = borderLineColor,
+                                                    start = Offset(0f, size.height),
+                                                    end = Offset(size.width, size.height),
+                                                    strokeWidth = 1.5.dp.toPx()
+                                                )
+                                            }
+                                            .pointerInput(currentKey) {
+                                                detectHorizontalDragGestures(
+                                                    onDragStart = { focusedRowKey = currentKey },
+                                                    onDragEnd = {
+                                                        if (rowSnapBehavior == RowSnapBehavior.ON_RELEASE) {
+                                                            coroutineScope.launch {
+                                                                rowScrollOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                                            }
+                                                        }
+                                                    },
+                                                    onDragCancel = {
                                                         coroutineScope.launch {
                                                             rowScrollOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                                                         }
                                                     }
-                                                },
-                                                onDragCancel = {
+                                                ) { change, dragAmount ->
+                                                    change.consume()
                                                     coroutineScope.launch {
-                                                        rowScrollOffset.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                                                        rowScrollOffset.snapTo((rowScrollOffset.value + dragAmount).coerceIn(-150f, 150f))
                                                     }
                                                 }
-                                            ) { change, dragAmount ->
-                                                change.consume()
-                                                coroutineScope.launch {
-                                                    rowScrollOffset.snapTo((rowScrollOffset.value + dragAmount).coerceIn(-150f, 150f))
-                                                }
-                                            }
-                                        },
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    visibleColumns.forEach { colDef ->
-                                        val colWidth = columnWidthMap[colDef.id] ?: colDef.width
-                                        Box(
-                                            modifier = Modifier
-                                                .width(colWidth)
-                                                .heightIn(min = 38.dp, max = 56.dp)
-                                                .padding(horizontal = 6.dp, vertical = 6.dp)
-                                                .clickable {
-                                                    focusedRowKey = currentKey
-                                                    if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
-                                                    else onRowClick?.invoke(item)
-                                                },
-                                            contentAlignment = Alignment.CenterStart
-                                        ) {
-                                            colDef.cellContent(item, isSelected, wrapDataLines)
-                                        }
-
-                                        // Column Resize Handle across Data Rows too
-                                        ColumnBorderResizeHandle(
-                                            columnId = colDef.id,
-                                            currentWidth = colWidth,
-                                            onWidthChange = { newW ->
-                                                columnWidthMap[colDef.id] = newW
-                                                SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
                                             },
-                                            height = 38.dp,
-                                            borderLineColor = borderLineColor
-                                        )
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        visibleColumns.forEach { colDef ->
+                                            val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(colWidth)
+                                                    .heightIn(min = 38.dp, max = 56.dp)
+                                                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                                                    .clickable {
+                                                        focusedRowKey = currentKey
+                                                        if (onToggleSelectKey != null) onToggleSelectKey(currentKey)
+                                                        else onRowClick?.invoke(item)
+                                                    },
+                                                contentAlignment = Alignment.CenterStart
+                                            ) {
+                                                colDef.cellContent(item, isSelected, wrapDataLines)
+                                            }
+
+                                            // Column Resize Handle across Data Rows too
+                                            ColumnBorderResizeHandle(
+                                                columnId = colDef.id,
+                                                currentWidth = colWidth,
+                                                onWidthChange = { newW ->
+                                                    columnWidthMap[colDef.id] = newW
+                                                    SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
+                                                },
+                                                height = 38.dp,
+                                                borderLineColor = borderLineColor
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1330,7 +1352,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // TAB 0: MULTI-COLUMN SORT PRIORITY (Expandable Section)
+                    // TAB 0: MULTI-COLUMN SORT PRIORITY (Drag-to-Reorder LazyColumn)
                     if (primaryGearActiveTab == 0) {
                         Column(
                             modifier = Modifier
@@ -1340,9 +1362,9 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         ) {
                             ExpandableSettingsSection(
                                 title = "Multi-Column Sort Priority Order",
-                                subtitle = "Drag items up/down to configure hierarchical sort ranking",
+                                subtitle = "Drag items up/down using the handle to set hierarchical sort priority",
                                 icon = Icons.Default.FormatListNumbered,
-                                initiallyExpanded = false
+                                initiallyExpanded = true
                             ) {
                                 val lazyListState = rememberLazyListState()
                                 val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -1351,77 +1373,113 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     SettingsManager.saveGridString(gridId, "sort_order", sortPriorityColumnIds.joinToString(","))
                                 }
 
-                                Column(
+                                val visiblePriorityColumns = sortPriorityColumnIds.filter { columnVisibilityMap[it] != false }
+
+                                LazyColumn(
+                                    state = lazyListState,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 320.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    sortPriorityColumnIds.forEachIndexed { index, colId ->
+                                    itemsIndexed(visiblePriorityColumns, key = { _, colId -> colId }) { index, colId ->
                                         val colDef = columns.find { it.id == colId }
                                         val currentStrat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
-                                        val isVisible = columnVisibilityMap[colId] != false
+                                        val activeSortRank = if (currentStrat != ColumnSortStrategy.NON_SORTING) {
+                                            activeSortedColumnIds.indexOf(colId)
+                                        } else -1
 
-                                        if (colDef != null && isVisible) {
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        if (colDef != null) {
+                                            ReorderableItem(reorderableLazyColumnState, key = colId) { isDragging ->
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.fillMaxWidth()
                                                 ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Surface(
-                                                            shape = CircleShape,
-                                                            color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                                            modifier = Modifier.size(24.dp)
-                                                        ) {
-                                                            Box(contentAlignment = Alignment.Center) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            if (activeSortRank >= 0) {
+                                                                Surface(
+                                                                    shape = CircleShape,
+                                                                    color = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(24.dp)
+                                                                ) {
+                                                                    Box(contentAlignment = Alignment.Center) {
+                                                                        Text(
+                                                                            text = "#${activeSortRank + 1}",
+                                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                                                            color = MaterialTheme.colorScheme.onPrimary
+                                                                        )
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                Surface(
+                                                                    shape = CircleShape,
+                                                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                                                    modifier = Modifier.size(24.dp)
+                                                                ) {
+                                                                    Box(contentAlignment = Alignment.Center) {
+                                                                        Text(
+                                                                            text = "—",
+                                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Text(
+                                                                text = colDef.title,
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                        }
+
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Button(
+                                                                onClick = {
+                                                                    val nextStrat = when (currentStrat) {
+                                                                        ColumnSortStrategy.NON_SORTING -> ColumnSortStrategy.ASCENDING
+                                                                        ColumnSortStrategy.ASCENDING -> ColumnSortStrategy.DESCENDING
+                                                                        ColumnSortStrategy.DESCENDING -> ColumnSortStrategy.CUSTOM_PRIORITY
+                                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> ColumnSortStrategy.NON_SORTING
+                                                                    }
+                                                                    columnSortStrategies[colId] = nextStrat
+                                                                    SettingsManager.saveGridString(gridId, "strat_$colId", nextStrat.name)
+                                                                },
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                                modifier = Modifier.height(30.dp)
+                                                            ) {
                                                                 Text(
-                                                                    text = "${index + 1}",
-                                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                                    color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                                    text = when (currentStrat) {
+                                                                        ColumnSortStrategy.ASCENDING -> "ASC ▲"
+                                                                        ColumnSortStrategy.DESCENDING -> "DESC ▼"
+                                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> "CUSTOM ⋮"
+                                                                        ColumnSortStrategy.NON_SORTING -> "OFF ○"
+                                                                    },
+                                                                    fontSize = 11.sp
                                                                 )
                                                             }
-                                                        }
-                                                        Spacer(modifier = Modifier.width(10.dp))
-                                                        Text(
-                                                            text = colDef.title,
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            fontWeight = FontWeight.SemiBold
-                                                        )
-                                                    }
 
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Button(
-                                                            onClick = {
-                                                                val nextStrat = when (currentStrat) {
-                                                                    ColumnSortStrategy.NON_SORTING -> ColumnSortStrategy.ASCENDING
-                                                                    ColumnSortStrategy.ASCENDING -> ColumnSortStrategy.DESCENDING
-                                                                    ColumnSortStrategy.DESCENDING -> ColumnSortStrategy.CUSTOM_PRIORITY
-                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> ColumnSortStrategy.NON_SORTING
-                                                                }
-                                                                columnSortStrategies[colId] = nextStrat
-                                                                SettingsManager.saveGridString(gridId, "strat_$colId", nextStrat.name)
-                                                            },
-                                                            shape = RoundedCornerShape(6.dp),
-                                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                                            modifier = Modifier.height(30.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = when (currentStrat) {
-                                                                    ColumnSortStrategy.ASCENDING -> "ASC ▲"
-                                                                    ColumnSortStrategy.DESCENDING -> "DESC ▼"
-                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> "CUSTOM ⋮"
-                                                                    ColumnSortStrategy.NON_SORTING -> "OFF ○"
-                                                                },
-                                                                fontSize = 11.sp
-                                                            )
+                                                            Spacer(modifier = Modifier.width(6.dp))
+
+                                                            IconButton(
+                                                                onClick = {},
+                                                                modifier = Modifier.draggableHandle().size(28.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.DragHandle,
+                                                                    contentDescription = "Drag to reorder sort priority",
+                                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1445,7 +1503,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 title = "Master Column Visibility",
                                 subtitle = "Enable or hide individual columns in the grid",
                                 icon = Icons.Default.Visibility,
-                                initiallyExpanded = false
+                                initiallyExpanded = true
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     columns.forEach { col ->
@@ -1483,7 +1541,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         }
                     }
 
-                    // TAB 2: FILTER PILLS (Expandable Sections)
+                    // TAB 2: FILTER PILLS (Expandable Sections + Drag to Reorder Custom Priority Pills)
                     if (primaryGearActiveTab == 2) {
                         Column(
                             modifier = Modifier
@@ -1625,6 +1683,94 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     }
                                 }
                             }
+
+                            // Reorder Custom Priority Pills directly in Settings
+                            if (activePillColumn != null) {
+                                ExpandableSettingsSection(
+                                    title = "Reorder Custom Priority Pills (${activePillColumn.title})",
+                                    subtitle = "Drag pills up/down to customize display and filter order",
+                                    icon = Icons.Default.DragHandle,
+                                    initiallyExpanded = false
+                                ) {
+                                    val rawPillList = remember(items, activePillColumn) {
+                                        items.map { activePillColumn.valueExtractor(it).trim() }.filter { it.isNotBlank() }.distinct()
+                                    }
+                                    var reorderablePills by remember(rawPillList, localPriorityOrders[activePillColumn.id]) {
+                                        val saved = localPriorityOrders[activePillColumn.id] ?: emptyList()
+                                        val ordered = saved.filter { rawPillList.contains(it) } + rawPillList.filter { !saved.contains(it) }
+                                        mutableStateOf(ordered.toMutableList())
+                                    }
+
+                                    val pillListState = rememberLazyListState()
+                                    val reorderablePillListState = rememberReorderableLazyListState(pillListState) { from, to ->
+                                        val updated = reorderablePills.toMutableList()
+                                        val item = updated.removeAt(from.index)
+                                        updated.add(to.index, item)
+                                        reorderablePills = updated
+                                        localPriorityOrders[activePillColumn.id] = updated
+                                        onCustomPriorityOrderChanged?.invoke(activePillColumn.id, updated)
+                                    }
+
+                                    LazyColumn(
+                                        state = pillListState,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 240.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        itemsIndexed(reorderablePills, key = { _, itemVal -> itemVal }) { index, itemVal ->
+                                            ReorderableItem(reorderablePillListState, key = itemVal) { isDragging ->
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Surface(
+                                                                shape = CircleShape,
+                                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                                modifier = Modifier.size(20.dp)
+                                                            ) {
+                                                                Box(contentAlignment = Alignment.Center) {
+                                                                    Text(
+                                                                        text = "${index + 1}",
+                                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                                                        color = MaterialTheme.colorScheme.primary
+                                                                    )
+                                                                }
+                                                            }
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(
+                                                                text = itemVal,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                        }
+
+                                                        IconButton(
+                                                            onClick = {},
+                                                            modifier = Modifier.draggableHandle().size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.DragHandle,
+                                                                contentDescription = "Drag to reorder pill",
+                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -1709,7 +1855,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text("Wrap Header Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                            Text("Headers wrap up to 2 lines", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("Headers wrap up to 3 lines", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         Switch(
                                             checked = wrapHeaderLines,
