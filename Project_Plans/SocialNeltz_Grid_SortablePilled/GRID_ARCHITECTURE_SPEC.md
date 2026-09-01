@@ -7,27 +7,39 @@
 
 ## 2. Key Architecture Pillars
 
-### A. Dynamic Pill Container with Integrated Gear Action
-- **Top Pill Bar**: Horizontally scrolling quick-pick pills dynamically populated based on the active dataset or active column filter.
-- **Top Gear Trigger (⚙️)**:
-  - **Single Click**: Opens the **Editable Priority Sorting Popup Tab** to configure manual hierarchy orders.
-  - **Click & Hold (Long-Press)**: Activates **Column Drag-and-Drop Reordering Mode**, allowing users to visually reposition table columns.
+### A. Quad Independent Container Architecture
+- **Overarching Container**: Large parent container that encapsulates four independent child containers:
+  1. **Container 1: Filter Pills Card**:
+     - Dedicated styled Card with rounded corners and border.
+     - Header displays Active Filter Column Title, count badge, Settings Gear (⚙), and Expand/Collapse toggle (`▲` / `▼`).
+     - Implements **Combo Pill Mechanics**:
+       - Stepper configuration for display rows (1 to 5 rows).
+       - Single-row horizontal scrolling when configured to 1 row.
+       - Multi-line wrap (`FlowRow` with `maxLines`) when configured to 2+ rows.
+       - Fully expanded multi-row wrap when toggled open.
+  2. **Container 2: Column Header Card**:
+     - Placed above the grid rows in its own container card.
+     - Synchronized horizontal scrolling with data rows.
+     - Every column header shows Title, Sort Order Badge (`#1`, `#2`, `⋮`, `○`), Sort Direction Indicator (`▲`, `▼`), and Column Gear (⚙).
+  3. **Container 3: Table Body Card**:
+     - Houses the scrollable paged data rows.
+  4. **Container 4: Footer Controls Card**:
+     - **Footer Settings Gear (⚙)**: Opens dialog to switch between **Pagination Mode** and **Continuous Scroll Mode**, and select default page size.
+     - **In Pagination Mode**: Displays item range summary (`Showing 1–10 of 45 items`), quick page size toggle chips (`10`, `25`, `50`, `All`), and navigation controls (`«`, `‹`, `Page 1 / 5`, `›`, `»`).
+     - **In Continuous Scroll Mode**: Displays total item summary (`Total: 45 items • Continuous Scroll Mode`) and renders all rows in a single scrollable view.
 
-### B. Multi-Strategy Column Header Sorting
-- Each sortable column header includes an interactive indicator and a dedicated mini-gear / sort trigger with four distinct strategies:
-  1. **Ascending (`ASC`)**: Standard alphanumeric or numeric ascending order.
-  2. **Descending (`DESC`)**: Standard alphanumeric or numeric descending order.
-  3. **Non-Sorting (`NONE`)**: Natural dataset order without column sorting overhead.
-  4. **Custom Priority (`CUSTOM_PRIORITY`)**: Orders items by user-defined position ranks established in the Priority Sorting Tab.
+### B. Main Gear Centralized Sort Priority & Visibility Management
+- **Tab 0: Sort Priority**: Drag-and-drop hierarchy to establish multi-level priority (`#1`, `#2`, `#3`, ...) and strategy per column (`ASC`, `DESC`, `CUSTOM`, `OFF`).
+- **Tab 1: Visibility**: Toggle switches to show/hide any column dynamically.
+- **Tab 2: Filter Pills**: Configure pill rows (1–5), sort pills A-Z, and select source column.
 
-### C. Editable Priority Sorting Popup Tab
+### C. Row Action & Deletion Safety Policy
+- **No Long-Press Row Deletion**: Clicking and holding table rows does NOT delete table items.
+- **AddEditScreen Only**: Table item deletion is strictly confined to the dedicated edit screen (`AddEditTransactionsScreen`), preventing accidental deletions.
+
+### D. Editable Priority Sorting Popup Tab
 - A dedicated modal dialog providing a reorderable list of distinct values (e.g., Categories, Subcategories, or Details).
 - Supports drag handles / up-down repositioning to establish hard-coded rank priorities (`Priority 1`, `Priority 2`, ...).
-- Priority orders persist and immediately govern column sorting whenever `CUSTOM_PRIORITY` strategy is engaged.
-
-### D. Visual Date Column Omission with Preserved Data Integrity
-- The Date column is omitted from the grid table body visually (since global PayDate pills and filters handle the temporal context), avoiding horizontal clutter.
-- Date data remains preserved in the underlying row model (`T`) for date-based grouping, calculations, and exports.
 
 ---
 
@@ -35,56 +47,19 @@
 
 ```kotlin
 enum class ColumnSortStrategy {
+    NON_SORTING,
     ASCENDING,
     DESCENDING,
-    NON_SORTING,
     CUSTOM_PRIORITY
 }
 
-data class GridColumnConfig<T>(
-    val key: String,
-    val headerTitle: String,
-    val widthFraction: Float = 1f,
+data class GridColumnDefinition<T>(
+    val id: String,
+    val title: String,
+    val width: Dp = 100.dp,
     val isSortable: Boolean = true,
-    val defaultSortStrategy: ColumnSortStrategy = ColumnSortStrategy.NON_SORTING,
-    val valueExtractor: (T) -> String,
-    val numericExtractor: ((T) -> Double)? = null,
-    val cellContent: @Composable (item: T) -> Unit
-)
-
-data class GridPriorityRank(
-    val itemValue: String,
-    val rank: Int
+    val defaultStrategy: ColumnSortStrategy = ColumnSortStrategy.NON_SORTING,
+    val valueExtractor: (T) -> String = { "" },
+    val cellContent: @Composable (item: T, isSelected: Boolean) -> Unit
 )
 ```
-
----
-
-## 4. Interaction Flow & State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> DefaultGrid
-    DefaultGrid --> ColumnHeaderClick: Tap Header
-    ColumnHeaderClick --> Ascending: Cycle Sort
-    Ascending --> Descending: Tap Header
-    Descending --> NonSorting: Tap Header
-    NonSorting --> DefaultGrid: Reset
-
-    DefaultGrid --> HeaderGearClick: Tap Column Gear
-    HeaderGearClick --> StrategyDialog: Select Sort Strategy (Asc / Desc / None / Custom)
-    StrategyDialog --> DefaultGrid: Apply Strategy
-
-    DefaultGrid --> MainGearClick: Single Tap Main Gear
-    MainGearClick --> PrioritySortingModal: Reorder Categories & Subcategories
-    PrioritySortingModal --> DefaultGrid: Save Custom Order Ranks
-
-    DefaultGrid --> MainGearLongPress: Long Press Main Gear
-    MainGearLongPress --> ColumnReorderingMode: Drag Columns to Reorder
-    ColumnReorderingMode --> DefaultGrid: Save Column Order
-```
-
----
-
-## 5. Generic Extensibility
-The component accepts generic row items `T` and can be utilized across transactions, grocery budgets, investment tables, inventory rosters, and financial audit reports.

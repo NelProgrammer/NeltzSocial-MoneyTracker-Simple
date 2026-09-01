@@ -1,66 +1,89 @@
 # Sorting, Reordering & Priority Engine Specification
 
 ## 1. Overview
-This document specifies the algorithmic logic, state management, and gesture mechanics governing multi-column sorting, drag-and-drop column reordering, and priority ranking in `SocialNeltz_Grid_Sortable_Pilled`.
+This document specifies the algorithmic logic, state management, and interaction mechanics governing multi-column sort priority, column visibility management, and sort badge rendering in `SocialNeltz_Grid_Sortable_Pilled`.
 
 ---
 
-## 2. Priority Sorting Engine
+## 2. Multi-Column Sort Priority Engine (Main Gear)
 
-### Algorithm:
-When a column is sorted with `CUSTOM_PRIORITY`:
-1. Retrieve the `priorityMap: Map<String, Int>` for that column's target attribute.
-2. For each row item `T`:
-   - Extract string key: `val key = column.valueExtractor(item).trim().lowercase()`
-   - Lookup rank: `val rank = priorityMap[key] ?: Int.MAX_VALUE`
-3. Sort items primarily by `rank ASC`.
-4. Secondary sort items with identical ranks by their natural alphanumeric or insertion order.
+### Architecture:
+- **Centralized Priority Management**: Column sorting priority is managed within the **Main Grid Gear** dialog (Tab 0: "Sort Priority").
+- **Drag-and-Drop Hierarchy**: Users drag columns up or down to set multi-level priority (`#1`, `#2`, `#3`, ...).
+- **Per-Column Strategy Selection**: Each column in the priority list can be toggled through:
+  - 🔼 **`ASC`**: Ascending order (A → Z / Min → Max)
+  - 🔽 **`DESC`**: Descending order (Z → A / Max → Min)
+  - ⋮ **`CUSTOM`**: Custom Priority (order defined in Custom Values manager)
+  - ○ **`OFF`**: Non-Sorting (excluded from active multi-column sorting)
 
+### Multi-Level Sort Algorithm:
 ```kotlin
-fun <T> sortDataByPriority(
+fun <T> multiColumnSort(
     items: List<T>,
-    column: GridColumnConfig<T>,
-    priorityMap: Map<String, Int>,
-    isAscending: Boolean = true
+    activePriorityColumnIds: List<String>,
+    columnList: List<GridColumnDefinition<T>>,
+    strategies: Map<String, ColumnSortStrategy>,
+    customOrders: Map<String, List<String>>
 ): List<T> {
-    return items.sortedWith(Comparator { a, b ->
-        val keyA = column.valueExtractor(a).trim().lowercase()
-        val keyB = column.valueExtractor(b).trim().lowercase()
-        val rankA = priorityMap[keyA] ?: (Int.MAX_VALUE - 1)
-        val rankB = priorityMap[keyB] ?: (Int.MAX_VALUE - 1)
+    if (activePriorityColumnIds.isEmpty()) return items
 
-        val rankComp = rankA.compareTo(rankB)
-        if (rankComp != 0) {
-            if (isAscending) rankComp else -rankComp
-        } else {
-            keyA.compareTo(keyB)
+    return items.sortedWith { a, b ->
+        var comparison = 0
+        for (colId in activePriorityColumnIds) {
+            val colDef = columnList.find { it.id == colId } ?: continue
+            val strat = strategies[colId] ?: ColumnSortStrategy.NON_SORTING
+            val valA = colDef.valueExtractor(a).trim()
+            val valB = colDef.valueExtractor(b).trim()
+
+            comparison = when (strat) {
+                ColumnSortStrategy.ASCENDING -> {
+                    val numA = valA.toDoubleOrNull()
+                    val numB = valB.toDoubleOrNull()
+                    if (numA != null && numB != null) numA.compareTo(numB) else valA.compareTo(valB, ignoreCase = true)
+                }
+                ColumnSortStrategy.DESCENDING -> {
+                    val numA = valA.toDoubleOrNull()
+                    val numB = valB.toDoubleOrNull()
+                    if (numA != null && numB != null) numB.compareTo(numA) else valB.compareTo(valA, ignoreCase = true)
+                }
+                ColumnSortStrategy.CUSTOM_PRIORITY -> {
+                    val order = customOrders[colId] ?: emptyList()
+                    val idxA = order.indexOfFirst { it.equals(valA, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
+                    val idxB = order.indexOfFirst { it.equals(valB, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
+                    idxA.compareTo(idxB)
+                }
+                ColumnSortStrategy.NON_SORTING -> 0
+            }
+            if (comparison != 0) break
         }
-    })
+        comparison
+    }
 }
 ```
 
 ---
 
-## 3. Long-Press Column Drag & Drop Reordering
+## 3. Column Header Badges & Indicator Layout
 
-### Gesture Mechanics:
-- **Long-Press Detector**: Detected via pointer input / long-press gesture on the main gear icon (`combinedClickable(onLongClick = { ... })`).
-- **Visual Feedback**:
-  - Grid enters `isReorderMode = true`.
-  - Column headers display subtle drag grip handles `⋮⋮` and elevation changes.
-- **Reordering Handler**:
-  - `onMoveColumn(fromIndex: Int, toIndex: Int)` updates the observable column order list.
-  - Persists column order indices to local state / settings.
+Each column header renders:
+1. **Column Title Text**
+2. **Sort Order Badge**:
+   - Displays priority rank `#1`, `#2`, `#3` if active in multi-column sorting.
+3. **Sort Direction Indicator**:
+   - `▲` (Up Arrow) for Ascending
+   - `▼` (Down Arrow) for Descending
+   - `⋮` (3 Vertical Dots) for Custom Priority / Non-directional
+   - `○` (Small Circle) for Non-Sorting
+4. **Column Gear (⚙)**: Opens quick strategy dropdown and shortcuts to Main Gear settings.
 
 ---
 
-## 4. Multi-Strategy Header Dialog
+## 4. Column Visibility Management (Main Gear Tab 1)
+- Dedicated Visibility Tab in the Main Gear modal.
+- Provides switches to show or hide any column dynamically without altering data structures.
 
-### Header Gear Click Workflow:
-1. User clicks the mini gear icon located on any column header `[Category ⚙]`.
-2. A popup modal presents 4 selectable options:
-   - 🔼 **Ascending (A → Z / 0 → 9)**
-   - 🔽 **Descending (Z → A / 9 → 0)**
-   - ⏸️ **Non-Sorting (Reset / Default)**
-   - ⭐ **Custom Priority Order (Use Ranked Order)**
-3. If "Custom Priority" is selected without prior configured ranks, prompt to open the Priority Tab editor.
+---
+
+## 5. Synchronized Horizontal Scroll Container
+- The **Column Header Container** and **Table Body Container** share a single `horizontalScrollState`.
+- Dragging / swiping horizontally across the Column Header Row moves table columns and data rows in perfect synchronization.

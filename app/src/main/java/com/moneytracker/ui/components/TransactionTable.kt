@@ -176,6 +176,6 @@ fun TransactionTable(
         initialPillColumnId = "category",
         onRowClick = { onEditTransaction(it.id) },
         onRowDoubleClick = { onEditTransaction(it.id) },
-        onRowLongClick = { onDeleteTransaction(it) }
+        onRowLongClick = null
     )
 }
