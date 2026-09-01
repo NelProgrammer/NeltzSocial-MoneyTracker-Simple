@@ -858,7 +858,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
                             val colWidth = columnWidthMap[colDef.id] ?: colDef.width
 
-                            // Header Cell Body (Clickable to open Column Sort Options)
+                            // Header Cell Body (Non-clickable container so dragging is preserved)
                             Box(
                                 modifier = Modifier
                                     .width(colWidth)
@@ -871,14 +871,13 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             strokeWidth = 1.5.dp.toPx()
                                         )
                                     }
-                                    .clickable { showColumnSortDropdown = true }
                                     .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.Start
                                 ) {
                                     Text(
                                         text = colDef.title,
@@ -888,17 +887,20 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         ),
                                         color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                         maxLines = if (wrapHeaderLines) 2 else 1,
-                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
+                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis
                                     )
 
-                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
 
-                                    // Compact Sort Order Badge + Direction Arrow (Integrated dropdown anchor, no separate gear)
+                                    // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
                                     Box {
                                         Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .clickable { showColumnSortDropdown = true }
+                                                .padding(horizontal = 2.dp, vertical = 2.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(2.5.dp)
                                         ) {
                                             Surface(
                                                 shape = CircleShape,
