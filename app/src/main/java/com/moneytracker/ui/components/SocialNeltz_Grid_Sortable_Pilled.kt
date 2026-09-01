@@ -137,6 +137,7 @@ data class GridColumnDefinition<T>(
     val width: Dp = 100.dp,
     val isSortable: Boolean = true,
     val defaultStrategy: ColumnSortStrategy? = null,
+    val parentColumnId: String? = null,
     val valueExtractor: (T) -> String = { "" },
     val cellContent: @Composable (item: T, isSelected: Boolean, wrapText: Boolean) -> Unit
 )
@@ -353,16 +354,16 @@ private fun ColumnBorderResizeHandle(
 }
 
 /**
- * Enterprise Reusable Generic Sortable & Pilled Grid Component
+ * Universal Reusable Grid Table with Top Pilled Filters and Full Sorting/Resizing.
  */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun <T> SocialNeltz_Grid_Sortable_Pilled(
     items: List<T>,
     columns: List<GridColumnDefinition<T>>,
     itemKey: (T) -> Any,
+    tableName: String,
     modifier: Modifier = Modifier,
-    tableName: String = "Transactions",
     initialPillColumnId: String? = null,
     selectedItemKeys: Set<Any> = emptySet(),
     onToggleSelectKey: ((Any) -> Unit)? = null,
@@ -372,9 +373,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     onAddItem: (() -> Unit)? = null,
     emptyMessage: String = "No items found",
     customPriorityOrders: Map<String, List<String>> = emptyMap(),
-    onCustomPriorityOrderChanged: ((columnId: String, newOrder: List<String>) -> Unit)? = null,
-    masterCategoryNames: List<String> = emptyList(),
-    masterSubcategoriesByCategory: Map<String, List<String>> = emptyMap()
+    onCustomPriorityOrderChanged: ((columnId: String, newOrder: List<String>) -> Unit)? = null
 ) {
     val context = LocalContext.current
     SettingsManager.init(context)
@@ -389,8 +388,9 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         val title = col.title.lowercase()
         return when {
             id.contains("note") || id.contains("comment") || title.contains("note") || title.contains("comment") -> ColumnSortStrategy.NON_SORTING
-            id.contains("date") || id.contains("time") || title.contains("date") -> ColumnSortStrategy.ASCENDING
             id.contains("amount") || id.contains("spent") || id.contains("balance") || id.contains("cost") || id.contains("units") || id.contains("count") -> ColumnSortStrategy.DESCENDING
+            id.contains("detail") || id.contains("desc") || id.contains("description") || title.contains("detail") || title.contains("description") -> ColumnSortStrategy.ASCENDING
+            id.contains("date") || id.contains("time") || title.contains("date") -> ColumnSortStrategy.ASCENDING
             else -> ColumnSortStrategy.CUSTOM_PRIORITY
         }
     }
@@ -503,10 +503,11 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     val localPriorityOrders = remember(columns, gridId) {
         mutableStateMapOf<String, List<String>>().apply {
             putAll(customPriorityOrders)
-            columns.forEach { col ->
-                val savedPillOrderStr = SettingsManager.getGridString(gridId, "pills_order_${col.id}", "")
-                if (savedPillOrderStr.isNotBlank()) {
-                    put(col.id, savedPillOrderStr.split("|||").filter { it.isNotBlank() })
+            val allSaved = SettingsManager.getAllGridStringMap(gridId)
+            allSaved.forEach { (key, value) ->
+                if (key.startsWith("pills_order_")) {
+                    val colKey = key.removePrefix("pills_order_")
+                    put(colKey, value.split("|||").filter { it.isNotBlank() })
                 }
             }
         }
@@ -607,7 +608,22 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             }
                         }
                         ColumnSortStrategy.CUSTOM_PRIORITY -> {
-                            val order = localPriorityOrders[colId] ?: emptyList()
+                            val pCol = colDef.parentColumnId?.let { pId -> columns.find { it.id == pId } }
+                            val gpCol = pCol?.parentColumnId?.let { gpId -> columns.find { it.id == gpId } }
+
+                            val order = when {
+                                gpCol != null && pCol != null -> {
+                                    val gpVal = gpCol.valueExtractor(a).trim()
+                                    val pVal = pCol.valueExtractor(a).trim()
+                                    localPriorityOrders["${colId}_${gpVal}_${pVal}"] ?: localPriorityOrders["${colId}_${pVal}"] ?: localPriorityOrders[colId] ?: emptyList()
+                                }
+                                pCol != null -> {
+                                    val pVal = pCol.valueExtractor(a).trim()
+                                    localPriorityOrders["${colId}_${pVal}"] ?: localPriorityOrders[colId] ?: emptyList()
+                                }
+                                else -> localPriorityOrders[colId] ?: emptyList()
+                            }
+
                             val idxA = order.indexOfFirst { it.equals(valA, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             val idxB = order.indexOfFirst { it.equals(valB, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             if (idxA != idxB) {
@@ -2072,16 +2088,63 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     // CUSTOM PRIORITY MODAL DIALOG
     // =================================================================
     if (showCustomPriorityDialog) {
-        val targetColDef = columns.find { it.id == priorityTargetColumnId } ?: columns.first()
+        val targetColDef: GridColumnDefinition<T> = columns.find { it.id == priorityTargetColumnId } ?: columns.first()
+        val parentColDef: GridColumnDefinition<T>? = targetColDef.parentColumnId?.let { pId -> columns.find { it.id == pId } }
+        val grandparentColDef: GridColumnDefinition<T>? = parentColDef?.parentColumnId?.let { gpId -> columns.find { it.id == gpId } }
 
-        val distinctValues = remember(items, targetColDef) {
-            items.map { targetColDef.valueExtractor(it).trim() }
+        // Grandparent selection (e.g. Category when editing Detail)
+        val distinctGrandparents: List<String> = remember(items, grandparentColDef) {
+            grandparentColDef?.let { gp ->
+                items.map { gp.valueExtractor(it).trim() }.filter { it.isNotBlank() }.distinct()
+            } ?: emptyList<String>()
+        }
+        var selectedGrandparent by remember(distinctGrandparents) {
+            mutableStateOf<String?>(distinctGrandparents.firstOrNull())
+        }
+
+        // Parent selection (e.g. Category when editing SubCategory, OR SubCategory when editing Detail)
+        val distinctParents: List<String> = remember(items, parentColDef, grandparentColDef, selectedGrandparent) {
+            if (parentColDef == null) {
+                emptyList<String>()
+            } else if (grandparentColDef != null && selectedGrandparent != null) {
+                items.filter { grandparentColDef.valueExtractor(it).trim().equals(selectedGrandparent, ignoreCase = true) }
+                    .map { parentColDef.valueExtractor(it).trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+            } else {
+                items.map { parentColDef.valueExtractor(it).trim() }.filter { it.isNotBlank() }.distinct()
+            }
+        }
+        var selectedParent by remember(distinctParents) {
+            mutableStateOf<String?>(distinctParents.firstOrNull())
+        }
+
+        // Target Items to reorder (filtered by Parent and Grandparent)
+        val distinctValues: List<String> = remember(items, targetColDef, parentColDef, grandparentColDef, selectedParent, selectedGrandparent) {
+            var filtered = items
+            if (grandparentColDef != null && selectedGrandparent != null) {
+                filtered = filtered.filter { grandparentColDef.valueExtractor(it).trim().equals(selectedGrandparent, ignoreCase = true) }
+            }
+            if (parentColDef != null && selectedParent != null) {
+                filtered = filtered.filter { parentColDef.valueExtractor(it).trim().equals(selectedParent, ignoreCase = true) }
+            }
+            filtered.map { targetColDef.valueExtractor(it).trim() }
                 .filter { it.isNotBlank() }
                 .distinct()
         }
 
-        var editableList by remember(distinctValues) {
-            val saved = localPriorityOrders[targetColDef.id] ?: emptyList()
+        val scopedOrderKey = remember(targetColDef.id, selectedGrandparent, selectedParent) {
+            when {
+                grandparentColDef != null && selectedGrandparent != null && selectedParent != null ->
+                    "${targetColDef.id}_${selectedGrandparent}_${selectedParent}"
+                parentColDef != null && selectedParent != null ->
+                    "${targetColDef.id}_${selectedParent}"
+                else -> targetColDef.id
+            }
+        }
+
+        var editableList by remember(distinctValues, scopedOrderKey) {
+            val saved = localPriorityOrders[scopedOrderKey] ?: localPriorityOrders[targetColDef.id] ?: emptyList()
             val ordered = saved.filter { distinctValues.contains(it) } + distinctValues.filter { !saved.contains(it) }
             mutableStateOf(ordered.toMutableList())
         }
@@ -2093,7 +2156,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.94f)
-                    .height(560.dp),
+                    .height(600.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
@@ -2121,6 +2184,48 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         }
                         IconButton(onClick = { showCustomPriorityDialog = false }) {
                             Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+
+                    // Grandparent Filter (e.g. Category when ranking Details)
+                    if (grandparentColDef != null && distinctGrandparents.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("${grandparentColDef.title}:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            distinctGrandparents.forEach { gpVal ->
+                                FilterChip(
+                                    selected = selectedGrandparent.equals(gpVal, ignoreCase = true),
+                                    onClick = { selectedGrandparent = gpVal },
+                                    label = { Text(gpVal, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Parent Filter (e.g. Category when ranking SubCategories, or SubCategory when ranking Details)
+                    if (parentColDef != null && distinctParents.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("${parentColDef.title}:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            distinctParents.forEach { pVal ->
+                                FilterChip(
+                                    selected = selectedParent.equals(pVal, ignoreCase = true),
+                                    onClick = { selectedParent = pVal },
+                                    label = { Text(pVal, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
                         }
                     }
 
@@ -2208,8 +2313,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                localPriorityOrders[targetColDef.id] = editableList
-                                SettingsManager.saveGridString(gridId, "pills_order_${targetColDef.id}", editableList.joinToString("|||"))
+                                localPriorityOrders[scopedOrderKey] = editableList
+                                SettingsManager.saveGridString(gridId, "pills_order_${scopedOrderKey}", editableList.joinToString("|||"))
                                 onCustomPriorityOrderChanged?.invoke(targetColDef.id, editableList)
                                 showCustomPriorityDialog = false
                             }

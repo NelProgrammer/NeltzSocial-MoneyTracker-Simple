@@ -137,6 +137,18 @@ object SettingsManager {
         return prefs?.getBoolean("grid_${gridId}_$key", default) ?: default
     }
 
+    fun getAllGridStringMap(gridId: String): Map<String, String> {
+        val prefix = "grid_${gridId}_"
+        val all = prefs?.all ?: return emptyMap()
+        val result = mutableMapOf<String, String>()
+        for ((k, v) in all) {
+            if (k.startsWith(prefix) && v is String) {
+                result[k.removePrefix(prefix)] = v
+            }
+        }
+        return result
+    }
+
     fun getPayDateDay(): Int = _settings.value.payDateDay
     fun getCutoffDay(): Int = _settings.value.cutoffDay
     fun getMorningCutoffHour(): Int = _settings.value.morningCutoffHour

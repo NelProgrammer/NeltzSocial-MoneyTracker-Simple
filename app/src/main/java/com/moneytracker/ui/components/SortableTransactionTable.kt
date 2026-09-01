@@ -100,6 +100,7 @@ fun SortableTransactionTable(
             width = 120.dp,
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
+            parentColumnId = "category",
             valueExtractor = { it.subCategory },
             cellContent = { item, _, wrapText ->
                 Text(
@@ -117,7 +118,8 @@ fun SortableTransactionTable(
             title = "Detail",
             width = 120.dp,
             isSortable = true,
-            defaultStrategy = ColumnSortStrategy.CUSTOM_PRIORITY,
+            defaultStrategy = ColumnSortStrategy.ASCENDING,
+            parentColumnId = "subCategory",
             valueExtractor = { it.detail },
             cellContent = { item, _, wrapText ->
                 Text(
