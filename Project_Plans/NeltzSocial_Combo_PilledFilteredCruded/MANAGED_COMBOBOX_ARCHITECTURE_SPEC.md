@@ -1,6 +1,6 @@
-# Permanent Specification: Autonomous Managed Combobox with Pills & Cascading Orchestration
+# Permanent Specification: NeltzSocial_Combo_PilledFilteredCruded & Cascading Orchestration
 
-This document serves as the permanent, framework-agnostic architectural specification and algorithmic reference for the **Autonomous Managed Combobox with Pills Component** and its **Hierarchical Cascading Orchestrator**.
+This document serves as the permanent, framework-agnostic architectural specification and algorithmic reference for the **NeltzSocial_Combo_PilledFilteredCruded Component** (`NeltzSocial_Combo_PilledFilteredCruded<T>`) and its **Hierarchical Cascading Orchestrator**.
 
 ---
 
@@ -33,7 +33,7 @@ flowchart TD
         State_3["Grandchild State"]:::screen
     end
 
-    subgraph ComponentTier["Autonomous Combobox Instances"]
+    subgraph ComponentTier["NeltzSocial_Combo_PilledFilteredCruded Instances"]
         direction TB
         Comp_1["Level 1 Combobox Instance"]:::comp
         Comp_2["Level 2 Combobox Instance"]:::comp
@@ -258,7 +258,7 @@ The component separates **CRUD item addition** from **Pill overflow display**:
 
 ## 6. How to Use the Component: End-to-End Screen Integration
 
-Here is the exact pattern for wiring a 3-tier cascading hierarchy (`Category` → `SubCategory` → `Detail`) in any screen:
+Here is the exact pattern for wiring a 3-tier cascading hierarchy (`Category` → `SubCategory` → `Detail`) using `NeltzSocial_Combo_PilledFilteredCruded`:
 
 ```kotlin
 // In your Screen Composable / View Controller:
@@ -281,7 +281,7 @@ val matchedSubCat = subCategories.find {
 // -------------------------------------------------------------
 // LEVEL 1: Category Combobox (Independent Root)
 // -------------------------------------------------------------
-ManagedComboboxWithPills(
+NeltzSocial_Combo_PilledFilteredCruded(
     label = "Category",
     selectedValue = categoryText,
     onValueChange = { input -> 
@@ -299,7 +299,7 @@ ManagedComboboxWithPills(
 // -------------------------------------------------------------
 // LEVEL 2: SubCategory Combobox (Child of Category)
 // -------------------------------------------------------------
-ManagedComboboxWithPills(
+NeltzSocial_Combo_PilledFilteredCruded(
     label = "SubCategory",
     selectedValue = subCategoryText,
     onValueChange = { subCategoryText = it },
@@ -318,7 +318,7 @@ ManagedComboboxWithPills(
 // -------------------------------------------------------------
 // LEVEL 3: Detail Combobox (Grandchild of SubCategory)
 // -------------------------------------------------------------
-ManagedComboboxWithPills(
+NeltzSocial_Combo_PilledFilteredCruded(
     label = "Detail",
     selectedValue = detailText,
     onValueChange = { detailText = it },
@@ -341,4 +341,3 @@ ManagedComboboxWithPills(
 1. **Pass the RAW collection**: Always pass the complete dataset (`items = allEntities`) from the database. Let the component filter internally.
 2. **Pass the `parentFilterKey`**: Pass the parent's string or ID as `parentFilterKey`. When this value changes, the component automatically re-evaluates the predicate and clears its value if no longer valid.
 3. **No manual reset boilerplate**: Do NOT write `subCategoryText = ""` or `detailText = ""` inside the Category's `onValueChange` callback. The child components handle their own cleanup automatically.
-

@@ -611,6 +611,62 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            // 7. Morning Slot Cutoff Hour Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = "Morning Slot Cutoff",
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = "Taxi Morning Slot Cutoff Hour",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    val hourLabel = when {
+                        settings.morningCutoffHour == 12 -> "12:00 PM (Noon)"
+                        settings.morningCutoffHour < 12 -> "${settings.morningCutoffHour}:00 AM"
+                        else -> "${settings.morningCutoffHour - 12}:00 PM"
+                    }
+
+                    Text(
+                        text = "Current cutoff: $hourLabel. Trips logged before this hour are classified as Morning trips, and trips logged after are classified as After-Hours / Evening trips (Default: 12:00 PM).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = settings.morningCutoffHour.toString(),
+                        onValueChange = { input ->
+                            val num = input.filter { it.isDigit() }.toIntOrNull()
+                            if (num != null && num in 1..23) {
+                                viewModel.updateMorningCutoffHour(num)
+                            }
+                        },
+                        label = { Text("Cutoff Hour (1-23, e.g. 12 for 12:00 PM)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 

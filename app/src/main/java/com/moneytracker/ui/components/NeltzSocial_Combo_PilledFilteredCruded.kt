@@ -23,16 +23,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -68,7 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -76,7 +75,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
@@ -89,11 +87,14 @@ data class ComboboxSettings(
 )
 
 /**
- * Standard Reusable Combobox with Up/Down buttons, Search, Quick-Pick Pills, and Gear Settings.
+ * Enterprise Reusable Generic Custom Combobox Component with Up/Down buttons, Search,
+ * Quick-Pick Pills, Parent-Filtered Cascading, Inline CRUD, and Gear Settings Modal.
+ *
+ * Component Name: NeltzSocial_Combo_PilledFilteredCruded
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun <T> ManagedComboboxWithPills(
+fun <T> NeltzSocial_Combo_PilledFilteredCruded(
     label: String,
     selectedValue: String,
     onValueChange: (String) -> Unit,
@@ -329,7 +330,7 @@ fun <T> ManagedComboboxWithPills(
                                         .fillMaxWidth()
                                         .background(
                                             if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                                            else Color.Transparent
+                                             else Color.Transparent
                                         )
                                         .clickable {
                                             onValueChange(itemText)
@@ -698,6 +699,44 @@ fun <T> ManagedComboboxWithPills(
             }
         )
     }
+}
+
+/**
+ * Backward compatibility alias for ManagedComboboxWithPills
+ */
+@Composable
+fun <T> ManagedComboboxWithPills(
+    label: String,
+    selectedValue: String,
+    onValueChange: (String) -> Unit,
+    items: List<T>,
+    filterPredicate: ((T) -> Boolean)? = null,
+    parentFilterKey: Any? = null,
+    autoResetOnParentChange: Boolean = true,
+    initialSettings: ComboboxSettings = ComboboxSettings(),
+    onSettingsChange: ((ComboboxSettings) -> Unit)? = null,
+    itemToText: (T) -> String = { it.toString() },
+    onAddItem: (() -> Unit)? = null,
+    onEditItem: ((T) -> Unit)? = null,
+    onDeleteItem: ((T) -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    NeltzSocial_Combo_PilledFilteredCruded(
+        label = label,
+        selectedValue = selectedValue,
+        onValueChange = onValueChange,
+        items = items,
+        filterPredicate = filterPredicate,
+        parentFilterKey = parentFilterKey,
+        autoResetOnParentChange = autoResetOnParentChange,
+        initialSettings = initialSettings,
+        onSettingsChange = onSettingsChange,
+        itemToText = itemToText,
+        onAddItem = onAddItem,
+        onEditItem = onEditItem,
+        onDeleteItem = onDeleteItem,
+        modifier = modifier
+    )
 }
 
 /**

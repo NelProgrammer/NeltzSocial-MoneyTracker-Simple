@@ -388,3 +388,33 @@ interface ShoppingListItemDao {
     @Query("DELETE FROM shopping_list_items WHERE shoppingListId = :listId AND isChecked = 0")
     suspend fun deleteUncheckedItems(listId: Long)
 }
+
+@Dao
+interface TaxiExhaustionDao {
+    @Query("SELECT * FROM taxi_exhaustions WHERE profileId = :profileId AND payMonthDate >= :startDate AND payMonthDate < :endDate ORDER BY date DESC, id DESC")
+    fun observeForMonth(profileId: Long, startDate: Long, endDate: Long): Flow<List<com.moneytracker.data.local.entity.TaxiExhaustionEntity>>
+
+    @Query("SELECT * FROM taxi_exhaustions WHERE profileId = :profileId AND payMonthDate >= :startDate AND payMonthDate < :endDate ORDER BY date DESC, id DESC")
+    suspend fun getForMonth(profileId: Long, startDate: Long, endDate: Long): List<com.moneytracker.data.local.entity.TaxiExhaustionEntity>
+
+    @Query("SELECT * FROM taxi_exhaustions WHERE profileId = :profileId AND routeId = :routeId AND payMonthDate >= :startDate AND payMonthDate < :endDate ORDER BY date DESC, id DESC")
+    suspend fun getForRouteAndMonth(profileId: Long, routeId: Long, startDate: Long, endDate: Long): List<com.moneytracker.data.local.entity.TaxiExhaustionEntity>
+
+    @Query("SELECT * FROM taxi_exhaustions WHERE profileId = :profileId AND routeId = :routeId AND date >= :dayStart AND date < :dayEnd AND timeOfDay = :timeOfDay LIMIT 1")
+    suspend fun getDailyEntry(profileId: Long, routeId: Long, dayStart: Long, dayEnd: Long, timeOfDay: String): com.moneytracker.data.local.entity.TaxiExhaustionEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: com.moneytracker.data.local.entity.TaxiExhaustionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<com.moneytracker.data.local.entity.TaxiExhaustionEntity>)
+
+    @Update
+    suspend fun update(item: com.moneytracker.data.local.entity.TaxiExhaustionEntity)
+
+    @Delete
+    suspend fun delete(item: com.moneytracker.data.local.entity.TaxiExhaustionEntity)
+
+    @Query("DELETE FROM taxi_exhaustions WHERE profileId = :profileId AND routeId = :routeId")
+    suspend fun deleteForRoute(profileId: Long, routeId: Long)
+}

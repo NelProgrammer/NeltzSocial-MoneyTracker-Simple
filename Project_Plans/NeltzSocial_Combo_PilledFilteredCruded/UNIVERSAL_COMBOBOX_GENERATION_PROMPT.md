@@ -1,12 +1,12 @@
-# Master Prompt: Generate the Autonomous Managed Combobox & Cascading Orchestrator in Any Language / Framework
+# Master Prompt: Generate NeltzSocial_Combo_PilledFilteredCruded & Cascading Orchestrator in Any Language / Framework
 
-Use this master prompt with any AI coding assistant, LLM, or software engineering team to implement the production-grade **Autonomous Managed Combobox with Pills Component** and its **Cascading Orchestrator Tool** in any programming language or UI framework (such as React / TypeScript, SwiftUI, Flutter, Vue 3, Svelte 5, Angular, Jetpack Compose, C# / .NET MAUI, or Python / PyQt).
+Use this master prompt with any AI coding assistant, LLM, or software engineering team to implement the production-grade **Autonomous Managed Combobox with Pills Component** (`NeltzSocial_Combo_PilledFilteredCruded<T>`) and its **Cascading Orchestrator Tool** in any programming language or UI framework (such as React / TypeScript, SwiftUI, Flutter, Vue 3, Svelte 5, Angular, Jetpack Compose, C# / .NET MAUI, or Python / PyQt).
 
 ---
 
 ```markdown
 # Role & Task
-You are a Principal Software Architect and UI Framework Engineer. Your task is to implement an enterprise-grade, generic **Managed Combobox with Quick-Pick Pills Component** (`ManagedComboboxWithPills<T>`) and its accompanying **Cascading Combobox Orchestrator Tool** (`CascadingComboboxOrchestrator<TCat, TSub, TDet>`) in:
+You are a Principal Software Architect and UI Framework Engineer. Your task is to implement an enterprise-grade, generic **Managed Combobox with Quick-Pick Pills Component** (`NeltzSocial_Combo_PilledFilteredCruded<T>`) and its accompanying **Cascading Combobox Orchestrator Tool** (`CascadingComboboxOrchestrator<TCat, TSub, TDet>`) in:
 👉 **TARGET LANGUAGE / FRAMEWORK**: [INSERT TARGET FRAMEWORK HERE, e.g., React + TypeScript / SwiftUI / Flutter / Jetpack Compose / Vue 3 + TypeScript / Svelte 5 / C# .NET MAUI]
 
 The implementation MUST adhere strictly to the decoupled architecture, state machines, behavioral contracts, and algorithms detailed below.
@@ -25,18 +25,18 @@ The architecture strictly separates UI rendering from hierarchical state orchest
 └──────────────────┬─────────────────────────────────┬───────────────────┘
                    │                                 │
                    ▼ (1. Initializes)                ▼ (2. Mounts)
-┌────────────────────────────────────┐ ┌─────────────────────────────────┐
-│     CascadingComboboxOrchestrator  │ │   ManagedComboboxWithPills<T>   │
-│   (State & Cascading Engine Tool)  │ │      (Pure Generic UI Widget)   │
-│                                    │ │                                 │
-│  - Coordinates the Combos' updates │◄┼── (3. Emits onValueChange events│
-│  - Resolves active matched parents │ │       when user selects/types)  │
-│  - Handles cascade resets & rules  │─┼─► (4. Feeds state, items &      │
-│  - Computes dynamic predicates     │ │       active predicates)        │
-└────────────────────────────────────┘ └─────────────────────────────────┘
+┌────────────────────────────────────┐ ┌──────────────────────────────────────────┐
+│     CascadingComboboxOrchestrator  │ │   NeltzSocial_Combo_PilledFilteredCruded │
+│   (State & Cascading Engine Tool)  │ │      (Pure Generic UI Widget)            │
+│                                    │ │                                          │
+│  - Coordinates the Combos' updates │◄┼── (3. Emits onValueChange events         │
+│  - Resolves active matched parents │ │       when user selects/types)           │
+│  - Handles cascade resets & rules  │─┼─► (4. Feeds state, items &               │
+│  - Computes dynamic predicates     │ │       active predicates)                 │
+└────────────────────────────────────┘ └──────────────────────────────────────────┘
 ```
 
-1. **`ManagedComboboxWithPills<T>` (UI Primitive)**:
+1. **`NeltzSocial_Combo_PilledFilteredCruded<T>` (UI Primitive)**:
    * 100% generic (`<T>`), dumb, and reusable in single-tier or multi-tier contexts.
    * Completely unaware of the Orchestrator or sibling comboboxes.
    * Receives `items: List<T>`, `selectedValue: String`, `parentFilterKey: Any?`, and `filterPredicate: ((T) -> Boolean)?`.
@@ -49,7 +49,7 @@ The architecture strictly separates UI rendering from hierarchical state orchest
 
 ---
 
-## 2. Core Functional Requirements for `ManagedComboboxWithPills<T>`
+## 2. Core Functional Requirements for `NeltzSocial_Combo_PilledFilteredCruded<T>`
 
 ### A. Autonomous Cascading Invalidation
 * The component receives the full raw domain entity dataset (`items: List<T>`), an optional parent tracker (`parentFilterKey`), and a filtering rule (`filterPredicate: (T) -> Boolean`).
@@ -99,90 +99,32 @@ The Orchestrator provides:
 
 ---
 
-## 4. Contract Specifications & Signatures
+## 4. API Contract Signatures
 
-### 4.1 `ManagedComboboxWithPills<T>` Signature
+### 4.1 `NeltzSocial_Combo_PilledFilteredCruded<T>` Signature
+
 ```typescript
-interface ManagedComboboxProps<T> {
+interface ComboboxSettings {
+  pillRows: number;            // Default 1
+  maxVisibleItems: number;     // Default 5
+  scrollStep: number;          // Default 3
+  isAlphabeticalSort: boolean; // Default false
+}
+
+interface NeltzSocialComboPilledFilteredCrudedProps<T> {
   label: string;
   selectedValue: string;
   onValueChange: (value: string) => void;
   items: T[];
-  itemToText: (item: T) => string;
   filterPredicate?: (item: T) => boolean;
   parentFilterKey?: any;
-  autoResetOnParentChange?: boolean;
+  autoResetOnParentChange?: boolean; // Default true
+  itemToText?: (item: T) => string;
   initialSettings?: ComboboxSettings;
+  onSettingsChange?: (settings: ComboboxSettings) => void;
   onAddItem?: () => void;
   onEditItem?: (item: T) => void;
   onDeleteItem?: (item: T) => void;
 }
 ```
-
-### 4.2 `CascadingComboboxOrchestrator` Signature
-```typescript
-interface CascadingOrchestrator<TCat, TSub, TDet> {
-  categories: TCat[];
-  subCategories: TSub[];
-  details: TDet[];
-  
-  categoryText: string;
-  subCategoryText: string;
-  detailText: string;
-
-  matchedCategory?: TCat;
-  matchedSubCategory?: TSub;
-  matchedDetail?: TDet;
-
-  isSubCategoryValid: (sub: TSub) => boolean;
-  isDetailValid: (det: TDet) => boolean;
-}
-```
-
----
-
-## 5. Algorithmic State Machines
-
-### A. Autonomous Reset Engine
-```text
-ON (items, filterPredicate, parentFilterKey) CHANGED:
-    parentFilteredItems = (filterPredicate != null) ? items.filter(filterPredicate) : items
-    
-    IF hasInitialized == FALSE:
-        IF items is NOT EMPTY OR parentFilterKey is NOT NULL:
-            hasInitialized = TRUE
-            lastKnownParentKey = parentFilterKey
-        RETURN
-        
-    IF lastKnownParentKey != parentFilterKey:
-        lastKnownParentKey = parentFilterKey
-        IF items is NOT EMPTY AND selectedValue is NOT EMPTY:
-            IF NOT parentFilteredItems.any(item => itemToText(item).equalsIgnoreCase(selectedValue.trim())):
-                onValueChange("") // Self-resets cleanly down the cascade
-```
-
-### B. Focus & Overwrite Engine
-```text
-ON FocusGained:
-    IF selectedValue is NOT EMPTY:
-        Set TextSelectionRange = [0 .. selectedValue.length]
-    Set DropdownExpanded = TRUE
-
-ON TextInput(newChar):
-    IF TextSelectionRange spanned entire text:
-        Replace entire text buffer with newChar
-    ELSE:
-        Insert newChar at cursor
-    Set DropdownExpanded = TRUE
-    Emit onValueChange(newTextBuffer)
-```
-
----
-
-## 6. Required Output & Deliverables
-
-Please generate clean, fully-typed, production-ready source code containing:
-1. **The Combobox UI Component (`ManagedComboboxWithPills`)**: Complete with dropdown search, pills card (collapsible rows), focus overwrite, settings modal, and inline CRUD.
-2. **The Orchestrator Tool (`CascadingComboboxOrchestrator`)**: Generic 3-tier and simplified string-based orchestrator implementations.
-3. **Complete Screen Example**: An end-to-end form (`Category` -> `SubCategory` -> `Detail`) demonstrating how the screen instantiates the Orchestrator and binds it to 3 Combobox instances with zero manual reset boilerplate.
 ```

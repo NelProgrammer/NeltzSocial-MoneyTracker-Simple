@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,7 +25,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalTaxi
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShoppingCartCheckout
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -43,10 +49,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,10 +61,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.moneytracker.data.local.entity.TaxiFareEntity
 import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.EmptyState
 import com.moneytracker.ui.components.PayMonthFilterHeader
+import com.moneytracker.ui.components.TaxiExhaustionPopupDialog
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
 import com.moneytracker.ui.viewmodel.TaxiFareViewModel
@@ -80,14 +86,29 @@ fun AddEditTaxiScreen(
     val routes by viewModel.routes.collectAsState()
     val budgetSummary by viewModel.budgetSummary.collectAsState()
     val selectedPayMonthDate by viewModel.selectedPayMonthDate.collectAsState()
+    val activeExhaustionRoute by viewModel.activeExhaustionRoute.collectAsState()
+    val monthlyExhaustions by viewModel.monthlyExhaustions.collectAsState()
+    val collatedUiList by viewModel.collatedExhaustionUiList.collectAsState()
+
     var showAddDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var editingRoute by remember { mutableStateOf<TaxiFareEntity?>(null) }
+    val payDateDay = remember { SettingsManager.getPayDateDay() }
 
     Scaffold(
         topBar = {
             AppTopBar(
                 screenTitle = "Taxi Fare & Commute Calculator",
-                showBack = false
+                showBack = false,
+                actions = {
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Settings,
+                            contentDescription = "Taxi Commute Settings",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -110,6 +131,7 @@ fun AddEditTaxiScreen(
                 selectedPayMonthDate = selectedPayMonthDate,
                 onPayMonthSelected = { viewModel.setPayMonth(it) }
             )
+
             // 1. Commute Budget vs Total Estimated Fare Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -180,9 +202,23 @@ fun AddEditTaxiScreen(
                             )
                         }
 
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Total Exhausted Actual",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = CurrencyUtils.format(budgetSummary.totalActualSpent),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (budgetSummary.isOverBudget) ExpenseColor else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "Total Estimated Commute Cost",
+                                text = "Estimated Commute",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -190,7 +226,7 @@ fun AddEditTaxiScreen(
                                 text = CurrencyUtils.format(budgetSummary.totalEstimatedFare),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (budgetSummary.isOverBudget) ExpenseColor else IncomeColor
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -215,7 +251,8 @@ fun AddEditTaxiScreen(
                     items(routes, key = { it.id }) { route ->
                         TaxiRouteCard(
                             route = route,
-                            onClick = {
+                            onExhaustClick = { viewModel.openExhaustionPopup(route) },
+                            onEditClick = {
                                 editingRoute = route
                                 showAddDialog = true
                             },
@@ -225,6 +262,32 @@ fun AddEditTaxiScreen(
                 }
             }
         }
+    }
+
+    // Modal Popup Dialog for Taxi Exhaustion
+    if (activeExhaustionRoute != null) {
+        val route = activeExhaustionRoute!!
+        TaxiExhaustionPopupDialog(
+            route = route,
+            exhaustionUiList = collatedUiList,
+            rawExhaustions = monthlyExhaustions.filter { it.routeId == route.id },
+            monthLabel = DateUtils.formatPayMonth(selectedPayMonthDate, payDateDay),
+            onDismiss = { viewModel.openExhaustionPopup(null) },
+            onQuickLogTrip = { timeOfDay, isMorning -> viewModel.quickLogTrip(route, timeOfDay, isMorning) },
+            onSaveTrip = { viewModel.saveTrip(it) },
+            onDeleteTrip = { viewModel.deleteTrip(it) }
+        )
+    }
+
+    if (showSettingsDialog) {
+        val currentCutoff = SettingsManager.getMorningCutoffHour()
+        TaxiCommuteSettingsDialog(
+            currentHour = currentCutoff,
+            onDismiss = { showSettingsDialog = false },
+            onSaveHour = { hour ->
+                viewModel.updateMorningCutoffHour(hour)
+            }
+        )
     }
 
     if (showAddDialog) {
@@ -261,57 +324,88 @@ fun AddEditTaxiScreen(
 @Composable
 private fun TaxiRouteCard(
     route: TaxiFareEntity,
-    onClick: () -> Unit,
+    onExhaustClick: () -> Unit,
+    onEditClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onExhaustClick),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = route.routeName,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${CurrencyUtils.format(route.farePerTrip)} / trip  •  ${route.tripsPerDay} trips/day  •  ${route.workingDaysPerMonth} days/mo",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = route.routeName,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${CurrencyUtils.format(route.farePerTrip)} / trip  •  ${route.tripsPerDay} trips/day  •  ${route.workingDaysPerMonth} days/mo",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = CurrencyUtils.format(route.monthlyTotal),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 4.dp)
                 )
-                IconButton(onClick = onClick) {
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onExhaustClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f))
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Route",
-                        tint = MaterialTheme.colorScheme.primary
+                        imageVector = Icons.Default.LocalTaxi,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Exhaust / Log Trips", fontSize = 12.sp)
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Route",
-                        tint = MaterialTheme.colorScheme.error
-                    )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Route",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Route",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
         }
@@ -527,4 +621,145 @@ private fun AddEditTaxiRouteDialog(
             }
         }
     }
+}
+
+@Composable
+fun TaxiCommuteSettingsDialog(
+    currentHour: Int,
+    onDismiss: () -> Unit,
+    onSaveHour: (Int) -> Unit
+) {
+    var selectedHour by remember { mutableStateOf(currentHour) }
+    var customHourInput by remember { mutableStateOf(currentHour.toString()) }
+    val presetHours = listOf(9, 10, 11, 12, 13, 14, 15, 17)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Transport & Slot Settings")
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Configure the cutoff hour dividing Morning commute trips from After-Hours / Evening trips.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                val label = when {
+                    selectedHour == 12 -> "12:00 PM (Noon)"
+                    selectedHour < 12 -> "$selectedHour:00 AM"
+                    else -> "${selectedHour - 12}:00 PM"
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Morning Cutoff:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Text("Quick Preset Cutoff Hours:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presetHours.take(4).forEach { h ->
+                        val isSelected = selectedHour == h
+                        Button(
+                            onClick = {
+                                selectedHour = h
+                                customHourInput = h.toString()
+                            },
+                            colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                     else ButtonDefaults.outlinedButtonColors(),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (h < 12) "${h}AM" else if (h == 12) "12PM" else "${h-12}PM",
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presetHours.drop(4).forEach { h ->
+                        val isSelected = selectedHour == h
+                        Button(
+                            onClick = {
+                                selectedHour = h
+                                customHourInput = h.toString()
+                            },
+                            colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                     else ButtonDefaults.outlinedButtonColors(),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (h < 12) "${h}AM" else if (h == 12) "12PM" else "${h-12}PM",
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = customHourInput,
+                    onValueChange = {
+                        customHourInput = it
+                        val num = it.filter { c -> c.isDigit() }.toIntOrNull()
+                        if (num != null && num in 1..23) {
+                            selectedHour = num
+                        }
+                    },
+                    label = { Text("Custom Cutoff Hour (1–23)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSaveHour(selectedHour)
+                    onDismiss()
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

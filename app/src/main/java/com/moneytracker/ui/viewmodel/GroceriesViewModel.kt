@@ -245,6 +245,15 @@ class GroceriesViewModel(
     }
 
     // Shopping List Generation & In-Store Actions
+    fun getNextShoppingListTitle(shoppingDateTimestamp: Long = System.currentTimeMillis()): String {
+        val date = DateUtils.toLocalDate(shoppingDateTimestamp)
+        val dateStr = date.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val countToday = shoppingLists.value.count {
+            DateUtils.toLocalDate(it.shoppingDate) == date
+        }
+        return "Shopping_Trip_${dateStr}_${countToday + 1}"
+    }
+
     fun generateShoppingList(title: String, shoppingDateTimestamp: Long = System.currentTimeMillis()) {
         val selectedIds = _selectedBudgetItemIds.value
         val itemsToInclude = budgetItems.value.filter { selectedIds.contains(it.id) }
@@ -252,7 +261,7 @@ class GroceriesViewModel(
 
         viewModelScope.launch {
             val (startTs, _) = payMonthRange.value
-            val listTitle = title.ifBlank { "Shopping List (${itemsToInclude.size} items)" }
+            val listTitle = title.ifBlank { getNextShoppingListTitle(shoppingDateTimestamp) }
             val listId = repository.generateShoppingListFromBudget(
                 payMonthTimestamp = startTs,
                 shoppingDateTimestamp = shoppingDateTimestamp,

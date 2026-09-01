@@ -362,7 +362,8 @@ fun AddEditGroceriesScreen(
 
     // Generate Shopping List Title Dialog
     if (showGenerateListDialog) {
-        var titleInput by remember { mutableStateOf("Shopping Trip (${selectedIds.size} items)") }
+        val defaultShoppingTripTitle = remember(selectedIds) { viewModel.getNextShoppingListTitle() }
+        var titleInput by remember(selectedIds) { mutableStateOf(defaultShoppingTripTitle) }
         AlertDialog(
             onDismissRequest = { showGenerateListDialog = false },
             title = { Text("Generate Shopping List") },
@@ -1198,8 +1199,8 @@ private fun AddEditBudgetItemDialog(
                     }
                 }
 
-                // 1. Category (ManagedComboboxWithPills - Root)
-                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                // 1. Category (NeltzSocial_Combo_PilledFilteredCruded - Root)
+                com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Category",
                     selectedValue = orchestrator.categoryText,
                     onValueChange = { catName ->
@@ -1217,8 +1218,8 @@ private fun AddEditBudgetItemDialog(
                     }
                 )
 
-                // 2. SubCategory (ManagedComboboxWithPills - Child of Category)
-                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                // 2. SubCategory (NeltzSocial_Combo_PilledFilteredCruded - Child of Category)
+                com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Sub-Category",
                     selectedValue = orchestrator.subCategoryText,
                     onValueChange = { subName -> orchestrator.subCategoryText = subName },
@@ -1237,8 +1238,8 @@ private fun AddEditBudgetItemDialog(
                     }
                 )
 
-                // 3. Detail / Item Name (ManagedComboboxWithPills - Grandchild of SubCategory)
-                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                // 3. Detail / Item Name (NeltzSocial_Combo_PilledFilteredCruded - Grandchild of SubCategory)
+                com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Detail / Item Name",
                     selectedValue = orchestrator.detailText,
                     onValueChange = { detName -> orchestrator.detailText = detName },
@@ -1268,8 +1269,8 @@ private fun AddEditBudgetItemDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // 5. Unit (ManagedComboboxWithPills - Standalone without parent)
-                com.moneytracker.ui.components.ManagedComboboxWithPills(
+                // 5. Unit (NeltzSocial_Combo_PilledFilteredCruded - Standalone without parent)
+                com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Unit",
                     selectedValue = unitMeasureInput,
                     onValueChange = { unitMeasureInput = it },

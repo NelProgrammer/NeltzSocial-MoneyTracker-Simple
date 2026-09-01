@@ -1028,6 +1028,10 @@ class SettingsViewModel : ViewModel() {
         com.moneytracker.util.SettingsManager.updateCutoffDay(day)
     }
 
+    fun updateMorningCutoffHour(hour: Int) {
+        com.moneytracker.util.SettingsManager.updateMorningCutoffHour(hour)
+    }
+
     fun updateIsRyuHidden(hidden: Boolean) {
         com.moneytracker.util.SettingsManager.updateIsRyuHidden(hidden)
     }

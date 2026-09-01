@@ -168,8 +168,8 @@ fun AddEditTransactionsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // 1. Category Section (ManagedComboboxWithPills - 100% Database Driven)
-            com.moneytracker.ui.components.ManagedComboboxWithPills(
+            // 1. Category Section (NeltzSocial_Combo_PilledFilteredCruded - 100% Database Driven)
+            com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                 label = "Category",
                 selectedValue = categoryInputText,
                 onValueChange = { input ->
@@ -202,8 +202,8 @@ fun AddEditTransactionsScreen(
                 thickness = 1.5.dp
             )
 
-            // 2. SubCategory Section (ManagedComboboxWithPills - with Component Parent Filtering & Auto-Reset)
-            com.moneytracker.ui.components.ManagedComboboxWithPills(
+            // 2. SubCategory Section (NeltzSocial_Combo_PilledFilteredCruded - with Component Parent Filtering & Auto-Reset)
+            com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                 label = "SubCategory",
                 selectedValue = state.subCategory,
                 onValueChange = viewModel::updateSubCategory,
@@ -233,8 +233,8 @@ fun AddEditTransactionsScreen(
                 thickness = 1.5.dp
             )
 
-            // 3. Detail Section (ManagedComboboxWithPills - with Component Parent Filtering & Auto-Reset)
-            com.moneytracker.ui.components.ManagedComboboxWithPills(
+            // 3. Detail Section (NeltzSocial_Combo_PilledFilteredCruded - with Component Parent Filtering & Auto-Reset)
+            com.moneytracker.ui.components.NeltzSocial_Combo_PilledFilteredCruded(
                 label = "Detail (optional)",
                 selectedValue = state.detail,
                 onValueChange = viewModel::updateDetail,

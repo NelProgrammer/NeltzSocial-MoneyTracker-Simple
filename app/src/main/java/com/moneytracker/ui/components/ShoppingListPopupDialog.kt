@@ -944,8 +944,8 @@ private fun AddShoppingListItemDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // 1. Category (ManagedComboboxWithPills)
-                ManagedComboboxWithPills(
+                // 1. Category (NeltzSocial_Combo_PilledFilteredCruded)
+                NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Category",
                     selectedValue = orchestrator.categoryText,
                     onValueChange = { cat ->
@@ -963,8 +963,8 @@ private fun AddShoppingListItemDialog(
                     }
                 )
 
-                // 2. SubCategory (ManagedComboboxWithPills - Parent: Category)
-                ManagedComboboxWithPills(
+                // 2. SubCategory (NeltzSocial_Combo_PilledFilteredCruded - Parent: Category)
+                NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Sub-Category",
                     selectedValue = orchestrator.subCategoryText,
                     onValueChange = { sub -> orchestrator.subCategoryText = sub },
@@ -983,8 +983,8 @@ private fun AddShoppingListItemDialog(
                     }
                 )
 
-                // 3. Detail / Name (ManagedComboboxWithPills - Parent: SubCategory)
-                ManagedComboboxWithPills(
+                // 3. Detail / Name (NeltzSocial_Combo_PilledFilteredCruded - Parent: SubCategory)
+                NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Item Name / Detail (Optional)",
                     selectedValue = orchestrator.detailText,
                     onValueChange = { det -> orchestrator.detailText = det },
@@ -1003,8 +1003,8 @@ private fun AddShoppingListItemDialog(
                     }
                 )
 
-                // 4. Unit Size (ManagedComboboxWithPills - without parent)
-                ManagedComboboxWithPills(
+                // 4. Unit Size (NeltzSocial_Combo_PilledFilteredCruded - without parent)
+                NeltzSocial_Combo_PilledFilteredCruded(
                     label = "Unit Size (e.g. 2L, 1kg, Pack)",
                     selectedValue = unitSizeInput,
                     onValueChange = { unitSizeInput = it },

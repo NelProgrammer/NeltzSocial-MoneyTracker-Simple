@@ -43,7 +43,8 @@ class TransactionRepository(
     private val groceryBudgetDao: GroceryBudgetDao? = null,
     private val unitSizeDao: UnitSizeDao? = null,
     private val shoppingListDao: ShoppingListDao? = null,
-    private val shoppingListItemDao: ShoppingListItemDao? = null
+    private val shoppingListItemDao: ShoppingListItemDao? = null,
+    private val taxiExhaustionDao: com.moneytracker.data.local.TaxiExhaustionDao? = null
 ) {
     val activeProfileId: Long
         get() = ProfileManager.activeProfile.value?.id ?: 1L
@@ -720,6 +721,40 @@ class TransactionRepository(
 
     suspend fun deleteShoppingList(shoppingList: ShoppingListEntity) {
         shoppingListDao?.delete(shoppingList)
+    }
+
+    // Taxi Exhaustion Operations
+    fun observeTaxiExhaustionsForMonth(startDate: Long, endDate: Long): Flow<List<com.moneytracker.data.local.entity.TaxiExhaustionEntity>> =
+        taxiExhaustionDao?.observeForMonth(activeProfileId, startDate, endDate) ?: flowOf(emptyList())
+
+    suspend fun getTaxiExhaustionsForMonth(startDate: Long, endDate: Long): List<com.moneytracker.data.local.entity.TaxiExhaustionEntity> =
+        taxiExhaustionDao?.getForMonth(activeProfileId, startDate, endDate) ?: emptyList()
+
+    suspend fun getTaxiExhaustionsForRouteAndMonth(routeId: Long, startDate: Long, endDate: Long): List<com.moneytracker.data.local.entity.TaxiExhaustionEntity> =
+        taxiExhaustionDao?.getForRouteAndMonth(activeProfileId, routeId, startDate, endDate) ?: emptyList()
+
+    suspend fun saveTaxiExhaustion(item: com.moneytracker.data.local.entity.TaxiExhaustionEntity): Long {
+        val dao = taxiExhaustionDao ?: return 0L
+        val pid = if (item.profileId > 0L) item.profileId else activeProfileId
+        val entity = item.copy(
+            profileId = pid,
+            totalCost = item.units * item.farePerTrip,
+            updatedAt = System.currentTimeMillis()
+        )
+        return if (entity.id == 0L) {
+            dao.insert(entity)
+        } else {
+            dao.update(entity)
+            entity.id
+        }
+    }
+
+    suspend fun deleteTaxiExhaustion(item: com.moneytracker.data.local.entity.TaxiExhaustionEntity) {
+        taxiExhaustionDao?.delete(item)
+    }
+
+    suspend fun deleteTaxiExhaustionsForRoute(routeId: Long) {
+        taxiExhaustionDao?.deleteForRoute(activeProfileId, routeId)
     }
 }
 

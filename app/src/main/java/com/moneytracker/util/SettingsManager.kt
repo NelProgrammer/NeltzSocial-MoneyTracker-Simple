@@ -22,6 +22,7 @@ enum class AppThemeMode(val displayName: String) {
 data class UserSettings(
     val payDateDay: Int = 20,
     val cutoffDay: Int = 18,
+    val morningCutoffHour: Int = 12,
     val isRyuHidden: Boolean = true,
     val themePalette: AppThemePalette = AppThemePalette.EMERALD_GREEN,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM
@@ -31,6 +32,7 @@ object SettingsManager {
     private const val PREFS_NAME = "money_tracker_user_settings"
     private const val KEY_PAY_DATE_DAY = "pay_date_day"
     private const val KEY_CUTOFF_DAY = "cutoff_day"
+    private const val KEY_MORNING_CUTOFF_HOUR = "morning_cutoff_hour"
     private const val KEY_IS_RYU_HIDDEN = "is_ryu_hidden"
     private const val KEY_THEME_PALETTE = "theme_palette"
     private const val KEY_THEME_MODE = "theme_mode"
@@ -45,6 +47,7 @@ object SettingsManager {
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val payDate = prefs?.getInt(KEY_PAY_DATE_DAY, 20) ?: 20
             val cutoff = prefs?.getInt(KEY_CUTOFF_DAY, 18) ?: 18
+            val morningHour = prefs?.getInt(KEY_MORNING_CUTOFF_HOUR, 12) ?: 12
             val isRyuHidden = prefs?.getBoolean(KEY_IS_RYU_HIDDEN, true) ?: true
             val paletteName = prefs?.getString(KEY_THEME_PALETTE, AppThemePalette.EMERALD_GREEN.name)
             val palette = try {
@@ -62,6 +65,7 @@ object SettingsManager {
             _settings.value = UserSettings(
                 payDateDay = payDate,
                 cutoffDay = cutoff,
+                morningCutoffHour = morningHour,
                 isRyuHidden = isRyuHidden,
                 themePalette = palette,
                 themeMode = mode
@@ -81,6 +85,13 @@ object SettingsManager {
         val current = _settings.value
         _settings.value = current.copy(cutoffDay = validDay)
         prefs?.edit()?.putInt(KEY_CUTOFF_DAY, validDay)?.apply()
+    }
+
+    fun updateMorningCutoffHour(hour: Int) {
+        val validHour = hour.coerceIn(1, 23)
+        val current = _settings.value
+        _settings.value = current.copy(morningCutoffHour = validHour)
+        prefs?.edit()?.putInt(KEY_MORNING_CUTOFF_HOUR, validHour)?.apply()
     }
 
     fun updateIsRyuHidden(hidden: Boolean) {
@@ -103,6 +114,7 @@ object SettingsManager {
 
     fun getPayDateDay(): Int = _settings.value.payDateDay
     fun getCutoffDay(): Int = _settings.value.cutoffDay
+    fun getMorningCutoffHour(): Int = _settings.value.morningCutoffHour
     fun isRyuHidden(): Boolean = _settings.value.isRyuHidden
     fun getThemePalette(): AppThemePalette = _settings.value.themePalette
     fun getThemeMode(): AppThemeMode = _settings.value.themeMode

@@ -20,6 +20,8 @@ import com.moneytracker.data.local.entity.TaxiFareEntity
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
 
+import com.moneytracker.data.local.entity.TaxiExhaustionEntity
+
 class TransactionTypeConverter {
     @TypeConverter
     fun fromType(type: TransactionType): String = type.name
@@ -51,13 +53,14 @@ class RecurrenceFrequencyConverter {
         TransactionEntity::class,
         GroceryItemEntity::class,
         TaxiFareEntity::class,
+        TaxiExhaustionEntity::class,
         ProfileEntity::class,
         GroceryBudgetItemEntity::class,
         UnitSizeEntity::class,
         ShoppingListEntity::class,
         ShoppingListItemEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 @TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
@@ -68,6 +71,7 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun groceryDao(): GroceryDao
     abstract fun taxiFareDao(): TaxiFareDao
+    abstract fun taxiExhaustionDao(): TaxiExhaustionDao
     abstract fun profileDao(): ProfileDao
     abstract fun groceryBudgetDao(): GroceryBudgetDao
     abstract fun unitSizeDao(): UnitSizeDao
@@ -106,7 +110,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_13_14,
                     DatabaseMigrations.MIGRATION_14_15,
                     DatabaseMigrations.MIGRATION_15_16,
-                    DatabaseMigrations.MIGRATION_16_17
+                    DatabaseMigrations.MIGRATION_16_17,
+                    DatabaseMigrations.MIGRATION_17_18
                 )
                 .build()
         }
