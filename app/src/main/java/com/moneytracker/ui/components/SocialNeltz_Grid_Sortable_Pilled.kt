@@ -5,8 +5,10 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,8 +18,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowOverflow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,14 +45,16 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,7 +70,9 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -75,7 +83,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +96,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.moneytracker.util.SettingsManager
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -94,6 +107,12 @@ enum class ColumnSortStrategy {
     CUSTOM_PRIORITY
 }
 
+enum class PillSortMode {
+    CUSTOM_PRIORITY,
+    NUMERICAL,
+    ALPHABETICAL
+}
+
 data class GridColumnDefinition<T>(
     val id: String,
     val title: String,
@@ -101,22 +120,26 @@ data class GridColumnDefinition<T>(
     val isSortable: Boolean = true,
     val defaultStrategy: ColumnSortStrategy = ColumnSortStrategy.NON_SORTING,
     val valueExtractor: (T) -> String = { "" },
-    val cellContent: @Composable (item: T, isSelected: Boolean) -> Unit
+    val cellContent: @Composable (item: T, isSelected: Boolean, wrapText: Boolean) -> Unit
 )
 
 /**
  * Enterprise Reusable Generic Sortable & Pilled Grid Component
  *
- * Architecture:
- * 1. Independent Pills Container (with Combo mechanics: collapsible rows, horizontal scroll or wrap, gear config).
- * 2. Independent Column Header Container (positioned above table rows, synchronized horizontal scroll).
- * 3. Independent Table Body Container (data rows).
- * 4. Main Gear Settings Dialog:
- *    - Column Sort Priority (drag-and-drop priority ordering #1, #2, #3 + direction strategies).
- *    - Column Visibility Section (toggle which columns are visible in grid).
- *    - Filter Pills Configuration (pill rows 1-5, source column, A-Z sort).
- *    - Custom Values Priority Manager.
- * 5. Column Headers show Sort Order Badge (#1, #2, ⋮, ○), Direction Arrow (▲, ▼), and Column Gear (⚙).
+ * Architectural Pillars:
+ * 1. Container Structure:
+ *    - Table Name Card (Title, Record Count, Primary Grid Gear ⚙)
+ *    - Filter Pills Card (Collapsible rows, Combo mechanics, 3-mode sort)
+ *    - Unified Table Card (Single card containing Header Row + Data Rows, Cell Borders, Drag-to-Resize, Synchronized Horizontal Scroll)
+ *    - Table Footer Card (Range summary, Page size selector, Navigation, Footer Gear ⚙)
+ * 2. Visual Quality:
+ *    - Cell borders (vertical dividers + horizontal dividers)
+ *    - Drag handle on column right border to resize width
+ *    - Vertically stacked Sort Order Badge directly above Sort Direction Arrow
+ * 3. Sorting & Visibility:
+ *    - Primary Grid Gear houses multi-column sort priority & master column visibility
+ *    - Category-filtered Subcategory custom priority reordering with persistent state
+ *    - 3-Mode Filter Pills sorting (Custom Priority default, Numerical, A-Z)
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -125,6 +148,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     columns: List<GridColumnDefinition<T>>,
     itemKey: (T) -> Any,
     modifier: Modifier = Modifier,
+    tableName: String = "Transactions",
     initialPillColumnId: String? = null,
     selectedItemKeys: Set<Any> = emptySet(),
     onToggleSelectKey: ((Any) -> Unit)? = null,
@@ -133,18 +157,25 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     onRowLongClick: ((T) -> Unit)? = null,
     emptyMessage: String = "No items found",
     customPriorityOrders: Map<String, List<String>> = emptyMap(),
-    onCustomPriorityOrderChanged: ((columnId: String, newOrder: List<String>) -> Unit)? = null
+    onCustomPriorityOrderChanged: ((columnId: String, newOrder: List<String>) -> Unit)? = null,
+    masterCategoryNames: List<String> = emptyList(),
+    masterSubcategoriesByCategory: Map<String, List<String>> = emptyMap()
 ) {
-    // 1. Column List & Column Visibility State
-    var columnList by remember(columns) { mutableStateOf(columns) }
+    // 1. Column Widths Map (Supports Drag-to-Resize)
+    val columnWidthMap = remember(columns) {
+        mutableStateMapOf<String, Dp>().apply {
+            columns.forEach { put(it.id, it.width) }
+        }
+    }
+
+    // 2. Master Column Visibility Map (Covers ALL defined columns)
     val columnVisibilityMap = remember(columns) {
         mutableStateMapOf<String, Boolean>().apply {
             columns.forEach { put(it.id, true) }
         }
     }
 
-    // 2. Column Sort Priority Order & Strategies
-    // The order in sortPriorityColumnIds defines Priority 1, Priority 2, etc.
+    // 3. Multi-Column Sort Priority & Strategies
     val sortPriorityColumnIds = remember(columns) {
         mutableStateListOf<String>().apply {
             addAll(columns.map { it.id })
@@ -156,39 +187,76 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // 3. Dynamic Filter Pills Column Configuration
+    // 4. Line-Wrapping States (Configurable in Primary Gear)
+    var wrapHeaderLines by remember { mutableStateOf(false) }
+    var wrapDataLines by remember { mutableStateOf(false) }
+
+    // 5. Dynamic Filter Pills Configuration
     var activePillColumnId by remember(columns, initialPillColumnId) {
         mutableStateOf(initialPillColumnId ?: columns.firstOrNull { it.id != "select" && it.id != "actions" }?.id ?: columns.first().id)
     }
     var selectedPillValue by remember { mutableStateOf<String?>(null) }
     var maxPillRows by remember { mutableIntStateOf(1) } // 1, 2, 3, 4, 5
     var isPillsExpanded by remember { mutableStateOf(false) }
-    var sortPillsAlphabetical by remember { mutableStateOf(true) }
+    var pillSortMode by remember { mutableStateOf(PillSortMode.CUSTOM_PRIORITY) }
 
-    // 4. Main Gear Settings Modal State
-    var showMainGearDialog by remember { mutableStateOf(false) }
-    var mainGearActiveTab by remember { mutableIntStateOf(0) } // 0 = Sort Priority, 1 = Visibility, 2 = Pills, 3 = Custom Values
+    // 6. Pagination & Display Mode State
+    var isPaginationEnabled by remember { mutableStateOf(true) }
+    var pageSize by remember { mutableIntStateOf(10) } // 5, 10, 20, 50, 0 = All
+    var currentPage by remember { mutableIntStateOf(1) }
+    var showFooterSettingsDialog by remember { mutableStateOf(false) }
 
-    // 5. Custom Priority Orders State
-    val localPriorityOrders = remember { mutableStateMapOf<String, List<String>>().apply { putAll(customPriorityOrders) } }
-    var prioritySortTargetColumn by remember { mutableStateOf<GridColumnDefinition<T>?>(null) }
+    // 7. Modals State
+    var showPrimaryGridGearDialog by remember { mutableStateOf(false) }
+    var primaryGearActiveTab by remember { mutableIntStateOf(0) } // 0 = Sort, 1 = Visibility, 2 = Pills, 3 = Layout
+    var showCustomPriorityDialog by remember { mutableStateOf(false) }
+    var priorityTargetColumnId by remember { mutableStateOf("category") }
 
-    // Synchronized Horizontal Scroll State
-    val tableHorizontalScrollState = rememberScrollState()
-
-    // Filter visible columns
-    val visibleColumns = remember(columnList, columnVisibilityMap.toMap()) {
-        columnList.filter { columnVisibilityMap[it.id] != false }
+    // Custom Priority Ranks Map
+    val localPriorityOrders = remember {
+        mutableStateMapOf<String, List<String>>().apply {
+            putAll(customPriorityOrders)
+        }
     }
 
-    // Extract unique values for active pill column
-    val activePillColumn = columnList.find { it.id == activePillColumnId }
-    val distinctPillValues = remember(items, activePillColumn, sortPillsAlphabetical) {
+    // Shared Horizontal Scroll State for synchronized header and body scrolling
+    val tableHorizontalScrollState = rememberScrollState()
+    val density = LocalDensity.current
+
+    // Visible columns list based on full master definitions
+    val visibleColumns = remember(columns, columnVisibilityMap.toMap()) {
+        columns.filter { columnVisibilityMap[it.id] != false }
+    }
+
+    // Active pill column definition
+    val activePillColumn = columns.find { it.id == activePillColumnId }
+
+    // Extract unique values for active pill column using 3-mode sorting
+    val distinctPillValues = remember(items, activePillColumn, pillSortMode, localPriorityOrders.toMap(), masterCategoryNames) {
         if (activePillColumn != null) {
             val list = items.map { activePillColumn.valueExtractor(it).trim() }
                 .filter { it.isNotBlank() }
                 .distinct()
-            if (sortPillsAlphabetical) list.sortedBy { it.lowercase() } else list
+
+            when (pillSortMode) {
+                PillSortMode.CUSTOM_PRIORITY -> {
+                    val customOrder = localPriorityOrders[activePillColumn.id] ?: masterCategoryNames
+                    list.sortedWith { a, b ->
+                        val idxA = customOrder.indexOfFirst { it.equals(a, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
+                        val idxB = customOrder.indexOfFirst { it.equals(b, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
+                        if (idxA != idxB) idxA.compareTo(idxB) else a.compareTo(b, ignoreCase = true)
+                    }
+                }
+                PillSortMode.NUMERICAL -> {
+                    // Sort by frequency count: Highest to Lowest
+                    list.sortedByDescending { pillVal ->
+                        items.count { activePillColumn.valueExtractor(it).trim().equals(pillVal, ignoreCase = true) }
+                    }
+                }
+                PillSortMode.ALPHABETICAL -> {
+                    list.sortedBy { it.lowercase() }
+                }
+            }
         } else {
             emptyList()
         }
@@ -203,19 +271,20 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // Sort Items based on ordered Column Sort Priority and Strategies
+    // Active sorted column IDs
     val activeSortedColumnIds = remember(sortPriorityColumnIds.toList(), columnSortStrategies.toMap()) {
         sortPriorityColumnIds.filter { (columnSortStrategies[it] ?: ColumnSortStrategy.NON_SORTING) != ColumnSortStrategy.NON_SORTING }
     }
 
-    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columnList) {
+    // Multi-Column Sorted Filtered Items
+    val sortedFilteredItems = remember(filteredItems, activeSortedColumnIds, columnSortStrategies.toMap(), localPriorityOrders.toMap(), columns) {
         if (activeSortedColumnIds.isEmpty()) {
             filteredItems
         } else {
             filteredItems.sortedWith { a, b ->
                 var result = 0
                 for (colId in activeSortedColumnIds) {
-                    val colDef = columnList.find { it.id == colId } ?: continue
+                    val colDef = columns.find { it.id == colId } ?: continue
                     val strat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
                     val valA = colDef.valueExtractor(a).trim()
                     val valB = colDef.valueExtractor(b).trim()
@@ -249,30 +318,22 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // 6. Pagination & Display Mode State
-    var isPaginationEnabled by remember { mutableStateOf(true) }
-    var pageSize by remember { mutableIntStateOf(10) } // 5, 10, 20, 50, 0 = All
-    var currentPage by remember { mutableIntStateOf(1) }
-    var showFooterSettingsDialog by remember { mutableStateOf(false) }
-
+    // Total Count and Pages Calculation
     val totalCount = sortedFilteredItems.size
     val totalPages = remember(totalCount, pageSize, isPaginationEnabled) {
         if (!isPaginationEnabled || pageSize <= 0 || totalCount == 0) 1
         else (totalCount + pageSize - 1) / pageSize
     }
 
-    androidx.compose.runtime.LaunchedEffect(totalPages) {
-        if (currentPage > totalPages) {
-            currentPage = totalPages
-        }
-        if (currentPage < 1) {
-            currentPage = 1
-        }
+    LaunchedEffect(totalPages) {
+        if (currentPage > totalPages) currentPage = totalPages
+        if (currentPage < 1) currentPage = 1
     }
 
     val startItemIdx = if (totalCount == 0) 0 else if (!isPaginationEnabled || pageSize <= 0) 1 else (currentPage - 1) * pageSize + 1
     val endItemIdx = if (totalCount == 0) 0 else if (!isPaginationEnabled || pageSize <= 0) totalCount else kotlin.math.min(currentPage * pageSize, totalCount)
 
+    // Paged Items slice
     val pagedItems = remember(sortedFilteredItems, currentPage, pageSize, isPaginationEnabled) {
         if (!isPaginationEnabled || pageSize <= 0 || totalCount == 0) sortedFilteredItems
         else {
@@ -282,14 +343,81 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
         }
     }
 
-    // OVERARCHING PARENT CONTAINER
+    val borderLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+
+    // =================================================================
+    // OVERARCHING GRID CONTAINER
+    // =================================================================
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // =================================================================
-        // CONTAINER 1: INDEPENDENT FILTER PILLS CONTAINER CARD
-        // =================================================================
+        // -------------------------------------------------------------
+        // CONTAINER 1: TABLE NAME & RECORD COUNT CARD (with Primary Gear ⚙)
+        // -------------------------------------------------------------
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            ),
+            border = BorderStroke(1.dp, borderLineColor)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.TableChart,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = tableName,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "$totalCount Items",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Primary Grid Gear (⚙)
+                IconButton(
+                    onClick = { 
+                        primaryGearActiveTab = 0
+                        showPrimaryGridGearDialog = true 
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Primary Grid Settings",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // CONTAINER 2: INDEPENDENT FILTER PILLS CONTAINER CARD
+        // -------------------------------------------------------------
         if (activePillColumn != null && distinctPillValues.isNotEmpty()) {
             Card(
                 modifier = Modifier
@@ -299,25 +427,24 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                border = BorderStroke(1.dp, borderLineColor)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 10.dp, vertical = 8.dp)
                 ) {
-                    // Pills Header Row
+                    // Header Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Left: Filter Column Title + Count Badge + Settings Gear
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { 
-                                mainGearActiveTab = 2
-                                showMainGearDialog = true 
+                            modifier = Modifier.clickable {
+                                primaryGearActiveTab = 2
+                                showPrimaryGridGearDialog = true
                             }
                         ) {
                             Icon(
@@ -345,22 +472,22 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 )
                             }
                             IconButton(
-                                onClick = { 
-                                    mainGearActiveTab = 2
-                                    showMainGearDialog = true 
+                                onClick = {
+                                    primaryGearActiveTab = 2
+                                    showPrimaryGridGearDialog = true
                                 },
                                 modifier = Modifier.size(24.dp).padding(start = 2.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
-                                    contentDescription = "Pill Settings",
+                                    contentDescription = "Pills Settings",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                     modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
 
-                        // Right: Expand / Collapse Toggle
+                        // Expand / Collapse Toggle
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.clickable { isPillsExpanded = !isPillsExpanded }
@@ -373,7 +500,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                             Spacer(modifier = Modifier.width(2.dp))
                             Icon(
                                 imageVector = if (isPillsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (isPillsExpanded) "Collapse Pills" else "Expand Pills",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -382,7 +509,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Pills Content
+                    // Pills Layout
                     if (isPillsExpanded) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -461,179 +588,202 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             }
         }
 
-        // =================================================================
-        // CONTAINER 2: INDEPENDENT COLUMN HEADER CONTAINER CARD
-        // (Placed directly above the grid table body in its own container)
-        // =================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(tableHorizontalScrollState)
-                    .padding(vertical = 6.dp, horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                visibleColumns.forEach { colDef ->
-                    var showColumnGearMenu by remember { mutableStateOf(false) }
-                    val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
-                    val activePriorityRank = activeSortedColumnIds.indexOf(colDef.id).let { if (it >= 0) it + 1 else null }
-
-                    Row(
-                        modifier = Modifier
-                            .width(colDef.width)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        // Column Title Text
-                        Text(
-                            text = colDef.title,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
-                            ),
-                            color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        // Sort Icon Set + Column Gear
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            // 1. Sort Order Badge (Priority Rank #1, #2, or 3-dots ⋮ for custom, or circle ○ for non-sorting)
-                            if (activePriorityRank != null) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = "$activePriorityRank",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    }
-                                }
-                            }
-
-                            // 2. Sort Direction Arrow (▲, ▼) or 3 vertical dots (⋮) or small circle (○)
-                            Icon(
-                                imageVector = when (currentStrategy) {
-                                    ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                    ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                    ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                    ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                },
-                                contentDescription = "Sort Direction",
-                                tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                                modifier = Modifier.size(12.dp)
-                            )
-
-                            // 3. Column Gear (⚙) next to sort icon set
-                            Box {
-                                IconButton(
-                                    onClick = { showColumnGearMenu = true },
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Column Options",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = showColumnGearMenu,
-                                    onDismissRequest = { showColumnGearMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Ascending (A → Z / Min → Max)") },
-                                        leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                        onClick = {
-                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
-                                            showColumnGearMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Descending (Z → A / Max → Min)") },
-                                        leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                        onClick = {
-                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
-                                            showColumnGearMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Custom Priority (Rank Values)") },
-                                        leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                                        onClick = {
-                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
-                                            prioritySortTargetColumn = colDef
-                                            showColumnGearMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Non-Sorting (Off)") },
-                                        leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
-                                        onClick = {
-                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
-                                            showColumnGearMenu = false
-                                        }
-                                    )
-                                    HorizontalDivider()
-                                    DropdownMenuItem(
-                                        text = { Text("Configure Multi-Column Sort...") },
-                                        leadingIcon = { Icon(Icons.Default.FormatListNumbered, contentDescription = null) },
-                                        onClick = {
-                                            showColumnGearMenu = false
-                                            mainGearActiveTab = 0
-                                            showMainGearDialog = true
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Manage Column Visibility...") },
-                                        leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null) },
-                                        onClick = {
-                                            showColumnGearMenu = false
-                                            mainGearActiveTab = 1
-                                            showMainGearDialog = true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // =================================================================
-        // CONTAINER 3: INDEPENDENT TABLE BODY CONTAINER CARD
-        // =================================================================
+        // -------------------------------------------------------------
+        // CONTAINER 3: UNIFIED TABLE CARD (Headers + Rows + Cell Borders)
+        // -------------------------------------------------------------
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, borderLineColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(tableHorizontalScrollState)
+            ) {
+                // =====================================================
+                // HEADER ROW WITH CELL BORDERS & DRAG-TO-RESIZE
+                // =====================================================
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    visibleColumns.forEachIndexed { colIdx, colDef ->
+                        var showColumnGearMenu by remember { mutableStateOf(false) }
+                        val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
+                        val activePriorityRank = activeSortedColumnIds.indexOf(colDef.id).let { if (it >= 0) it + 1 else null }
+                        val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+
+                        Box(
+                            modifier = Modifier
+                                .width(colWidth)
+                                .heightIn(min = 40.dp)
+                                .drawBehind {
+                                    // Right vertical cell border divider
+                                    drawLine(
+                                        color = borderLineColor,
+                                        start = Offset(size.width, 0f),
+                                        end = Offset(size.width, size.height),
+                                        strokeWidth = 1.dp.toPx()
+                                    )
+                                    // Bottom cell border
+                                    drawLine(
+                                        color = borderLineColor,
+                                        start = Offset(0f, size.height),
+                                        end = Offset(size.width, size.height),
+                                        strokeWidth = 1.dp.toPx()
+                                    )
+                                }
+                                .padding(horizontal = 6.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Column Title
+                                Text(
+                                    text = colDef.title,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
+                                    ),
+                                    color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = if (wrapHeaderLines) Int.MAX_VALUE else 1,
+                                    overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(modifier = Modifier.width(2.dp))
+
+                                // Vertically Stacked Badge & Direction Arrow + Column Gear
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    // Vertical Stack: Badge directly above Arrow
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        if (activePriorityRank != null) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(13.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = "$activePriorityRank",
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Icon(
+                                            imageVector = when (currentStrategy) {
+                                                ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                            },
+                                            contentDescription = "Sort Direction",
+                                            tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                    }
+
+                                    // Column Gear (⚙)
+                                    Box {
+                                        IconButton(
+                                            onClick = { showColumnGearMenu = true },
+                                            modifier = Modifier.size(18.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = "Column Options",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = showColumnGearMenu,
+                                            onDismissRequest = { showColumnGearMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Ascending (A → Z / Min → Max)") },
+                                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
+                                                    showColumnGearMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Descending (Z → A / Max → Min)") },
+                                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
+                                                    showColumnGearMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Custom Priority (Rank Order)") },
+                                                leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
+                                                    priorityTargetColumnId = colDef.id
+                                                    showCustomPriorityDialog = true
+                                                    showColumnGearMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Non-Sorting (Off)") },
+                                                leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
+                                                onClick = {
+                                                    columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
+                                                    showColumnGearMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Right Edge Drag-to-Resize Handle
+                            Box(
+                                modifier = Modifier
+                                    .width(8.dp)
+                                    .fillMaxHeight()
+                                    .align(Alignment.CenterEnd)
+                                    .pointerInput(colDef.id) {
+                                        detectHorizontalDragGestures { change, dragAmount ->
+                                            change.consume()
+                                            with(density) {
+                                                val curW = columnWidthMap[colDef.id] ?: colDef.width
+                                                val newW = (curW + dragAmount.toDp()).coerceIn(60.dp, 400.dp)
+                                                columnWidthMap[colDef.id] = newW
+                                            }
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                }
+
+                // =====================================================
+                // DATA ROWS WITH CELL BORDERS
+                // =====================================================
                 if (pagedItems.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -645,13 +795,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 } else {
                     pagedItems.forEachIndexed { rowIdx, item ->
                         val isSelected = selectedItemKeys.contains(itemKey(item))
-                        if (rowIdx > 0) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
-                        }
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(tableHorizontalScrollState)
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                                     else Color.Transparent
@@ -663,18 +808,35 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                     },
                                     onDoubleClick = { onRowDoubleClick?.invoke(item) },
                                     onLongClick = { onRowLongClick?.invoke(item) }
-                                )
-                                .padding(vertical = 6.dp, horizontal = 4.dp),
+                                ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             visibleColumns.forEach { colDef ->
+                                val colWidth = columnWidthMap[colDef.id] ?: colDef.width
                                 Box(
                                     modifier = Modifier
-                                        .width(colDef.width)
-                                        .padding(horizontal = 4.dp),
+                                        .width(colWidth)
+                                        .heightIn(min = 36.dp)
+                                        .drawBehind {
+                                            // Right vertical divider
+                                            drawLine(
+                                                color = borderLineColor,
+                                                start = Offset(size.width, 0f),
+                                                end = Offset(size.width, size.height),
+                                                strokeWidth = 1.dp.toPx()
+                                            )
+                                            // Bottom divider
+                                            drawLine(
+                                                color = borderLineColor,
+                                                start = Offset(0f, size.height),
+                                                end = Offset(size.width, size.height),
+                                                strokeWidth = 1.dp.toPx()
+                                            )
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 6.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    colDef.cellContent(item, isSelected)
+                                    colDef.cellContent(item, isSelected, wrapDataLines)
                                 }
                             }
                         }
@@ -683,16 +845,16 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
             }
         }
 
-        // =================================================================
-        // CONTAINER 4: INDEPENDENT FOOTER CARD (Pagination / Scroll Controls)
-        // =================================================================
+        // -------------------------------------------------------------
+        // CONTAINER 4: INDEPENDENT FOOTER CARD (Pagination & Mode Controls)
+        // -------------------------------------------------------------
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            border = BorderStroke(1.dp, borderLineColor)
         ) {
             Row(
                 modifier = Modifier
@@ -792,14 +954,14 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Pagination & Scroll Settings",
+                                contentDescription = "Footer Settings",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 modifier = Modifier.size(14.dp)
                             )
                         }
                     }
                 } else {
-                    // Continuous Scroll Mode Header / Summary
+                    // Continuous Scroll Mode
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -818,10 +980,629 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
-                                contentDescription = "Pagination & Scroll Settings",
+                                contentDescription = "Footer Settings",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(15.dp)
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =================================================================
+    // PRIMARY GRID GEAR SETTINGS DIALOG
+    // Tabs: 0: Multi-Column Sort | 1: Visibility | 2: Pills | 3: Layout & Line-Wrap
+    // =================================================================
+    if (showPrimaryGridGearDialog) {
+        Dialog(
+            onDismissRequest = { showPrimaryGridGearDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .height(600.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // Title Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Grid Table Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        IconButton(onClick = { showPrimaryGridGearDialog = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Tab Navigation
+                    TabRow(selectedTabIndex = primaryGearActiveTab) {
+                        Tab(
+                            selected = primaryGearActiveTab == 0,
+                            onClick = { primaryGearActiveTab = 0 },
+                            text = { Text("Sort Priority", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        )
+                        Tab(
+                            selected = primaryGearActiveTab == 1,
+                            onClick = { primaryGearActiveTab = 1 },
+                            text = { Text("Visibility", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        )
+                        Tab(
+                            selected = primaryGearActiveTab == 2,
+                            onClick = { primaryGearActiveTab = 2 },
+                            text = { Text("Pills", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        )
+                        Tab(
+                            selected = primaryGearActiveTab == 3,
+                            onClick = { primaryGearActiveTab = 3 },
+                            text = { Text("Layout", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // TAB 0: MULTI-COLUMN SORT PRIORITY
+                    if (primaryGearActiveTab == 0) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Drag columns up or down to set multi-level sort priority (#1, #2, ...). Tap the badge to cycle strategy.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val lazyListState = rememberLazyListState()
+                            val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                                val item = sortPriorityColumnIds.removeAt(from.index)
+                                sortPriorityColumnIds.add(to.index, item)
+                            }
+
+                            LazyColumn(
+                                state = lazyListState,
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                itemsIndexed(sortPriorityColumnIds, key = { _, colId -> colId }) { index, colId ->
+                                    val colDef = columns.find { it.id == colId }
+                                    val currentStrat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
+                                    val isVisible = columnVisibilityMap[colId] != false
+
+                                    if (colDef != null && isVisible) {
+                                        ReorderableItem(reorderableLazyColumnState, key = colId) { isDragging ->
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Surface(
+                                                            shape = CircleShape,
+                                                            color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Box(contentAlignment = Alignment.Center) {
+                                                                Text(
+                                                                    text = "${index + 1}",
+                                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                                    color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                        }
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            text = colDef.title,
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                    }
+
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Button(
+                                                            onClick = {
+                                                                columnSortStrategies[colId] = when (currentStrat) {
+                                                                    ColumnSortStrategy.NON_SORTING -> ColumnSortStrategy.ASCENDING
+                                                                    ColumnSortStrategy.ASCENDING -> ColumnSortStrategy.DESCENDING
+                                                                    ColumnSortStrategy.DESCENDING -> ColumnSortStrategy.CUSTOM_PRIORITY
+                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> ColumnSortStrategy.NON_SORTING
+                                                                }
+                                                            },
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                            modifier = Modifier.height(30.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = when (currentStrat) {
+                                                                    ColumnSortStrategy.ASCENDING -> "ASC ▲"
+                                                                    ColumnSortStrategy.DESCENDING -> "DESC ▼"
+                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> "CUSTOM ⋮"
+                                                                    ColumnSortStrategy.NON_SORTING -> "OFF ○"
+                                                                },
+                                                                fontSize = 11.sp
+                                                            )
+                                                        }
+
+                                                        Spacer(modifier = Modifier.width(6.dp))
+
+                                                        IconButton(
+                                                            onClick = {},
+                                                            modifier = Modifier.draggableHandle()
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.DragHandle,
+                                                                contentDescription = "Drag to reorder",
+                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 1: COLUMN VISIBILITY (Covers Master Columns)
+                    if (primaryGearActiveTab == 1) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Select which columns are visible in the grid table:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                itemsIndexed(columns, key = { _, col -> col.id }) { _, col ->
+                                    val isVisible = columnVisibilityMap[col.id] != false
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { columnVisibilityMap[col.id] = !isVisible }
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(col.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                            Switch(
+                                                checked = isVisible,
+                                                onCheckedChange = { columnVisibilityMap[col.id] = it }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 2: FILTER PILLS (Rows, 3-Mode Sorting, Source Column)
+                    if (primaryGearActiveTab == 2) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Pill Rows Stepper
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Pill Display Rows", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = if (maxPillRows == 1) "1 Row (Horizontal Scroll)" else "$maxPillRows Rows (Multi-line Wrap)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (maxPillRows > 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.size(32.dp),
+                                        onClick = { if (maxPillRows > 1) maxPillRows-- }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.Remove, contentDescription = "Decrement", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.width(36.dp).height(32.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("$maxPillRows", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (maxPillRows < 5) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.size(32.dp),
+                                        onClick = { if (maxPillRows < 5) maxPillRows++ }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.Add, contentDescription = "Increment", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            // 3-Mode Pill Sorting: Custom Priority (Default), Numerical, A-Z
+                            Text("Pills Sorting Order:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                listOf(
+                                    PillSortMode.CUSTOM_PRIORITY to "Custom Priority (Default)",
+                                    PillSortMode.NUMERICAL to "Numerical (Highest to Lowest Count)",
+                                    PillSortMode.ALPHABETICAL to "Alphabetical (A → Z)"
+                                ).forEach { (mode, label) ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { pillSortMode = mode }
+                                            .padding(horizontal = 6.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = pillSortMode == mode,
+                                            onClick = { pillSortMode = mode }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(label, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            // Source Column
+                            Text("Pills Source Column:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                itemsIndexed(columns) { _, col ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                activePillColumnId = col.id
+                                                selectedPillValue = null
+                                            }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = activePillColumnId == col.id,
+                                            onClick = {
+                                                activePillColumnId = col.id
+                                                selectedPillValue = null
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(col.title, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // TAB 3: LAYOUT & LINE-WRAPPING SETTINGS
+                    if (primaryGearActiveTab == 3) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            // Header Line Wrap Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Wrap Header Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = if (wrapHeaderLines) "Headers wrap into multiple lines" else "Headers stay single-line with ellipsis",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = wrapHeaderLines,
+                                    onCheckedChange = { wrapHeaderLines = it }
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            // Data Line Wrap Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Wrap Data Cell Text", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        text = if (wrapDataLines) "Cell text wraps to fit content" else "Cell text is truncated with ellipsis",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = wrapDataLines,
+                                    onCheckedChange = { wrapDataLines = it }
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            // Reset Column Widths
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Reset Column Widths", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text("Restore default widths for all columns", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        columns.forEach { columnWidthMap[it.id] = it.width }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Reset")
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Button(onClick = { showPrimaryGridGearDialog = false }) {
+                            Text("Done")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =================================================================
+    // CUSTOM PRIORITY MODAL DIALOG (With Parent Category Filter)
+    // =================================================================
+    if (showCustomPriorityDialog) {
+        val targetColDef = columns.find { it.id == priorityTargetColumnId } ?: columns.first()
+        var selectedParentCategory by remember { mutableStateOf<String?>(masterCategoryNames.firstOrNull()) }
+
+        val distinctValues = remember(items, targetColDef, selectedParentCategory, masterSubcategoriesByCategory) {
+            if (targetColDef.id == "subCategory" && selectedParentCategory != null) {
+                // If sorting subcategories, filter strictly by selected parent category
+                val masterSub = masterSubcategoriesByCategory[selectedParentCategory] ?: emptyList()
+                val itemSub = items.filter { (it as? com.moneytracker.data.local.entity.TransactionWithCategory)?.categoryName.equals(selectedParentCategory, ignoreCase = true) }
+                    .map { targetColDef.valueExtractor(it).trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                (masterSub + itemSub).distinct()
+            } else {
+                val list = items.map { targetColDef.valueExtractor(it).trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                (if (masterCategoryNames.isNotEmpty()) masterCategoryNames + list else list).distinct()
+            }
+        }
+
+        var editableList by remember(distinctValues) {
+            val saved = localPriorityOrders[targetColDef.id] ?: emptyList()
+            val ordered = saved.filter { distinctValues.contains(it) } + distinctValues.filter { !saved.contains(it) }
+            mutableStateOf(ordered.toMutableList())
+        }
+
+        Dialog(
+            onDismissRequest = { showCustomPriorityDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .height(560.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Custom Priority: ${targetColDef.title}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Drag items up or down to set custom sort rank order",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { showCustomPriorityDialog = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+
+                    // Parent Category Filter Dropdown if sorting SubCategories
+                    if (targetColDef.id == "subCategory" && masterCategoryNames.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Category:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            masterCategoryNames.forEach { cat ->
+                                FilterChip(
+                                    selected = selectedParentCategory == cat,
+                                    onClick = { selectedParentCategory = cat },
+                                    label = { Text(cat, style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val lazyListState = rememberLazyListState()
+                    val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
+                        val updated = editableList.toMutableList()
+                        val item = updated.removeAt(from.index)
+                        updated.add(to.index, item)
+                        editableList = updated
+                    }
+
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        itemsIndexed(editableList, key = { _, item -> item }) { index, itemValue ->
+                            ReorderableItem(reorderableLazyColumnState, key = itemValue) { isDragging ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(
+                                                        text = "${index + 1}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = itemValue,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = {},
+                                            modifier = Modifier.draggableHandle()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DragHandle,
+                                                contentDescription = "Drag to reorder",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showCustomPriorityDialog = false }) {
+                            Text("Cancel")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                localPriorityOrders[targetColDef.id] = editableList
+                                onCustomPriorityOrderChanged?.invoke(targetColDef.id, editableList)
+                                showCustomPriorityDialog = false
+                            }
+                        ) {
+                            Text("Save Priority Order")
                         }
                     }
                 }
@@ -851,7 +1632,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Grid Navigation Mode:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
 
-                    // Option 1: Pagination Mode
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -867,11 +1647,10 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text("Pagination Mode", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                            Text("Fixed number of rows per page with page controls", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Fixed number of rows per page with page navigation buttons", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
-                    // Option 2: Continuous Scroll Mode
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -923,503 +1702,5 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 }
             }
         )
-    }
-
-    // =================================================================
-    // MAIN GEAR SETTINGS MODAL DIALOG
-    // Contains: 1. Column Sort Priority | 2. Column Visibility | 3. Filter Pills
-    // =================================================================
-    if (showMainGearDialog) {
-        Dialog(
-            onDismissRequest = { showMainGearDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.94f)
-                    .height(580.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Grid Table Settings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        IconButton(onClick = { showMainGearDialog = false }) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Tab Row
-                    TabRow(selectedTabIndex = mainGearActiveTab) {
-                        Tab(
-                            selected = mainGearActiveTab == 0,
-                            onClick = { mainGearActiveTab = 0 },
-                            text = { Text("Sort Priority", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-                        )
-                        Tab(
-                            selected = mainGearActiveTab == 1,
-                            onClick = { mainGearActiveTab = 1 },
-                            text = { Text("Visibility", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-                        )
-                        Tab(
-                            selected = mainGearActiveTab == 2,
-                            onClick = { mainGearActiveTab = 2 },
-                            text = { Text("Pills", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // TAB 0: COLUMN SORT PRIORITY (Drag & Drop Column Hierarchy)
-                    if (mainGearActiveTab == 0) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Drag columns up or down to set multi-level sort priority (#1, #2, ...). Tap the sort badge to cycle strategy.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            val lazyListState = rememberLazyListState()
-                            val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                                val item = sortPriorityColumnIds.removeAt(from.index)
-                                sortPriorityColumnIds.add(to.index, item)
-                            }
-
-                            LazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                itemsIndexed(sortPriorityColumnIds, key = { _, colId -> colId }) { index, colId ->
-                                    val colDef = columnList.find { it.id == colId }
-                                    val currentStrat = columnSortStrategies[colId] ?: ColumnSortStrategy.NON_SORTING
-                                    val isVisible = columnVisibilityMap[colId] != false
-
-                                    if (colDef != null && isVisible) {
-                                        ReorderableItem(reorderableLazyColumnState, key = colId) { isDragging ->
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        // Priority Rank Badge
-                                                        Surface(
-                                                            shape = CircleShape,
-                                                            color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                                            modifier = Modifier.size(24.dp)
-                                                        ) {
-                                                            Box(contentAlignment = Alignment.Center) {
-                                                                Text(
-                                                                    text = "${index + 1}",
-                                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                                    color = if (currentStrat != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                                                )
-                                                            }
-                                                        }
-                                                        Spacer(modifier = Modifier.width(10.dp))
-                                                        Text(
-                                                            text = colDef.title,
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            fontWeight = FontWeight.SemiBold
-                                                        )
-                                                    }
-
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        // Strategy Selector Button
-                                                        Button(
-                                                            onClick = {
-                                                                // Cycle strategy: NON_SORTING -> ASCENDING -> DESCENDING -> CUSTOM_PRIORITY -> NON_SORTING
-                                                                columnSortStrategies[colId] = when (currentStrat) {
-                                                                    ColumnSortStrategy.NON_SORTING -> ColumnSortStrategy.ASCENDING
-                                                                    ColumnSortStrategy.ASCENDING -> ColumnSortStrategy.DESCENDING
-                                                                    ColumnSortStrategy.DESCENDING -> ColumnSortStrategy.CUSTOM_PRIORITY
-                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> ColumnSortStrategy.NON_SORTING
-                                                                }
-                                                            },
-                                                            shape = RoundedCornerShape(6.dp),
-                                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                                            modifier = Modifier.height(30.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = when (currentStrat) {
-                                                                    ColumnSortStrategy.ASCENDING -> "ASC ▲"
-                                                                    ColumnSortStrategy.DESCENDING -> "DESC ▼"
-                                                                    ColumnSortStrategy.CUSTOM_PRIORITY -> "CUSTOM ⋮"
-                                                                    ColumnSortStrategy.NON_SORTING -> "OFF ○"
-                                                                },
-                                                                fontSize = 11.sp
-                                                            )
-                                                        }
-
-                                                        Spacer(modifier = Modifier.width(6.dp))
-
-                                                        // Drag Grip
-                                                        IconButton(
-                                                            onClick = {},
-                                                            modifier = Modifier.draggableHandle()
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.DragHandle,
-                                                                contentDescription = "Drag to reorder priority",
-                                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TAB 1: COLUMN VISIBILITY SECTION
-                    if (mainGearActiveTab == 1) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Select which columns are visible in the grid table:",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                itemsIndexed(columnList, key = { _, col -> col.id }) { _, col ->
-                                    val isVisible = columnVisibilityMap[col.id] != false
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable { columnVisibilityMap[col.id] = !isVisible }
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(col.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                            Switch(
-                                                checked = isVisible,
-                                                onCheckedChange = { columnVisibilityMap[col.id] = it }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // TAB 2: FILTER PILLS CONFIGURATION
-                    if (mainGearActiveTab == 2) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Row Stepper
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Pill Rows (1–5)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        text = if (maxPillRows == 1) "1 Row (Horizontal Scroll)" else "$maxPillRows Rows (Multi-line Wrap)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (maxPillRows > 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.size(32.dp),
-                                        onClick = { if (maxPillRows > 1) maxPillRows-- }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Decrement", modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        modifier = Modifier.width(36.dp).height(32.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text("$maxPillRows", fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (maxPillRows < 5) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier.size(32.dp),
-                                        onClick = { if (maxPillRows < 5) maxPillRows++ }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Add, contentDescription = "Increment", modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            // Sort Pills A-Z
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Sort Pills A-Z", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                Switch(
-                                    checked = sortPillsAlphabetical,
-                                    onCheckedChange = { sortPillsAlphabetical = it }
-                                )
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            // Pill Column Driver
-                            Text("Source Column for Pills:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                itemsIndexed(columnList) { _, col ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { 
-                                                activePillColumnId = col.id
-                                                selectedPillValue = null
-                                            }
-                                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = activePillColumnId == col.id,
-                                            onClick = {
-                                                activePillColumnId = col.id
-                                                selectedPillValue = null
-                                            }
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(col.title, style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Button(onClick = { showMainGearDialog = false }) {
-                            Text("Done")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // =================================================================
-    // EDITABLE PRIORITY SORTING POPUP DIALOG (For Custom Priority values)
-    // =================================================================
-    if (prioritySortTargetColumn != null) {
-        val targetCol = prioritySortTargetColumn!!
-        val distinctItems = remember(items, targetCol) {
-            val list = items.map { targetCol.valueExtractor(it).trim() }
-                .filter { it.isNotBlank() }
-                .distinct()
-            val existingSaved = localPriorityOrders[targetCol.id] ?: emptyList()
-            val ordered = existingSaved.filter { list.contains(it) } + list.filter { !existingSaved.contains(it) }
-            ordered.toMutableList()
-        }
-        var editableList by remember(targetCol) { mutableStateOf(distinctItems) }
-
-        Dialog(
-            onDismissRequest = { prioritySortTargetColumn = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .height(520.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Custom Priority: ${targetCol.title}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Drag items up or down to set custom sorting priority",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(onClick = { prioritySortTargetColumn = null }) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val lazyListState = rememberLazyListState()
-                    val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                        val updated = editableList.toMutableList()
-                        val item = updated.removeAt(from.index)
-                        updated.add(to.index, item)
-                        editableList = updated
-                    }
-
-                    LazyColumn(
-                        state = lazyListState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        itemsIndexed(editableList, key = { _, item -> item }) { index, itemValue ->
-                            ReorderableItem(reorderableLazyColumnState, key = itemValue) { isDragging ->
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = "${index + 1}",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                text = itemValue,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-
-                                        IconButton(
-                                            onClick = {},
-                                            modifier = Modifier.draggableHandle()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.DragHandle,
-                                                contentDescription = "Drag to reorder",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { prioritySortTargetColumn = null }) {
-                            Text("Cancel")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                localPriorityOrders[targetCol.id] = editableList
-                                onCustomPriorityOrderChanged?.invoke(targetCol.id, editableList)
-                                prioritySortTargetColumn = null
-                            }
-                        ) {
-                            Text("Save Priority Order")
-                        }
-                    }
-                }
-            }
-        }
     }
 }

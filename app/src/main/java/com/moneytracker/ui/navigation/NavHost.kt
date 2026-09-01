@@ -26,6 +26,7 @@ import com.moneytracker.ui.screens.DashboardScreen
 import com.moneytracker.ui.screens.StatsScreen
 import com.moneytracker.ui.screens.TransactionsScreen
 import com.moneytracker.ui.screens.AddEditGroceriesScreen
+import com.moneytracker.ui.screens.CommuteRouteScreen
 import com.moneytracker.ui.screens.AddEditTaxiScreen
 import com.moneytracker.ui.screens.MonthComparisonScreen
 import com.moneytracker.ui.screens.CategoriesScreen
@@ -68,6 +69,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Stats : Screen("stats", "Stats", Icons.Default.PieChart)
     object Groceries : Screen("groceries", "Grocery", Icons.Default.ShoppingCart)
     object ShoppingList : Screen("shoppingList", "Shopping", Icons.AutoMirrored.Filled.ListAlt)
+    object Commute : Screen("commute", "Commute", Icons.Default.DirectionsTransit)
     object TaxiFare : Screen("taxi", "Taxi", Icons.Default.DirectionsCar)
     object MonthComparison : Screen("monthComparison", "Month Compare", Icons.Default.CalendarMonth)
     object Categories : Screen("categories", "Categories", Icons.Default.Category)
@@ -92,7 +94,7 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
         Screen.SummaryTable,
         Screen.Transactions,
         Screen.Groceries,
-        Screen.ShoppingList,
+        Screen.Commute,
         Screen.TaxiFare,
         Screen.MonthComparison
     )
@@ -226,6 +228,12 @@ fun MoneyTrackerNavHost(repository: TransactionRepository) {
                     )
                     AddEditShoppingListScreen(
                         viewModel = viewModel,
+                        contentPadding = innerPadding
+                    )
+                }
+                composable(Screen.Commute.route) {
+                    CommuteRouteScreen(
+                        repository = repository,
                         contentPadding = innerPadding
                     )
                 }

@@ -44,7 +44,8 @@ class TransactionRepository(
     private val unitSizeDao: UnitSizeDao? = null,
     private val shoppingListDao: ShoppingListDao? = null,
     private val shoppingListItemDao: ShoppingListItemDao? = null,
-    private val taxiExhaustionDao: com.moneytracker.data.local.TaxiExhaustionDao? = null
+    private val taxiExhaustionDao: com.moneytracker.data.local.TaxiExhaustionDao? = null,
+    private val commuteJourneyDao: com.moneytracker.data.local.CommuteJourneyDao? = null
 ) {
     val activeProfileId: Long
         get() = ProfileManager.activeProfile.value?.id ?: 1L
@@ -755,6 +756,48 @@ class TransactionRepository(
 
     suspend fun deleteTaxiExhaustionsForRoute(routeId: Long) {
         taxiExhaustionDao?.deleteForRoute(activeProfileId, routeId)
+    }
+
+    // =========================================================================
+    // MULTI-MODAL COMMUTE JOURNEYS & LEGS OPERATIONS
+    // =========================================================================
+    fun observeCommuteJourneys(): Flow<List<com.moneytracker.data.local.entity.JourneyWithLegs>> =
+        commuteJourneyDao?.observeJourneysWithLegs(activeProfileId) ?: flowOf(emptyList())
+
+    suspend fun getCommuteJourneyWithLegs(id: Long): com.moneytracker.data.local.entity.JourneyWithLegs? =
+        commuteJourneyDao?.getJourneyWithLegs(id)
+
+    suspend fun getDefaultWorkdayJourney(): com.moneytracker.data.local.entity.CommuteJourneyEntity? =
+        commuteJourneyDao?.getDefaultWorkdayJourney(activeProfileId)
+
+    suspend fun saveCommuteJourney(
+        journey: com.moneytracker.data.local.entity.CommuteJourneyEntity,
+        legs: List<com.moneytracker.data.local.entity.CommuteLegEntity>
+    ): Long {
+        val dao = commuteJourneyDao ?: return 0L
+        val journeyToSave = journey.copy(profileId = activeProfileId, updatedAt = System.currentTimeMillis())
+        val journeyId = if (journeyToSave.id == 0L) {
+            dao.insertJourney(journeyToSave)
+        } else {
+            dao.updateJourney(journeyToSave)
+            journeyToSave.id
+        }
+
+        dao.deleteLegsForJourney(journeyId)
+        val legsToSave = legs.mapIndexed { idx, leg ->
+            leg.copy(
+                id = 0L,
+                journeyId = journeyId,
+                legOrder = idx + 1,
+                monthlyBudget = leg.farePerTrip * leg.tripsPerDay * leg.workingDaysPerMonth
+            )
+        }
+        dao.insertLegs(legsToSave)
+        return journeyId
+    }
+
+    suspend fun deleteCommuteJourney(journey: com.moneytracker.data.local.entity.CommuteJourneyEntity) {
+        commuteJourneyDao?.deleteJourney(journey)
     }
 }
 

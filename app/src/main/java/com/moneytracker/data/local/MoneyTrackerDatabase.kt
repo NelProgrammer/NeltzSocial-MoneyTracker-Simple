@@ -17,10 +17,12 @@ import com.moneytracker.data.local.entity.UnitSizeEntity
 import com.moneytracker.data.local.entity.ShoppingListEntity
 import com.moneytracker.data.local.entity.ShoppingListItemEntity
 import com.moneytracker.data.local.entity.TaxiFareEntity
+import com.moneytracker.data.local.entity.TaxiExhaustionEntity
+import com.moneytracker.data.local.entity.CommuteJourneyEntity
+import com.moneytracker.data.local.entity.CommuteLegEntity
+import com.moneytracker.data.local.entity.TransportMode
 import com.moneytracker.data.local.entity.TransactionEntity
 import com.moneytracker.data.local.entity.TransactionType
-
-import com.moneytracker.data.local.entity.TaxiExhaustionEntity
 
 class TransactionTypeConverter {
     @TypeConverter
@@ -45,6 +47,20 @@ class RecurrenceFrequencyConverter {
     } ?: RecurrenceFrequency.ONCE_OFF
 }
 
+class TransportModeConverter {
+    @TypeConverter
+    fun fromMode(mode: TransportMode?): String = (mode ?: TransportMode.TAXI).name
+
+    @TypeConverter
+    fun toMode(value: String?): TransportMode = value?.let {
+        try {
+            TransportMode.valueOf(it)
+        } catch (e: Exception) {
+            TransportMode.TAXI
+        }
+    } ?: TransportMode.TAXI
+}
+
 @Database(
     entities = [
         CategoryEntity::class,
@@ -58,12 +74,18 @@ class RecurrenceFrequencyConverter {
         GroceryBudgetItemEntity::class,
         UnitSizeEntity::class,
         ShoppingListEntity::class,
-        ShoppingListItemEntity::class
+        ShoppingListItemEntity::class,
+        CommuteJourneyEntity::class,
+        CommuteLegEntity::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
-@TypeConverters(TransactionTypeConverter::class, RecurrenceFrequencyConverter::class)
+@TypeConverters(
+    TransactionTypeConverter::class,
+    RecurrenceFrequencyConverter::class,
+    TransportModeConverter::class
+)
 abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun subCategoryDao(): SubCategoryDao
@@ -72,6 +94,7 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
     abstract fun groceryDao(): GroceryDao
     abstract fun taxiFareDao(): TaxiFareDao
     abstract fun taxiExhaustionDao(): TaxiExhaustionDao
+    abstract fun commuteJourneyDao(): CommuteJourneyDao
     abstract fun profileDao(): ProfileDao
     abstract fun groceryBudgetDao(): GroceryBudgetDao
     abstract fun unitSizeDao(): UnitSizeDao
@@ -111,7 +134,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_14_15,
                     DatabaseMigrations.MIGRATION_15_16,
                     DatabaseMigrations.MIGRATION_16_17,
-                    DatabaseMigrations.MIGRATION_17_18
+                    DatabaseMigrations.MIGRATION_17_18,
+                    DatabaseMigrations.MIGRATION_18_19
                 )
                 .build()
         }

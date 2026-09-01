@@ -418,3 +418,45 @@ interface TaxiExhaustionDao {
     @Query("DELETE FROM taxi_exhaustions WHERE profileId = :profileId AND routeId = :routeId")
     suspend fun deleteForRoute(profileId: Long, routeId: Long)
 }
+
+@Dao
+interface CommuteJourneyDao {
+    @androidx.room.Transaction
+    @Query("SELECT * FROM commute_journeys WHERE profileId = :profileId ORDER BY updatedAt DESC")
+    fun observeJourneysWithLegs(profileId: Long): Flow<List<com.moneytracker.data.local.entity.JourneyWithLegs>>
+
+    @androidx.room.Transaction
+    @Query("SELECT * FROM commute_journeys WHERE id = :id")
+    suspend fun getJourneyWithLegs(id: Long): com.moneytracker.data.local.entity.JourneyWithLegs?
+
+    @Query("SELECT * FROM commute_journeys WHERE profileId = :profileId AND isDefaultWorkday = 1 LIMIT 1")
+    suspend fun getDefaultWorkdayJourney(profileId: Long): com.moneytracker.data.local.entity.CommuteJourneyEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertJourney(journey: com.moneytracker.data.local.entity.CommuteJourneyEntity): Long
+
+    @Update
+    suspend fun updateJourney(journey: com.moneytracker.data.local.entity.CommuteJourneyEntity)
+
+    @Delete
+    suspend fun deleteJourney(journey: com.moneytracker.data.local.entity.CommuteJourneyEntity)
+
+    @Query("SELECT * FROM commute_legs WHERE journeyId = :journeyId ORDER BY legOrder ASC")
+    fun observeLegsForJourney(journeyId: Long): Flow<List<com.moneytracker.data.local.entity.CommuteLegEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLeg(leg: com.moneytracker.data.local.entity.CommuteLegEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLegs(legs: List<com.moneytracker.data.local.entity.CommuteLegEntity>)
+
+    @Update
+    suspend fun updateLeg(leg: com.moneytracker.data.local.entity.CommuteLegEntity)
+
+    @Delete
+    suspend fun deleteLeg(leg: com.moneytracker.data.local.entity.CommuteLegEntity)
+
+    @Query("DELETE FROM commute_legs WHERE journeyId = :journeyId")
+    suspend fun deleteLegsForJourney(journeyId: Long)
+}
+

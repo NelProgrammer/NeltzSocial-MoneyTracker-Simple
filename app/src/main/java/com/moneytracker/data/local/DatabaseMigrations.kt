@@ -308,4 +308,42 @@ object DatabaseMigrations {
             )
         }
     }
+
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val now = System.currentTimeMillis()
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `commute_journeys` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL DEFAULT 0,
+                    `journeyName` TEXT NOT NULL,
+                    `isDefaultWorkday` INTEGER NOT NULL DEFAULT 1,
+                    `updatedAt` INTEGER NOT NULL DEFAULT $now
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `commute_legs` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `journeyId` INTEGER NOT NULL,
+                    `legOrder` INTEGER NOT NULL DEFAULT 1,
+                    `legName` TEXT NOT NULL,
+                    `mode` TEXT NOT NULL DEFAULT 'TAXI',
+                    `farePerTrip` REAL NOT NULL DEFAULT 0.0,
+                    `tripsPerDay` INTEGER NOT NULL DEFAULT 2,
+                    `workingDaysPerMonth` INTEGER NOT NULL DEFAULT 20,
+                    `monthlyBudget` REAL NOT NULL DEFAULT 0.0,
+                    `trafficDensity` TEXT NOT NULL DEFAULT 'LOW',
+                    `estimatedDelayMinutes` INTEGER NOT NULL DEFAULT 0,
+                    `traverseTimeMinutes` INTEGER NOT NULL DEFAULT 15,
+                    FOREIGN KEY(`journeyId`) REFERENCES `commute_journeys`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_commute_legs_journeyId` ON `commute_legs` (`journeyId`)")
+        }
+    }
 }
+

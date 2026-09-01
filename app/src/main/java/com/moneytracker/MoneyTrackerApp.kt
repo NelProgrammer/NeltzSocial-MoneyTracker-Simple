@@ -35,7 +35,8 @@ class MoneyTrackerApp : Application() {
             unitSizeDao = database.unitSizeDao(),
             shoppingListDao = database.shoppingListDao(),
             shoppingListItemDao = database.shoppingListItemDao(),
-            taxiExhaustionDao = database.taxiExhaustionDao()
+            taxiExhaustionDao = database.taxiExhaustionDao(),
+            commuteJourneyDao = database.commuteJourneyDao()
         )
 
         applicationScope.launch {

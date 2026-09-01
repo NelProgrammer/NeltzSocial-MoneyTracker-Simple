@@ -1,6 +1,7 @@
 package com.moneytracker.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,19 +26,19 @@ import com.moneytracker.ui.theme.EducationColor
 import com.moneytracker.ui.theme.ExpenseColor
 import com.moneytracker.ui.theme.IncomeColor
 import com.moneytracker.ui.theme.InvestmentColor
-import com.moneytracker.ui.viewmodel.SortCriterion
-import com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField
 import com.moneytracker.util.CurrencyUtils
 
 @Composable
 fun SortableTransactionTable(
     transactions: List<TransactionWithCategory>,
+    modifier: Modifier = Modifier,
+    tableName: String = "Transactions",
     reorderEnabled: Boolean = false,
-    secondarySorts: List<SortCriterion> = emptyList(),
-    onHeaderClicked: (SortField) -> Unit = {},
-    onHeaderLongPressed: (SortField) -> Unit = {},
+    secondarySorts: List<com.moneytracker.ui.viewmodel.SortCriterion> = emptyList(),
+    onHeaderClicked: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
+    onHeaderLongPressed: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    onReorder: (List<TransactionWithCategory>) -> Unit = {},
+    onReorder: ((List<TransactionWithCategory>) -> Unit)? = null,
     onEditTransaction: (Long) -> Unit = {},
     onDeleteTransaction: (TransactionWithCategory) -> Unit = {}
 ) {
@@ -45,11 +46,11 @@ fun SortableTransactionTable(
         GridColumnDefinition<TransactionWithCategory>(
             id = "category",
             title = "Category",
-            width = 100.dp,
+            width = 105.dp,
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.ASCENDING,
             valueExtractor = { it.categoryName },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
                     TransactionType.INCOME -> IncomeColor
                     TransactionType.INVESTMENT -> InvestmentColor
@@ -66,8 +67,8 @@ fun SortableTransactionTable(
                         color = categoryColor,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                        overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                     )
                 }
             }
@@ -79,12 +80,12 @@ fun SortableTransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { it.subCategory },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = item.subCategory,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, fontSize = 11.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         ),
@@ -95,13 +96,13 @@ fun SortableTransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { it.detail },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.detail.isNotBlank()) item.detail else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = if (item.detail.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         ),
@@ -112,7 +113,7 @@ fun SortableTransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.DESCENDING,
             valueExtractor = { it.amount.toString() },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
                     TransactionType.INCOME -> IncomeColor
                     TransactionType.INVESTMENT -> InvestmentColor
@@ -158,13 +159,13 @@ fun SortableTransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { it.note },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.note.isNotBlank()) item.note else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                     color = if (item.note.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         )
@@ -174,6 +175,7 @@ fun SortableTransactionTable(
         items = transactions,
         columns = columns,
         itemKey = { it.id },
+        tableName = tableName,
         modifier = Modifier.padding(contentPadding),
         initialPillColumnId = "category",
         onRowClick = { onEditTransaction(it.id) },

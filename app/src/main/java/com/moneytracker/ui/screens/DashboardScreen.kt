@@ -29,6 +29,7 @@ import com.moneytracker.ui.components.AppTopBar
 import com.moneytracker.ui.components.BalanceCard
 import com.moneytracker.ui.components.CategoryPieChartCard
 import com.moneytracker.ui.components.DualIncomePieChartCard
+import com.moneytracker.ui.components.DualEducationInvestmentPieChartCard
 import com.moneytracker.ui.components.PayMonthFilterHeader
 import androidx.compose.foundation.lazy.items
 import com.moneytracker.ui.theme.getCategoryBaseColor
@@ -153,27 +154,19 @@ fun DashboardScreen(
                 )
             }
 
-            // 7. Investments Pie Chart (Where Money is Invested)
+            // 7. Combined Education & Investment Pie Chart Card
             item {
-                CategoryPieChartCard(
-                    title = "Investment Distribution",
-                    summaries = investmentBreakdown,
-                    detailSummaries = investmentDetailBreakdown,
-                    totalAmount = summary.investment,
-                    baseColor = InvestmentColor,
-                    emptyMessage = "No investments recorded for this pay period."
-                )
-            }
-
-            // 8. Education Pie Chart
-            item {
-                CategoryPieChartCard(
-                    title = "Education & Training",
-                    summaries = educationBreakdown,
-                    detailSummaries = educationDetailBreakdown,
-                    totalAmount = summary.education,
-                    baseColor = EducationColor,
-                    emptyMessage = "No education expenses recorded for this pay period."
+                DualEducationInvestmentPieChartCard(
+                    title = "Education & Investment Breakdown",
+                    educationSummaries = educationBreakdown,
+                    educationDetailSummaries = educationDetailBreakdown,
+                    educationTotal = summary.education,
+                    investmentSummaries = investmentBreakdown,
+                    investmentDetailSummaries = investmentDetailBreakdown,
+                    investmentTotal = summary.investment,
+                    onSliceClick = { category, subCategory ->
+                        onViewAll()
+                    }
                 )
             }
 

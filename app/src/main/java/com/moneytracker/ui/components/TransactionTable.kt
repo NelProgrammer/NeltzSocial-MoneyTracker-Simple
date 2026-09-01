@@ -32,6 +32,7 @@ import com.moneytracker.util.CurrencyUtils
 fun TransactionTable(
     transactions: List<TransactionWithCategory>,
     modifier: Modifier = Modifier,
+    tableName: String = "Transactions",
     secondarySorts: List<com.moneytracker.ui.viewmodel.SortCriterion> = emptyList(),
     onHeaderClicked: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
     onHeaderLongPressed: (com.moneytracker.ui.viewmodel.TransactionsViewModel.SortField) -> Unit = {},
@@ -43,11 +44,11 @@ fun TransactionTable(
         GridColumnDefinition<TransactionWithCategory>(
             id = "category",
             title = "Category",
-            width = 100.dp,
+            width = 105.dp,
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.ASCENDING,
             valueExtractor = { it.categoryName },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
                     TransactionType.INCOME -> IncomeColor
                     TransactionType.INVESTMENT -> InvestmentColor
@@ -64,8 +65,8 @@ fun TransactionTable(
                         color = categoryColor,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                        overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                     )
                 }
             }
@@ -77,12 +78,12 @@ fun TransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { it.subCategory },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = item.subCategory,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, fontSize = 11.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         ),
@@ -93,13 +94,13 @@ fun TransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { it.detail },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.detail.isNotBlank()) item.detail else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = if (item.detail.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         ),
@@ -110,7 +111,7 @@ fun TransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.DESCENDING,
             valueExtractor = { it.amount.toString() },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 val categoryColor = when (item.type) {
                     TransactionType.INCOME -> IncomeColor
                     TransactionType.INVESTMENT -> InvestmentColor
@@ -156,13 +157,13 @@ fun TransactionTable(
             isSortable = true,
             defaultStrategy = ColumnSortStrategy.NON_SORTING,
             valueExtractor = { item -> item.note },
-            cellContent = { item, _ ->
+            cellContent = { item, _, wrapText ->
                 Text(
                     text = if (item.note.isNotBlank()) item.note else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                     color = if (item.note.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = if (wrapText) Int.MAX_VALUE else 1,
+                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
                 )
             }
         )
@@ -172,6 +173,7 @@ fun TransactionTable(
         items = transactions,
         columns = columns,
         itemKey = { it.id },
+        tableName = tableName,
         modifier = modifier.padding(contentPadding),
         initialPillColumnId = "category",
         onRowClick = { onEditTransaction(it.id) },
