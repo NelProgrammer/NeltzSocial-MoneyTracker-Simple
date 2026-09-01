@@ -223,8 +223,9 @@ private fun ExpandableSettingsSection(
  * Column Border Resize Handle:
  * Envelopes the column border line with 2 vertical dotted lines,
  * and sandwiches the enveloping vertical line with left and right arrows (⯇❘⯈) at hover/drag.
- * Tight detection range strictly on the border line.
+ * Doubled detection range (18.dp) with mouse-over/touch tracking.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun ColumnBorderResizeHandle(
     columnId: String,
@@ -240,8 +241,24 @@ private fun ColumnBorderResizeHandle(
 
     Box(
         modifier = modifier
-            .width(8.dp)
+            .width(18.dp)
             .height(height)
+            .pointerInput(columnId) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            androidx.compose.ui.input.pointer.PointerEventType.Enter,
+                            androidx.compose.ui.input.pointer.PointerEventType.Move -> {
+                                isHoveredOrDragging = true
+                            }
+                            androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
+                                isHoveredOrDragging = false
+                            }
+                        }
+                    }
+                }
+            }
             .pointerInput(columnId) {
                 detectHorizontalDragGestures(
                     onDragStart = { isHoveredOrDragging = true },
@@ -263,16 +280,16 @@ private fun ColumnBorderResizeHandle(
                 val dashEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 5f), 0f)
                 drawLine(
                     color = primaryColor,
-                    start = Offset(midX - 2.5.dp.toPx(), 0f),
-                    end = Offset(midX - 2.5.dp.toPx(), size.height),
-                    strokeWidth = 1.dp.toPx(),
+                    start = Offset(midX - 3.5.dp.toPx(), 0f),
+                    end = Offset(midX - 3.5.dp.toPx(), size.height),
+                    strokeWidth = 1.2.dp.toPx(),
                     pathEffect = dashEffect
                 )
                 drawLine(
                     color = primaryColor,
-                    start = Offset(midX + 2.5.dp.toPx(), 0f),
-                    end = Offset(midX + 2.5.dp.toPx(), size.height),
-                    strokeWidth = 1.dp.toPx(),
+                    start = Offset(midX + 3.5.dp.toPx(), 0f),
+                    end = Offset(midX + 3.5.dp.toPx(), size.height),
+                    strokeWidth = 1.2.dp.toPx(),
                     pathEffect = dashEffect
                 )
                 drawLine(
@@ -408,10 +425,10 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
 
     // 4. Line-Wrapping & Row Snap Settings (Persisted)
     var wrapHeaderLines by remember(gridId) {
-        mutableStateOf(SettingsManager.getGridBoolean(gridId, "wrap_header", false))
+        mutableStateOf(SettingsManager.getGridBoolean(gridId, "wrap_header", true))
     }
     var wrapDataLines by remember(gridId) {
-        mutableStateOf(SettingsManager.getGridBoolean(gridId, "wrap_data", false))
+        mutableStateOf(SettingsManager.getGridBoolean(gridId, "wrap_data", true))
     }
     var rowSnapBehavior by remember(gridId) {
         val savedSnap = SettingsManager.getGridString(gridId, "snap_behavior", RowSnapBehavior.ON_RELEASE.name)
@@ -886,11 +903,13 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
                                         ),
                                         color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = if (wrapHeaderLines) 2 else 1,
-                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis
+                                        softWrap = true,
+                                        maxLines = if (wrapHeaderLines) 3 else 1,
+                                        overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
 
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(3.dp))
 
                                     // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
                                     Box {

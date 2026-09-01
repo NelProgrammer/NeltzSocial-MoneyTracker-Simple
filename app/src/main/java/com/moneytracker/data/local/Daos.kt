@@ -158,6 +158,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
+               t.formula,
                t.isRecurring, t.recurrenceFrequency, t.recurTillDate, t.recurCount, t.isRecurred,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t
@@ -171,6 +172,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT t.id, t.amount, t.type, t.categoryId, t.date, t.note, t.sortOrder, t.subCategory, t.detail,
+               t.formula,
                t.isRecurring, t.recurrenceFrequency, t.recurTillDate, t.recurCount, t.isRecurred,
                c.name AS categoryName, c.iconName AS categoryIconName
         FROM transactions t

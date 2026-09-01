@@ -78,7 +78,7 @@ class TransportModeConverter {
         CommuteJourneyEntity::class,
         CommuteLegEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 @TypeConverters(
@@ -135,7 +135,8 @@ abstract class MoneyTrackerDatabase : RoomDatabase() {
                     DatabaseMigrations.MIGRATION_15_16,
                     DatabaseMigrations.MIGRATION_16_17,
                     DatabaseMigrations.MIGRATION_17_18,
-                    DatabaseMigrations.MIGRATION_18_19
+                    DatabaseMigrations.MIGRATION_18_19,
+                    DatabaseMigrations.MIGRATION_19_20
                 )
                 .build()
         }

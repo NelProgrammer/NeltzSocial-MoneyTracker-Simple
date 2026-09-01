@@ -29,6 +29,7 @@ data class TransactionEntity(
     val sortOrder: Int = 0,
     val subCategory: String = "",
     val detail: String = "",
+    val formula: String = "",
     val isRecurring: Boolean = false,
     val recurrenceFrequency: RecurrenceFrequency? = null,
     val recurTillDate: Long? = null,

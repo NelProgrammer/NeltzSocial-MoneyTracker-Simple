@@ -154,6 +154,16 @@ fun SortableTransactionTable(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (item.formula.isNotBlank()) {
+                        Text(
+                            text = "(${item.formula})",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = TextAlign.End,
+                            maxLines = if (wrapText) 2 else 1,
+                            overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
+                        )
+                    }
                     if (isPlanFuture) {
                         Surface(
                             color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),

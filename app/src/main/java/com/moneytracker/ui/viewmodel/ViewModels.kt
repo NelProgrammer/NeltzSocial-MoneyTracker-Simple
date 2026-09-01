@@ -666,7 +666,13 @@ class AddEditViewModel(
                 if (transaction != null) {
                     existingSortOrder = transaction.sortOrder
                     val absAmt = kotlin.math.abs(transaction.amount)
-                    val formattedAmt = if (absAmt == absAmt.toLong().toDouble()) absAmt.toLong().toString() else absAmt.toString()
+                    val formattedAmt = if (transaction.formula.isNotBlank()) {
+                        transaction.formula
+                    } else if (absAmt == absAmt.toLong().toDouble()) {
+                        absAmt.toLong().toString()
+                    } else {
+                        absAmt.toString()
+                    }
                     val initialFreq = transaction.recurrenceFrequency ?: (if (transaction.isRecurring) RecurrenceFrequency.MONTHLY else RecurrenceFrequency.ONCE_OFF)
                     val normalizedFreq = if (initialFreq == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else initialFreq
                     _uiState.value = _uiState.value.copy(
@@ -810,7 +816,13 @@ class AddEditViewModel(
     fun swapToExistingDuplicate() {
         val existing = _uiState.value.duplicateCandidateEntity ?: return
         val absAmt = kotlin.math.abs(existing.amount)
-        val formattedAmt = if (absAmt == absAmt.toLong().toDouble()) absAmt.toLong().toString() else absAmt.toString()
+        val formattedAmt = if (existing.formula.isNotBlank()) {
+            existing.formula
+        } else if (absAmt == absAmt.toLong().toDouble()) {
+            absAmt.toLong().toString()
+        } else {
+            absAmt.toString()
+        }
         val initialFreq = existing.recurrenceFrequency ?: (if (existing.isRecurring) RecurrenceFrequency.MONTHLY else RecurrenceFrequency.ONCE_OFF)
         val normalizedFreq = if (initialFreq == RecurrenceFrequency.CONTINUOUS) RecurrenceFrequency.MONTHLY else initialFreq
         _uiState.value = _uiState.value.copy(
@@ -836,7 +848,8 @@ class AddEditViewModel(
 
     fun save(onSuccess: () -> Unit, forceSave: Boolean = false) {
         val state = _uiState.value
-        val amount = if (com.moneytracker.util.FormulaEvaluator.isFormula(state.amount)) {
+        val isFormulaInput = com.moneytracker.util.FormulaEvaluator.isFormula(state.amount)
+        val amount = if (isFormulaInput) {
             com.moneytracker.util.FormulaEvaluator.evaluate(state.amount)
         } else {
             state.amount.toDoubleOrNull()
@@ -855,6 +868,7 @@ class AddEditViewModel(
         }
 
         val absAmount = kotlin.math.abs(amount)
+        val formulaToSave = if (isFormulaInput) state.amount.trim() else ""
         val isPlanFuture = state.recurrenceFrequency == RecurrenceFrequency.PLAN_FUTURE
 
         viewModelScope.launch {
@@ -929,6 +943,7 @@ class AddEditViewModel(
                 sortOrder = existingSortOrder,
                 subCategory = state.subCategory.trim(),
                 detail = state.detail.trim(),
+                formula = formulaToSave,
                 isRecurring = state.isRecurring && finalFreq != RecurrenceFrequency.ONCE_OFF,
                 recurrenceFrequency = finalFreq,
                 recurTillDate = if (state.isRecurring && !isPlanFuture && state.recurTillDate != null) DateUtils.toEpochMillis(state.recurTillDate) else null,

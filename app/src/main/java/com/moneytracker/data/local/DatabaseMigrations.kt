@@ -345,5 +345,11 @@ object DatabaseMigrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_commute_legs_journeyId` ON `commute_legs` (`journeyId`)")
         }
     }
+
+    val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `transactions` ADD COLUMN `formula` TEXT NOT NULL DEFAULT ''")
+        }
+    }
 }
 
