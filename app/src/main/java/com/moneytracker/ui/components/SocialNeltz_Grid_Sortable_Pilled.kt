@@ -937,72 +937,6 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 val colWidth = columnWidthMap[colDef.id] ?: colDef.width
                                 val isColHighlighted = (activeResizingColumnId == colDef.id || hoveredBorderColumnId == colDef.id)
 
-                                val annotatedTitle = remember(colDef.title, rankDisplay, currentStrategy) {
-                                    buildAnnotatedString {
-                                        append(colDef.title)
-                                        append(" ")
-                                        if (rankDisplay.isNotEmpty()) {
-                                            appendInlineContent("badge", "[#]")
-                                            append(" ")
-                                        }
-                                        appendInlineContent("arrow", "[▲]")
-                                    }
-                                }
-
-                                val inlineContentMap = remember(rankDisplay, currentStrategy) {
-                                    mapOf(
-                                        "badge" to androidx.compose.foundation.text.InlineTextContent(
-                                            androidx.compose.ui.text.Placeholder(
-                                                width = 16.sp,
-                                                height = 16.sp,
-                                                placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.Center
-                                            )
-                                        ) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier
-                                                    .size(15.dp)
-                                                    .clickable { showColumnSortDropdown = true }
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Text(
-                                                        text = rankDisplay,
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
-                                                        color = MaterialTheme.colorScheme.onPrimary
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        "arrow" to androidx.compose.foundation.text.InlineTextContent(
-                                            androidx.compose.ui.text.Placeholder(
-                                                width = 14.sp,
-                                                height = 14.sp,
-                                                placeholderVerticalAlign = androidx.compose.ui.text.PlaceholderVerticalAlign.Center
-                                            )
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(14.dp)
-                                                    .clickable { showColumnSortDropdown = true },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = when (currentStrategy) {
-                                                        ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                                        ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                                        ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                                    },
-                                                    contentDescription = "Sort Direction",
-                                                    tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
-                                    )
-                                }
-
                                 // Header Cell Body (Non-clickable container so dragging is preserved)
                                 Box(
                                     modifier = Modifier
@@ -1019,24 +953,68 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    Text(
-                                        text = annotatedTitle,
-                                        inlineContent = inlineContentMap,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
-                                        ),
-                                        color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        softWrap = true,
-                                        maxLines = if (wrapHeaderLines) 3 else 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-
-                                    DropdownMenu(
-                                        expanded = showColumnSortDropdown,
-                                        onDismissRequest = { showColumnSortDropdown = false }
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Start,
+                                        verticalArrangement = Arrangement.Center
                                     ) {
+                                        Text(
+                                            text = colDef.title,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.sp,
+                                                fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
+                                            ),
+                                            color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            softWrap = true,
+                                            maxLines = if (wrapHeaderLines) 3 else 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Spacer(modifier = Modifier.width(3.dp))
+
+                                        // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
+                                        Box {
+                                            Row(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .clickable { showColumnSortDropdown = true }
+                                                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                                            ) {
+                                                if (rankDisplay.isNotEmpty()) {
+                                                    Surface(
+                                                        shape = CircleShape,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(15.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text(
+                                                                text = rankDisplay,
+                                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
+                                                                color = MaterialTheme.colorScheme.onPrimary
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Icon(
+                                                    imageVector = when (currentStrategy) {
+                                                        ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                        ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                        ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                                    },
+                                                    contentDescription = "Sort Direction",
+                                                    tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+
+                                            DropdownMenu(
+                                                expanded = showColumnSortDropdown,
+                                                onDismissRequest = { showColumnSortDropdown = false }
+                                            ) {
                                         DropdownMenuItem(
                                             text = { Text("Ascending (A → Z / Min → Max)") },
                                             leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
@@ -1077,6 +1055,8 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         )
                                     }
                                 }
+                            }
+                        }
 
                                 // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
                                 ColumnBorderResizeHandle(
