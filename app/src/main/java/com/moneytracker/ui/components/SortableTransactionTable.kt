@@ -78,7 +78,8 @@ fun SortableTransactionTable(
                 }
                 Surface(
                     color = categoryColor.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = item.categoryName,
@@ -87,7 +88,8 @@ fun SortableTransactionTable(
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                         textAlign = TextAlign.Start,
                         maxLines = if (wrapText) 2 else 1,
-                        overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
+                        softWrap = true,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -104,7 +106,9 @@ fun SortableTransactionTable(
                     text = item.subCategory,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, fontSize = 11.sp),
                     maxLines = if (wrapText) 2 else 1,
-                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
+                    softWrap = true,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         ),
@@ -121,7 +125,9 @@ fun SortableTransactionTable(
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = if (item.detail.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     maxLines = if (wrapText) 2 else 1,
-                    overflow = if (wrapText) TextOverflow.Clip else TextOverflow.Ellipsis
+                    softWrap = true,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         ),

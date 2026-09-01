@@ -242,6 +242,9 @@ private fun ColumnBorderResizeHandle(
 ) {
     val density = LocalDensity.current
     val primaryColor = MaterialTheme.colorScheme.primary
+    val currentWidthState by androidx.compose.runtime.rememberUpdatedState(currentWidth)
+    val onWidthChangeState by androidx.compose.runtime.rememberUpdatedState(onWidthChange)
+    var dragWidthDp by remember { mutableStateOf(currentWidth) }
 
     Box(
         modifier = modifier
@@ -266,6 +269,7 @@ private fun ColumnBorderResizeHandle(
             .pointerInput(columnId) {
                 detectHorizontalDragGestures(
                     onDragStart = { 
+                        dragWidthDp = currentWidthState
                         onDragStateChange(true)
                     },
                     onDragEnd = { 
@@ -279,8 +283,8 @@ private fun ColumnBorderResizeHandle(
                 ) { change, dragAmount ->
                     change.consume()
                     with(density) {
-                        val newW = (currentWidth + dragAmount.toDp()).coerceIn(25.dp, 800.dp)
-                        onWidthChange(newW)
+                        dragWidthDp = (dragWidthDp + dragAmount.toDp()).coerceIn(20.dp, 800.dp)
+                        onWidthChangeState(dragWidthDp)
                     }
                 }
             },
@@ -944,55 +948,56 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                             color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             softWrap = true,
                                             maxLines = if (wrapHeaderLines) 3 else 1,
-                                            overflow = if (wrapHeaderLines) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                            overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
                                         )
 
-                                        Spacer(modifier = Modifier.width(3.dp))
+                                        if (colWidth >= 36.dp) {
+                                            Spacer(modifier = Modifier.width(2.dp))
 
-                                        // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
-                                        Box {
-                                            Row(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .clickable { showColumnSortDropdown = true }
-                                                    .padding(horizontal = 2.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
-                                            ) {
-                                                if (rankDisplay.isNotEmpty()) {
-                                                    Surface(
-                                                        shape = CircleShape,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(15.dp)
-                                                    ) {
-                                                        Box(contentAlignment = Alignment.Center) {
-                                                            Text(
-                                                                text = rankDisplay,
-                                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
-                                                                color = MaterialTheme.colorScheme.onPrimary
-                                                            )
+                                            // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
+                                            Box {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .clickable { showColumnSortDropdown = true }
+                                                        .padding(horizontal = 1.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                                ) {
+                                                    if (rankDisplay.isNotEmpty() && colWidth >= 52.dp) {
+                                                        Surface(
+                                                            shape = CircleShape,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(14.dp)
+                                                        ) {
+                                                            Box(contentAlignment = Alignment.Center) {
+                                                                Text(
+                                                                    text = rankDisplay,
+                                                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                                )
+                                                            }
                                                         }
                                                     }
+
+                                                    Icon(
+                                                        imageVector = when (currentStrategy) {
+                                                            ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                            ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                            ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                            ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                                        },
+                                                        contentDescription = "Sort Direction",
+                                                        tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
                                                 }
 
-                                                Icon(
-                                                    imageVector = when (currentStrategy) {
-                                                        ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                                        ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                                        ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                                    },
-                                                    contentDescription = "Sort Direction",
-                                                    tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-
-                                            DropdownMenu(
-                                                expanded = showColumnSortDropdown,
-                                                onDismissRequest = { showColumnSortDropdown = false }
-                                            ) {
+                                                DropdownMenu(
+                                                    expanded = showColumnSortDropdown,
+                                                    onDismissRequest = { showColumnSortDropdown = false }
+                                                ) {
                                                 DropdownMenuItem(
                                                     text = { Text("Ascending (A → Z / Min → Max)") },
                                                     leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
@@ -1035,6 +1040,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         }
                                     }
                                 }
+                            }
 
                                 // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
                                 ColumnBorderResizeHandle(
