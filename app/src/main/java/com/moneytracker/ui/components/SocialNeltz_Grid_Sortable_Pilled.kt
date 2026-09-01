@@ -377,9 +377,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     masterSubcategoriesByCategory: Map<String, List<String>> = emptyMap()
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        SettingsManager.init(context)
-    }
+    SettingsManager.init(context)
 
     val coroutineScope = rememberCoroutineScope()
     val gridId = remember(tableName) { tableName.replace("\\s+".toRegex(), "_").lowercase() }
@@ -458,9 +456,14 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     }
 
     // 5. Dynamic Filter Pills Configuration (Persisted)
-    var activePillColumnId by remember(columns, initialPillColumnId, gridId) {
-        val savedPillCol = SettingsManager.getGridString(gridId, "pill_col", "")
-        mutableStateOf(if (savedPillCol.isNotBlank()) savedPillCol else initialPillColumnId ?: columns.firstOrNull { it.id != "select" && it.id != "actions" }?.id ?: columns.first().id)
+    var activePillColumnId by remember(columns, gridId) {
+        val savedPillCol = SettingsManager.getGridString(gridId, "active_pill_col", "")
+        val initialId = if (savedPillCol.isNotBlank() && columns.any { it.id == savedPillCol }) {
+            savedPillCol
+        } else {
+            columns.firstOrNull { it.id.contains("category", ignoreCase = true) }?.id ?: columns.firstOrNull()?.id ?: ""
+        }
+        mutableStateOf(initialId)
     }
     var selectedPillValue by remember { mutableStateOf<String?>(null) }
     var maxPillRows by remember(gridId) {
@@ -482,19 +485,30 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
     var currentPage by remember { mutableIntStateOf(1) }
     var showFooterSettingsDialog by remember { mutableStateOf(false) }
 
-    // 7. Unified Table-Level Border Resize State
+    // 7. Sticky Column Pinning (Persisted)
+    var isLeftColumnPinned by remember(gridId) {
+        mutableStateOf(SettingsManager.getGridBoolean(gridId, "pin_left", false))
+    }
+
+    // 8. Unified Table-Level Border Resize State
     var activeResizingColumnId by remember { mutableStateOf<String?>(null) }
     var hoveredBorderColumnId by remember { mutableStateOf<String?>(null) }
 
-    // 8. Modals State
+    // 9. Modals State
     var showPrimaryGridGearDialog by remember { mutableStateOf(false) }
     var primaryGearActiveTab by remember { mutableIntStateOf(0) }
     var showCustomPriorityDialog by remember { mutableStateOf(false) }
     var priorityTargetColumnId by remember { mutableStateOf("category") }
 
-    val localPriorityOrders = remember {
+    val localPriorityOrders = remember(columns, gridId) {
         mutableStateMapOf<String, List<String>>().apply {
             putAll(customPriorityOrders)
+            columns.forEach { col ->
+                val savedPillOrderStr = SettingsManager.getGridString(gridId, "pills_order_${col.id}", "")
+                if (savedPillOrderStr.isNotBlank()) {
+                    put(col.id, savedPillOrderStr.split("|||").filter { it.isNotBlank() })
+                }
+            }
         }
     }
 
@@ -1497,14 +1511,22 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 icon = Icons.Default.FormatListNumbered,
                                 initiallyExpanded = true
                             ) {
+                                val visiblePriorityColumns = sortPriorityColumnIds.filter { columnVisibilityMap[it] != false }
+
                                 val lazyListState = rememberLazyListState()
                                 val reorderableLazyColumnState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                                    val item = sortPriorityColumnIds.removeAt(from.index)
-                                    sortPriorityColumnIds.add(to.index, item)
-                                    SettingsManager.saveGridString(gridId, "sort_order", sortPriorityColumnIds.joinToString(","))
+                                    val fromId = visiblePriorityColumns.getOrNull(from.index)
+                                    val toId = visiblePriorityColumns.getOrNull(to.index)
+                                    if (fromId != null && toId != null) {
+                                        val fromRealIdx = sortPriorityColumnIds.indexOf(fromId)
+                                        val toRealIdx = sortPriorityColumnIds.indexOf(toId)
+                                        if (fromRealIdx != -1 && toRealIdx != -1) {
+                                            val item = sortPriorityColumnIds.removeAt(fromRealIdx)
+                                            sortPriorityColumnIds.add(toRealIdx, item)
+                                            SettingsManager.saveGridString(gridId, "sort_order", sortPriorityColumnIds.joinToString(","))
+                                        }
+                                    }
                                 }
-
-                                val visiblePriorityColumns = sortPriorityColumnIds.filter { columnVisibilityMap[it] != false }
 
                                 LazyColumn(
                                     state = lazyListState,
@@ -1839,6 +1861,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                         updated.add(to.index, item)
                                         reorderablePills = updated
                                         localPriorityOrders[activePillColumn.id] = updated
+                                        SettingsManager.saveGridString(gridId, "pills_order_${activePillColumn.id}", updated.joinToString("|||"))
                                         onCustomPriorityOrderChanged?.invoke(activePillColumn.id, updated)
                                     }
 
@@ -2237,6 +2260,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         Button(
                             onClick = {
                                 localPriorityOrders[targetColDef.id] = editableList
+                                SettingsManager.saveGridString(gridId, "pills_order_${targetColDef.id}", editableList.joinToString("|||"))
                                 onCustomPriorityOrderChanged?.invoke(targetColDef.id, editableList)
                                 showCustomPriorityDialog = false
                             }
