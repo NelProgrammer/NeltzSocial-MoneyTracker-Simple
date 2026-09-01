@@ -424,7 +424,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                 addAll(savedCols)
                 columns.filter { !savedCols.contains(it.id) }.forEach { add(it.id) }
             } else {
-                val preferredOrder = listOf("category", "subCategory", "detail", "date", "amount", "note")
+                val preferredOrder = listOf("category", "subCategory", "amount", "detail", "date", "note")
                 val orderedIds = preferredOrder.filter { id -> columns.any { it.id == id } }
                 addAll(orderedIds)
                 columns.filter { !orderedIds.contains(it.id) }.forEach { add(it.id) }
@@ -614,7 +614,7 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                                 "Income", "Salary", "Bonus", "Freelance", "Dividends", "Interest", "Investments", "Rental Income", "Gifts", "Refunds", "Other Income",
                                 "Food & Dining", "Groceries", "Restaurants", "Transportation", "Fuel", "Public Transit", "Housing", "Rent", "Mortgage", "Utilities", "Electricity", "Water", "Internet", "Entertainment", "Shopping", "Healthcare", "Personal Care", "Education", "Miscellaneous", "Debt Payments"
                             )
-                            val order = localPriorityOrders[colId] ?: (if (colId.contains("category", ignoreCase = true)) (masterCategoryNames.ifEmpty { defaultIncomeFirstCategories }) else emptyList())
+                            val order = localPriorityOrders[colId] ?: (if (colId == "category") (masterCategoryNames.ifEmpty { defaultIncomeFirstCategories }) else emptyList())
                             val idxA = order.indexOfFirst { it.equals(valA, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             val idxB = order.indexOfFirst { it.equals(valB, ignoreCase = true) }.let { if (it == -1) Int.MAX_VALUE else it }
                             if (idxA != idxB) {
