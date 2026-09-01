@@ -211,6 +211,10 @@ fun TransactionTable(
         tableName = tableName,
         modifier = modifier.padding(contentPadding),
         initialPillColumnId = "category",
+        masterCategoryNames = listOf(
+            "Income", "Salary", "Bonus", "Freelance", "Dividends", "Interest", "Investments", "Rental Income", "Gifts", "Refunds", "Other Income",
+            "Food & Dining", "Groceries", "Restaurants", "Transportation", "Fuel", "Public Transit", "Housing", "Rent", "Mortgage", "Utilities", "Electricity", "Water", "Internet", "Entertainment", "Shopping", "Healthcare", "Personal Care", "Education", "Miscellaneous", "Debt Payments"
+        ),
         onAddItem = onAddItem,
         onRowClick = { onEditTransaction(it.id) },
         onRowDoubleClick = { onEditTransaction(it.id) }
