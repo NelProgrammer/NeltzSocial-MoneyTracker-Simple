@@ -936,166 +936,169 @@ fun <T> SocialNeltz_Grid_Sortable_Pilled(
                         // =====================================================
                         // 1. STICKY COLUMN HEADER ROW (High-Contrast Borders & Inline Sort Triggers)
                         // =====================================================
-                        Row(
-                            modifier = Modifier
-                                .width(totalTableWidth)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            visibleColumns.forEachIndexed { colIdx, colDef ->
-                                var showColumnSortDropdown by remember { mutableStateOf(false) }
-                                val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
-                                val isVisible = columnVisibilityMap[colDef.id] != false
-                                val priorityRankIndex = if (isVisible && currentStrategy != ColumnSortStrategy.NON_SORTING) {
-                                    activeSortedColumnIds.indexOf(colDef.id)
-                                } else -1
-                                val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
-                                val colWidth = columnWidthMap[colDef.id] ?: colDef.width
-                                val isColHighlighted = (activeResizingColumnId == colDef.id || hoveredBorderColumnId == colDef.id)
+                        androidx.compose.foundation.text.selection.DisableSelection {
+                            Row(
+                                modifier = Modifier
+                                    .width(totalTableWidth)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                visibleColumns.forEachIndexed { colIdx, colDef ->
+                                    var showColumnSortDropdown by remember { mutableStateOf(false) }
+                                    val currentStrategy = columnSortStrategies[colDef.id] ?: ColumnSortStrategy.NON_SORTING
+                                    val isVisible = columnVisibilityMap[colDef.id] != false
+                                    val priorityRankIndex = if (isVisible && currentStrategy != ColumnSortStrategy.NON_SORTING) {
+                                        activeSortedColumnIds.indexOf(colDef.id)
+                                    } else -1
+                                    val rankDisplay = if (priorityRankIndex >= 0) "${priorityRankIndex + 1}" else ""
+                                    val colWidth = columnWidthMap[colDef.id] ?: colDef.width
+                                    val isColHighlighted = (activeResizingColumnId == colDef.id || hoveredBorderColumnId == colDef.id)
 
-                                // Header Cell Body (Non-clickable container so dragging is preserved)
-                                Box(
-                                    modifier = Modifier
-                                        .width(colWidth)
-                                        .heightIn(min = 44.dp)
-                                        .drawBehind {
-                                            drawLine(
-                                                color = borderLineColor,
-                                                start = Offset(0f, size.height),
-                                                end = Offset(size.width, size.height),
-                                                strokeWidth = 1.5.dp.toPx()
-                                            )
-                                        }
-                                        .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    FlowRow(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Start,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = colDef.title,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 11.sp,
-                                                fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
-                                            ),
-                                            color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                            softWrap = true,
-                                            maxLines = if (wrapHeaderLines) 3 else 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-
-                                        Spacer(modifier = Modifier.width(3.dp))
-
-                                        // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
-                                        Box {
-                                            Row(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .clickable { showColumnSortDropdown = true }
-                                                    .padding(horizontal = 2.dp, vertical = 2.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
-                                            ) {
-                                                if (rankDisplay.isNotEmpty()) {
-                                                    Surface(
-                                                        shape = CircleShape,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(15.dp)
-                                                    ) {
-                                                        Box(contentAlignment = Alignment.Center) {
-                                                            Text(
-                                                                text = rankDisplay,
-                                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
-                                                                color = MaterialTheme.colorScheme.onPrimary
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                Icon(
-                                                    imageVector = when (currentStrategy) {
-                                                        ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
-                                                        ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
-                                                        ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
-                                                        ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
-                                                    },
-                                                    contentDescription = "Sort Direction",
-                                                    tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.size(12.dp)
+                                    // Header Cell Body (Non-clickable container so dragging is preserved)
+                                    Box(
+                                        modifier = Modifier
+                                            .width(colWidth)
+                                            .heightIn(min = 44.dp)
+                                            .drawBehind {
+                                                drawLine(
+                                                    color = borderLineColor,
+                                                    start = Offset(0f, size.height),
+                                                    end = Offset(size.width, size.height),
+                                                    strokeWidth = 1.5.dp.toPx()
                                                 )
                                             }
+                                            .padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        FlowRow(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .clickable { showColumnSortDropdown = true },
+                                            horizontalArrangement = Arrangement.Start,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = colDef.title,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (currentStrategy != ColumnSortStrategy.NON_SORTING) FontWeight.Bold else FontWeight.SemiBold
+                                                ),
+                                                color = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                softWrap = true,
+                                                maxLines = if (wrapHeaderLines) 3 else 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
 
-                                            DropdownMenu(
-                                                expanded = showColumnSortDropdown,
-                                                onDismissRequest = { showColumnSortDropdown = false }
-                                            ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Ascending (A → Z / Min → Max)") },
-                                            leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                            onClick = {
-                                                columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
-                                                SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
-                                                showColumnSortDropdown = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Descending (Z → A / Max → Min)") },
-                                            leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                            onClick = {
-                                                columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
-                                                SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
-                                                showColumnSortDropdown = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Custom Priority (Rank Order)") },
-                                            leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
-                                            onClick = {
-                                                columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
-                                                SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
-                                                priorityTargetColumnId = colDef.id
-                                                showCustomPriorityDialog = true
-                                                showColumnSortDropdown = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Non-Sorting (Off)") },
-                                            leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
-                                            onClick = {
-                                                columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
-                                                SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
-                                                showColumnSortDropdown = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                                            Spacer(modifier = Modifier.width(3.dp))
 
-                                // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
-                                ColumnBorderResizeHandle(
-                                    columnId = colDef.id,
-                                    currentWidth = colWidth,
-                                    onWidthChange = { newW ->
-                                        columnWidthMap[colDef.id] = newW
-                                        SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
-                                    },
-                                    height = 44.dp,
-                                    borderLineColor = borderLineColor,
-                                    isHighlighted = isColHighlighted,
-                                    showArrowBadge = true,
-                                    onHoverChange = { isHov ->
-                                        if (activeResizingColumnId == null) {
-                                            hoveredBorderColumnId = if (isHov) colDef.id else null
+                                            // Horizontally Inline Sort Badge + Sort Direction Arrow (Clickable trigger for sort popup)
+                                            Box {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                                                ) {
+                                                    if (rankDisplay.isNotEmpty()) {
+                                                        Surface(
+                                                            shape = CircleShape,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(15.dp)
+                                                        ) {
+                                                            Box(contentAlignment = Alignment.Center) {
+                                                                Text(
+                                                                    text = rankDisplay,
+                                                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp, fontWeight = FontWeight.Bold),
+                                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Icon(
+                                                        imageVector = when (currentStrategy) {
+                                                            ColumnSortStrategy.ASCENDING -> Icons.Default.ArrowUpward
+                                                            ColumnSortStrategy.DESCENDING -> Icons.Default.ArrowDownward
+                                                            ColumnSortStrategy.CUSTOM_PRIORITY -> Icons.Default.MoreVert
+                                                            ColumnSortStrategy.NON_SORTING -> Icons.Default.RadioButtonUnchecked
+                                                        },
+                                                        contentDescription = "Sort Direction",
+                                                        tint = if (currentStrategy != ColumnSortStrategy.NON_SORTING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                }
+
+                                                DropdownMenu(
+                                                    expanded = showColumnSortDropdown,
+                                                    onDismissRequest = { showColumnSortDropdown = false }
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("Ascending (A → Z / Min → Max)") },
+                                                        leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                                        onClick = {
+                                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.ASCENDING
+                                                            SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.ASCENDING.name)
+                                                            showColumnSortDropdown = false
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Descending (Z → A / Max → Min)") },
+                                                        leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                                        onClick = {
+                                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.DESCENDING
+                                                            SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.DESCENDING.name)
+                                                            showColumnSortDropdown = false
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Custom Priority (Rank Order)") },
+                                                        leadingIcon = { Icon(Icons.Default.MoreVert, contentDescription = null) },
+                                                        onClick = {
+                                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.CUSTOM_PRIORITY
+                                                            SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.CUSTOM_PRIORITY.name)
+                                                            priorityTargetColumnId = colDef.id
+                                                            showCustomPriorityDialog = true
+                                                            showColumnSortDropdown = false
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Non-Sorting (Off)") },
+                                                        leadingIcon = { Icon(Icons.Default.RadioButtonUnchecked, contentDescription = null) },
+                                                        onClick = {
+                                                            columnSortStrategies[colDef.id] = ColumnSortStrategy.NON_SORTING
+                                                            SettingsManager.saveGridString(gridId, "strat_${colDef.id}", ColumnSortStrategy.NON_SORTING.name)
+                                                            showColumnSortDropdown = false
+                                                        }
+                                                    )
+                                                }
+                                            }
                                         }
-                                    },
-                                    onDragStateChange = { isDragging ->
-                                        activeResizingColumnId = if (isDragging) colDef.id else null
-                                        hoveredBorderColumnId = if (isDragging) colDef.id else null
                                     }
-                                )
+
+                                    // Column Border with Enveloped Dotted Line & ⯇❘⯈ Sandwich Arrows on Hover/Drag
+                                    ColumnBorderResizeHandle(
+                                        columnId = colDef.id,
+                                        currentWidth = colWidth,
+                                        onWidthChange = { newW ->
+                                            columnWidthMap[colDef.id] = newW
+                                            SettingsManager.saveGridInt(gridId, "width_${colDef.id}", newW.value.roundToInt())
+                                        },
+                                        height = 44.dp,
+                                        borderLineColor = borderLineColor,
+                                        isHighlighted = isColHighlighted,
+                                        showArrowBadge = true,
+                                        onHoverChange = { isHov ->
+                                            if (activeResizingColumnId == null) {
+                                                hoveredBorderColumnId = if (isHov) colDef.id else null
+                                            }
+                                        },
+                                        onDragStateChange = { isDragging ->
+                                            activeResizingColumnId = if (isDragging) colDef.id else null
+                                            hoveredBorderColumnId = if (isDragging) colDef.id else null
+                                        }
+                                    )
+                                }
                             }
                         }
 
